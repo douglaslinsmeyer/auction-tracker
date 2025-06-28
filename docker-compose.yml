@@ -1,42 +1,46 @@
 services:
   nellis-backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
     container_name: nellis-auction-backend
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=production
       - PORT=3000
       - AUTH_TOKEN=${AUTH_TOKEN:-dev-token}
       - LOG_LEVEL=info
+      - REDIS_URL=redis://redis:6379
     volumes:
       - ./logs:/app/logs
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); })"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/status"]
       interval: 30s
-      timeout: 3s
+      timeout: 10s
       retries: 3
-      start_period: 5s
+      start_period: 10s
     networks:
       - nellis-network
+    depends_on:
+      - redis
 
-  # Optional: Add Redis for session/cache management in the future
-  # redis:
-  #   image: redis:7-alpine
-  #   container_name: nellis-redis
-  #   ports:
-  #     - "6379:6379"
-  #   volumes:
-  #     - redis-data:/data
-  #   networks:
-  #     - nellis-network
+  redis:
+    image: redis:7-alpine
+    container_name: nellis-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --appendfsync everysec
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nellis-network
 
 networks:
   nellis-network:
     driver: bridge
 
-# volumes:
-#   redis-data:
+volumes:
+  redis-data:

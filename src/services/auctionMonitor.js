@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const nellisApi = require('./nellisApi');
 const EventEmitter = require('events');
 const WebSocket = require('ws');
+const storage = require('./storage');
 
 class AuctionMonitor extends EventEmitter {
   constructor() {
@@ -9,14 +10,45 @@ class AuctionMonitor extends EventEmitter {
     this.monitoredAuctions = new Map();
     this.pollingIntervals = new Map();
     this.wss = null;
+    this.storageInitialized = false;
   }
 
-  initialize(wss) {
+  async initialize(wss) {
     this.wss = wss;
-    console.log('Auction monitor initialized');
+    
+    // Initialize storage
+    await storage.initialize();
+    this.storageInitialized = true;
+    
+    // Recover persisted auctions
+    await this.recoverPersistedState();
+    
+    console.log('Auction monitor initialized with persistence');
+  }
+  
+  async recoverPersistedState() {
+    try {
+      console.log('Recovering persisted auction state...');
+      const auctions = await storage.getAllAuctions();
+      
+      if (auctions.length > 0) {
+        console.log(`Found ${auctions.length} persisted auctions`);
+        
+        for (const auction of auctions) {
+          // Don't start polling for ended auctions
+          if (auction.status !== 'ended') {
+            this.monitoredAuctions.set(auction.id, auction);
+            this.startPolling(auction.id);
+            console.log(`Recovered auction ${auction.id}: ${auction.title}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error recovering persisted state:', error);
+    }
   }
 
-  addAuction(auctionId, config = {}, metadata = {}) {
+  async addAuction(auctionId, config = {}, metadata = {}) {
     if (this.monitoredAuctions.has(auctionId)) {
       console.warn(`Auction ${auctionId} is already being monitored`);
       return false;
@@ -41,19 +73,26 @@ class AuctionMonitor extends EventEmitter {
     };
 
     this.monitoredAuctions.set(auctionId, auction);
+    
+    // Persist to storage
+    await storage.saveAuction(auctionId, auction);
+    
     this.startPolling(auctionId);
     
     console.log(`Started monitoring auction ${auctionId}`);
     return true;
   }
 
-  removeAuction(auctionId) {
+  async removeAuction(auctionId) {
     if (!this.monitoredAuctions.has(auctionId)) {
       return false;
     }
 
     this.stopPolling(auctionId);
     this.monitoredAuctions.delete(auctionId);
+    
+    // Remove from storage
+    await storage.removeAuction(auctionId);
     
     console.log(`Stopped monitoring auction ${auctionId}`);
     return true;
@@ -86,12 +125,16 @@ class AuctionMonitor extends EventEmitter {
         this.adjustPollingRate(auctionId, 2000); // Poll every 2 seconds
       }
 
+      // Persist updated auction state
+      await storage.saveAuction(auctionId, auction);
+      
       // Broadcast full auction state to WebSocket clients
       this.broadcastAuctionState(auctionId);
 
     } catch (error) {
       console.error(`Error updating auction ${auctionId}:`, error);
       auction.status = 'error';
+      await storage.saveAuction(auctionId, auction);
     }
   }
 
@@ -137,6 +180,14 @@ class AuctionMonitor extends EventEmitter {
           auction.lastBidAmount = nextBid;
           auction.lastBidTime = Date.now();
           
+          // Save bid history
+          await storage.saveBidHistory(auctionId, {
+            amount: nextBid,
+            strategy: auction.config.strategy,
+            success: true,
+            result: result.data
+          });
+          
           // Check if bid was accepted but we're still not winning
           if (result.data && result.data.message && 
               result.data.message.includes('another user has a higher maximum bid')) {
@@ -162,9 +213,25 @@ class AuctionMonitor extends EventEmitter {
           this.emit('bidPlaced', { auctionId, amount: nextBid, result: result.data });
         } else {
           console.error(`Auto-bid failed for auction ${auctionId}:`, result.error);
+          
+          // Save failed bid to history
+          await storage.saveBidHistory(auctionId, {
+            amount: nextBid,
+            strategy: auction.config.strategy,
+            success: false,
+            error: result.error
+          });
         }
       } catch (error) {
         console.error(`Error placing auto-bid for auction ${auctionId}:`, error);
+        
+        // Save error to bid history
+        await storage.saveBidHistory(auctionId, {
+          amount: nextBid,
+          strategy: auction.config.strategy,
+          success: false,
+          error: error.message
+        });
       }
     } else {
       console.warn(`Auto-bid skipped for auction ${auctionId}: Next bid $${nextBid} exceeds max bid $${auction.config.maxBid}`);
@@ -302,7 +369,7 @@ class AuctionMonitor extends EventEmitter {
     return this.monitoredAuctions.size;
   }
 
-  updateAuctionConfig(auctionId, config) {
+  async updateAuctionConfig(auctionId, config) {
     const auction = this.monitoredAuctions.get(auctionId);
     if (!auction) {
       return false;
@@ -310,6 +377,10 @@ class AuctionMonitor extends EventEmitter {
     
     auction.config = { ...auction.config, ...config };
     console.log(`Updated config for auction ${auctionId}:`, config);
+    
+    // Persist the updated auction
+    await storage.saveAuction(auctionId, auction);
+    
     return true;
   }
 

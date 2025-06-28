@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const auctionMonitor = require('../services/auctionMonitor');
 const nellisApi = require('../services/nellisApi');
+const storage = require('../services/storage');
 
 // Get all monitored auctions
 router.get('/auctions', (req, res) => {
@@ -164,14 +165,121 @@ router.post('/auth', async (req, res) => {
   }
 });
 
+// Validate authentication and test bid placement
+router.post('/auth/validate', async (req, res) => {
+  try {
+    const { auctionId, testBidAmount } = req.body;
+    
+    // Check if we have cookies
+    if (!nellisApi.cookies) {
+      return res.json({ 
+        success: false, 
+        authenticated: false,
+        error: 'No authentication cookies set'
+      });
+    }
+    
+    // Test 1: Try to fetch auction data (validates cookies work)
+    let auctionData = null;
+    try {
+      auctionData = await nellisApi.getAuctionData(auctionId || '57938394');
+      console.log('Successfully fetched auction data:', {
+        id: auctionData.id,
+        title: auctionData.title,
+        currentBid: auctionData.currentBid,
+        isWinning: auctionData.isWinning
+      });
+    } catch (error) {
+      console.error('Failed to fetch auction data:', error.message);
+      return res.json({
+        success: false,
+        authenticated: false,
+        error: 'Failed to fetch auction data - cookies may be invalid',
+        details: error.message
+      });
+    }
+    
+    // Test 2: Check user state in auction
+    const userAuthenticated = auctionData.isWatching !== undefined || auctionData.isWinning !== undefined;
+    
+    // Test 3: Optionally test bid placement (dry run)
+    let bidTestResult = null;
+    if (testBidAmount && auctionData && !auctionData.isClosed) {
+      console.log('Testing bid placement (dry run)...');
+      // For safety, we'll only test with a bid that's below current bid
+      const safeBidAmount = Math.min(testBidAmount, auctionData.currentBid - 1);
+      
+      try {
+        // Note: This will likely fail but we can check the error response
+        bidTestResult = await nellisApi.placeBid(auctionData.id, safeBidAmount);
+      } catch (error) {
+        bidTestResult = {
+          tested: true,
+          error: error.message,
+          // A specific error about bid being too low is actually good - means auth works
+          likelyAuthenticated: error.message.includes('bid') || error.message.includes('amount')
+        };
+      }
+    }
+    
+    res.json({
+      success: true,
+      authenticated: userAuthenticated,
+      cookiesSet: !!nellisApi.cookies,
+      auctionDataFetched: !!auctionData,
+      userState: {
+        isWatching: auctionData?.isWatching,
+        isWinning: auctionData?.isWinning
+      },
+      bidTestResult,
+      testAuction: auctionData ? {
+        id: auctionData.id,
+        title: auctionData.title,
+        currentBid: auctionData.currentBid,
+        nextBid: auctionData.nextBid,
+        timeRemaining: auctionData.timeRemaining
+      } : null
+    });
+  } catch (error) {
+    console.error('Error validating authentication:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      stack: error.stack
+    });
+  }
+});
+
+// Get authentication status
+router.get('/auth/status', (req, res) => {
+  const hasCookies = !!nellisApi.cookies && nellisApi.cookies.length > 0;
+  const cookieCount = hasCookies ? nellisApi.cookies.split(';').length : 0;
+  
+  res.json({
+    authenticated: hasCookies,
+    cookieCount: cookieCount,
+    cookiesSet: hasCookies,
+    message: hasCookies ? 'Cookies are set' : 'No cookies set - please sync from extension'
+  });
+});
+
 // Get system status
-router.get('/status', (req, res) => {
+router.get('/status', async (req, res) => {
+  const redisHealthy = await storage.isHealthy();
+  
   res.json({
     success: true,
     status: 'running',
     monitoredAuctions: auctionMonitor.getMonitoredCount(),
     uptime: process.uptime(),
-    memory: process.memoryUsage()
+    memory: process.memoryUsage(),
+    hotReload: true,
+    timestamp: new Date().toISOString(),
+    storage: {
+      type: storage.connected ? 'redis' : 'memory',
+      connected: storage.connected,
+      healthy: redisHealthy
+    }
   });
 });
 

@@ -35,12 +35,18 @@ h1 {
     justify-content: space-between;
     align-items: center;
     font-size: 14px;
+    gap: 20px;
 }
 
 .status-indicator {
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+.status-indicator + .status-indicator {
+    padding-left: 20px;
+    border-left: 1px solid #e5e7eb;
 }
 
 .status-dot {
@@ -58,6 +64,11 @@ h1 {
 
 .status-dot.disconnected {
     background-color: #ef4444;
+    animation: none;
+}
+
+.status-dot.warning {
+    background-color: #f59e0b;
     animation: none;
 }
 

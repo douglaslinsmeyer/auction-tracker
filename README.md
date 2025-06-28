@@ -164,9 +164,5 @@ The service logs to:
 
 ## TODO
 
+- [ ] Add data persistence
 - [ ] Implement actual bid placement (currently placeholder)
-- [ ] Add Redis for session management
-- [ ] Implement OAuth/JWT authentication
-- [ ] Add metrics and monitoring (Prometheus/Grafana)
-- [ ] Implement rate limiting
-- [ ] Add database for auction history

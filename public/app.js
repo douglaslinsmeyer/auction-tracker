@@ -9,8 +9,11 @@ class AuctionMonitorUI {
         
         this.elements = {
             connectionStatus: document.getElementById('connection-status'),
-            statusDot: document.querySelector('.status-dot'),
-            statusText: document.querySelector('.status-text'),
+            statusDot: document.querySelector('#connection-status .status-dot'),
+            statusText: document.querySelector('#connection-status .status-text'),
+            authStatus: document.getElementById('auth-status'),
+            authStatusDot: document.querySelector('#auth-status .status-dot'),
+            authStatusText: document.querySelector('#auth-status .status-text'),
             auctionCount: document.getElementById('auction-count'),
             auctionsGrid: document.getElementById('auctions-grid'),
             emptyState: document.getElementById('empty-state'),
@@ -25,6 +28,10 @@ class AuctionMonitorUI {
         this.connectWebSocket();
         this.attachEventListeners();
         this.loadAuctions();
+        this.checkAuthStatus();
+        
+        // Check auth status periodically
+        setInterval(() => this.checkAuthStatus(), 30000); // Every 30 seconds
     }
     
     connectWebSocket() {
@@ -118,6 +125,8 @@ class AuctionMonitorUI {
                     type: 'getMonitoredAuctions',
                     requestId: this.generateRequestId()
                 });
+                // Check auth status after WebSocket auth
+                this.checkAuthStatus();
                 break;
         }
     }
@@ -566,6 +575,28 @@ class AuctionMonitorUI {
     showNotification(data) {
         // Could add toast notifications here
         console.log('Notification:', data);
+    }
+    
+    async checkAuthStatus() {
+        try {
+            const response = await fetch('/api/auth/status');
+            const data = await response.json();
+            
+            this.updateAuthStatus(data.authenticated, data.cookieCount);
+        } catch (error) {
+            console.error('Failed to check auth status:', error);
+            this.updateAuthStatus(false, 0);
+        }
+    }
+    
+    updateAuthStatus(isAuthenticated, cookieCount = 0) {
+        if (isAuthenticated) {
+            this.elements.authStatusDot.className = 'status-dot connected';
+            this.elements.authStatusText.textContent = `Authenticated (${cookieCount} cookies)`;
+        } else {
+            this.elements.authStatusDot.className = 'status-dot disconnected';
+            this.elements.authStatusText.textContent = 'Not Authenticated';
+        }
     }
 }
 

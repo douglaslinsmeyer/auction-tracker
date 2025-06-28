@@ -7,6 +7,8 @@ const path = require('path');
 require('dotenv').config();
 
 const auctionMonitor = require('./services/auctionMonitor');
+const nellisApi = require('./services/nellisApi');
+const storage = require('./services/storage');
 const apiRoutes = require('./routes/api');
 const wsHandler = require('./services/websocket');
 
@@ -77,20 +79,40 @@ wss.on('connection', (ws) => {
   wsHandler.handleConnection(ws, wss);
 });
 
-// Start server
+// Initialize services and start server
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  logger.info(`Nellis Auction Backend running on port ${PORT}`);
-  
-  // Start auction monitoring service
-  auctionMonitor.initialize(wss);
-});
+
+async function startServer() {
+  try {
+    // Initialize storage first
+    await storage.initialize();
+    
+    // Initialize nellisApi to recover cookies
+    await nellisApi.initialize();
+    
+    // Initialize auction monitor which will recover persisted auctions
+    await auctionMonitor.initialize(wss);
+    
+    // Start listening
+    server.listen(PORT, () => {
+      logger.info(`Nellis Auction Backend running on port ${PORT}`);
+      logger.info(`Redis connected: ${storage.connected}`);
+      logger.info(`Monitored auctions: ${auctionMonitor.getMonitoredCount()}`);
+    });
+  } catch (error) {
+    logger.error('Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+startServer();
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully');
-  server.close(() => {
+  server.close(async () => {
     auctionMonitor.shutdown();
+    await storage.close();
     process.exit(0);
   });
 });

@@ -1,4 +1,5 @@
 const axios = require('axios');
+const storage = require('./storage');
 
 class NellisApi {
   constructor() {
@@ -12,6 +13,21 @@ class NellisApi {
       'Cache-Control': 'no-cache',
       'Pragma': 'no-cache'
     };
+    this.initialized = false;
+  }
+  
+  async initialize() {
+    try {
+      // Try to recover cookies from storage
+      const savedCookies = await storage.getCookies();
+      if (savedCookies) {
+        this.cookies = savedCookies;
+        console.log('Recovered authentication cookies from storage');
+      }
+      this.initialized = true;
+    } catch (error) {
+      console.error('Error initializing NellisApi:', error);
+    }
   }
 
   async getAuctionData(auctionId) {
@@ -74,6 +90,13 @@ class NellisApi {
       // For now, we'll assume cookies are provided through configuration
       console.info('Authentication not yet implemented - using provided cookies');
       this.cookies = credentials.cookies || '';
+      
+      // Save cookies to storage
+      if (this.cookies) {
+        await storage.saveCookies(this.cookies);
+        console.log('Saved authentication cookies to storage');
+      }
+      
       return true;
     } catch (error) {
       console.error('Authentication error:', error);
