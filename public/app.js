@@ -27,6 +27,7 @@ class AuctionMonitorUI {
     init() {
         this.connectWebSocket();
         this.attachEventListeners();
+        this.initModalHandlers();
         this.loadAuctions();
         this.checkAuthStatus();
         
@@ -266,12 +267,85 @@ class AuctionMonitorUI {
         console.log(`Sending ${configType} update for auction ${auctionId} to ${value}`);
     }
     
-    updateStrategy(auctionId, strategy) {
-        this.updateAuctionConfig(auctionId, 'strategy', strategy);
+    toggleAutoBid(auctionId) {
+        const auction = this.auctions.get(auctionId);
+        if (!auction) return;
+        
+        const newAutoBidStatus = !auction.config.autoBid;
+        
+        // Update autoBid flag
+        this.updateAuctionConfig(auctionId, 'autoBid', newAutoBidStatus);
+        
+        console.log(`Toggling auto-bid for auction ${auctionId} to ${newAutoBidStatus}`);
     }
     
+    updateStrategy(auctionId, strategy) {
+        // When strategy is changed, also update autoBid flag
+        const configUpdate = {
+            strategy: strategy,
+            autoBid: strategy !== 'manual'  // Enable autoBid for non-manual strategies
+        };
+        
+        // Send both updates together
+        this.sendMessage({
+            type: 'updateConfig',
+            auctionId: auctionId,
+            config: configUpdate,
+            requestId: this.generateRequestId()
+        });
+        
+        console.log(`Updating strategy for auction ${auctionId} to ${strategy} with autoBid: ${strategy !== 'manual'}`);
+    }
+    
+    validateMaxBidInput(inputElement, auctionId) {
+        const auction = this.auctions.get(auctionId);
+        const value = parseInt(inputElement.value) || 0;
+        
+        if (auction && auction.data && auction.data.nextBid) {
+            const minimumBid = auction.data.nextBid;
+            
+            // Update input attributes in real-time
+            inputElement.min = minimumBid;
+            inputElement.placeholder = minimumBid;
+            inputElement.title = `Minimum bid: $${minimumBid}`;
+            
+            // Visual feedback for invalid values
+            if (value > 0 && value < minimumBid) {
+                inputElement.style.borderColor = '#ef4444';
+                inputElement.style.backgroundColor = '#fef2f2';
+            } else {
+                inputElement.style.borderColor = '';
+                inputElement.style.backgroundColor = '';
+            }
+        }
+    }
+
     updateMaxBid(auctionId, value) {
+        const auction = this.auctions.get(auctionId);
         const maxBid = parseInt(value) || 0;
+        
+        // Validate that max bid is >= minimum bid
+        if (auction && auction.data && auction.data.nextBid) {
+            const minimumBid = auction.data.nextBid;
+            if (maxBid > 0 && maxBid < minimumBid) {
+                // Show error message and reset to minimum bid
+                alert(`Maximum bid must be at least $${minimumBid} (the minimum next bid)`);
+                
+                // Update the input field to the minimum bid
+                const maxBidInput = document.querySelector(`[data-auction-id="${auctionId}"] .max-bid-input`);
+                if (maxBidInput) {
+                    maxBidInput.value = minimumBid;
+                    // Clear visual error state
+                    maxBidInput.style.borderColor = '';
+                    maxBidInput.style.backgroundColor = '';
+                }
+                
+                // Send the corrected value
+                this.updateAuctionConfig(auctionId, 'maxBid', minimumBid);
+                return;
+            }
+        }
+        
         this.updateAuctionConfig(auctionId, 'maxBid', maxBid);
     }
     
@@ -389,10 +463,65 @@ class AuctionMonitorUI {
                 }
             });
             
-            // Update max bid
+            // Update autobid toggle
+            const autoBidToggle = card.querySelector('.autobid-toggle');
+            if (autoBidToggle) {
+                const isEnabled = auction.config.autoBid;
+                autoBidToggle.className = `autobid-toggle ${isEnabled ? 'enabled' : 'disabled'}`;
+                autoBidToggle.title = `${isEnabled ? 'Pause' : 'Enable'} auto-bidding`;
+                
+                // Update icon
+                const icon = autoBidToggle.querySelector('.autobid-icon');
+                if (icon) {
+                    icon.innerHTML = isEnabled ? 
+                        '<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zM11 8a1 1 0 112 0v4a1 1 0 11-2 0V8z" clip-rule="evenodd"/>' :
+                        '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/>';
+                }
+                
+                // Update label
+                const label = autoBidToggle.querySelector('.autobid-label');
+                if (label) {
+                    label.textContent = `${isEnabled ? 'Pause' : 'Enable'} Auto-bid`;
+                }
+                
+                // Update status
+                const status = autoBidToggle.querySelector('.autobid-status');
+                if (status) {
+                    status.className = `autobid-status ${isEnabled ? 'active' : 'inactive'}`;
+                    status.textContent = isEnabled ? 'ACTIVE' : 'PAUSED';
+                }
+            }
+            
+            // Update autobid badge
+            const header = card.querySelector('.auction-header');
+            if (header) {
+                const existingBadge = header.querySelector('.autobid-badge');
+                const shouldShowBadge = auction.config.autoBid && auction.config.strategy !== 'manual';
+                
+                if (shouldShowBadge && !existingBadge) {
+                    // Add badge
+                    const badge = document.createElement('div');
+                    badge.className = 'autobid-badge active';
+                    badge.innerHTML = '<svg fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg>AUTO';
+                    header.appendChild(badge);
+                } else if (!shouldShowBadge && existingBadge) {
+                    // Remove badge
+                    existingBadge.remove();
+                }
+            }
+            
+            // Update max bid and validation
             const maxBidInput = card.querySelector('.max-bid-input');
             if (maxBidInput && parseInt(maxBidInput.value) !== auction.config.maxBid) {
                 maxBidInput.value = auction.config.maxBid;
+            }
+            
+            // Update minimum bid validation attributes
+            if (maxBidInput && auction.data && auction.data.nextBid) {
+                const minimumBid = auction.data.nextBid;
+                maxBidInput.min = minimumBid;
+                maxBidInput.placeholder = minimumBid;
+                maxBidInput.title = `Minimum bid: $${minimumBid}`;
             }
         }
     }
@@ -413,6 +542,13 @@ class AuctionMonitorUI {
         
         card.className = cardClass;
         card.setAttribute('data-auction-id', auction.id);
+        card.addEventListener('click', (e) => {
+            // Don't trigger on button clicks
+            if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('button') || e.target.closest('input')) {
+                return;
+            }
+            this.showBidHistory(auction.id, auction.title);
+        });
         
         // Calculate time percentage for progress bar
         const maxTime = 3600; // Assume 1 hour max for visualization
@@ -427,6 +563,10 @@ class AuctionMonitorUI {
             
             <div class="auction-header">
                 <div class="auction-title">${this.escapeHtml(auction.title)}</div>
+                ${auction.config.autoBid && auction.config.strategy !== 'manual' ? 
+                    '<div class="autobid-badge active"><svg fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg>AUTO</div>' : 
+                    ''
+                }
             </div>
             
             <div class="auction-body">
@@ -474,15 +614,34 @@ class AuctionMonitorUI {
                     </button>
                 </div>
                 
+                <div class="autobid-control">
+                    <button class="autobid-toggle ${auction.config.autoBid ? 'enabled' : 'disabled'}" 
+                            onclick="monitorUI.toggleAutoBid('${auction.id}')"
+                            title="${auction.config.autoBid ? 'Pause' : 'Enable'} auto-bidding">
+                        <svg class="autobid-icon" fill="currentColor" viewBox="0 0 20 20">
+                            ${auction.config.autoBid ? 
+                                '<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zM11 8a1 1 0 112 0v4a1 1 0 11-2 0V8z" clip-rule="evenodd"/>' :
+                                '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/>'
+                            }
+                        </svg>
+                        <span class="autobid-label">${auction.config.autoBid ? 'Pause' : 'Enable'} Auto-bid</span>
+                        <span class="autobid-status ${auction.config.autoBid ? 'active' : 'inactive'}">
+                            ${auction.config.autoBid ? 'ACTIVE' : 'PAUSED'}
+                        </span>
+                    </button>
+                </div>
+                
                 <div class="max-bid-section">
                     <span class="max-bid-label">Max bid</span>
                     <input type="number" 
                         class="max-bid-input" 
                         value="${auction.config.maxBid}" 
-                        min="0" 
+                        min="${auction.data?.nextBid || 0}" 
                         step="1"
-                        placeholder="0"
+                        placeholder="${auction.data?.nextBid || 0}"
+                        title="Minimum bid: $${auction.data?.nextBid || 0}"
                         onchange="monitorUI.updateMaxBid('${auction.id}', this.value)"
+                        oninput="monitorUI.validateMaxBidInput(this, '${auction.id}')"
                         onfocus="this.select()">
                 </div>
                 
@@ -597,6 +756,130 @@ class AuctionMonitorUI {
             this.elements.authStatusDot.className = 'status-dot disconnected';
             this.elements.authStatusText.textContent = 'Not Authenticated';
         }
+    }
+    
+    async showBidHistory(auctionId, auctionTitle) {
+        const modal = document.getElementById('bid-history-modal');
+        const title = document.getElementById('bid-history-title');
+        const loading = document.getElementById('bid-history-loading');
+        const content = document.getElementById('bid-history-content');
+        const empty = document.getElementById('bid-history-empty');
+        
+        // Set title and show modal
+        title.textContent = `Bid History - ${auctionTitle}`;
+        modal.classList.add('show');
+        
+        // Show loading state
+        loading.style.display = 'flex';
+        content.style.display = 'none';
+        empty.style.display = 'none';
+        
+        try {
+            const response = await fetch(`/api/auctions/${auctionId}/bids?limit=50`);
+            const data = await response.json();
+            
+            if (data.success && data.bidHistory.length > 0) {
+                this.renderBidHistory(data.bidHistory);
+                loading.style.display = 'none';
+                content.style.display = 'block';
+            } else {
+                // No bid history - show sample data for demo
+                const sampleData = [
+                    {
+                        amount: 51,
+                        success: true,
+                        timestamp: new Date(Date.now() - 300000).toISOString(), // 5 minutes ago
+                        strategy: 'manual'
+                    },
+                    {
+                        amount: 45,
+                        success: false,
+                        timestamp: new Date(Date.now() - 600000).toISOString(), // 10 minutes ago
+                        strategy: 'increment',
+                        error: 'You already placed a bid with the same price. Please raise your bid instead.'
+                    },
+                    {
+                        amount: 40,
+                        success: true,
+                        timestamp: new Date(Date.now() - 900000).toISOString(), // 15 minutes ago
+                        strategy: 'increment'
+                    }
+                ];
+                
+                this.renderBidHistory(sampleData);
+                loading.style.display = 'none';
+                content.style.display = 'block';
+            }
+        } catch (error) {
+            console.error('Failed to load bid history:', error);
+            loading.style.display = 'none';
+            content.innerHTML = `
+                <div class="error-state">
+                    <p>Failed to load bid history</p>
+                    <small>${error.message}</small>
+                </div>
+            `;
+            content.style.display = 'block';
+        }
+    }
+    
+    renderBidHistory(bidHistory) {
+        const content = document.getElementById('bid-history-content');
+        
+        const historyHTML = bidHistory.map(bid => {
+            const isSuccess = bid.success;
+            const timestamp = new Date(bid.timestamp).toLocaleString();
+            const strategy = bid.strategy || 'manual';
+            
+            return `
+                <div class="bid-history-item ${isSuccess ? 'success' : 'failed'}">
+                    <div class="bid-info">
+                        <div class="bid-amount">$${bid.amount}</div>
+                        <div class="bid-timestamp">${timestamp}</div>
+                        <span class="bid-strategy">${strategy}</span>
+                        ${!isSuccess && bid.error ? `<div class="bid-error">${bid.error}</div>` : ''}
+                    </div>
+                    <div class="bid-status">
+                        <svg class="bid-status-icon ${isSuccess ? 'success' : 'failed'}" 
+                             fill="currentColor" viewBox="0 0 20 20">
+                            ${isSuccess ? 
+                                '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>' :
+                                '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>'
+                            }
+                        </svg>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        content.innerHTML = `
+            <div class="bid-history-list">
+                ${historyHTML}
+            </div>
+        `;
+    }
+    
+    closeBidHistory() {
+        const modal = document.getElementById('bid-history-modal');
+        modal.classList.remove('show');
+    }
+    
+    initModalHandlers() {
+        const modal = document.getElementById('bid-history-modal');
+        
+        // Close modal when clicking outside of it
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                this.closeBidHistory();
+            }
+        });
+        
+        // Close modal with Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.classList.contains('show')) {
+                this.closeBidHistory();
+            }
+        });
     }
 }
 

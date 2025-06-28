@@ -99,6 +99,7 @@ class AuctionMonitor extends EventEmitter {
   }
 
   async updateAuction(auctionId) {
+    console.log(`Updating auction ${auctionId}`);
     const auction = this.monitoredAuctions.get(auctionId);
     if (!auction) return;
 
@@ -131,6 +132,12 @@ class AuctionMonitor extends EventEmitter {
       // Broadcast full auction state to WebSocket clients
       this.broadcastAuctionState(auctionId);
 
+      // Execute auto-bid based on strategy and autoBid flag
+      if (auction.config.strategy !== 'manual' && 
+          auction.config.autoBid === true) {
+        this.executeAutoBid(auctionId, data);
+      }
+
     } catch (error) {
       console.error(`Error updating auction ${auctionId}:`, error);
       auction.status = 'error';
@@ -148,16 +155,16 @@ class AuctionMonitor extends EventEmitter {
     if (newData.isWinning === false && oldData.isWinning === true) {
       this.handleOutbid(auctionId, newData);
     }
-
-    // Execute auto-bid based on strategy
-    if (auction.config.strategy !== 'manual' && !newData.isWinning && !auction.maxBidReached) {
-      this.executeAutoBid(auctionId, newData);
-    }
   }
 
   async executeAutoBid(auctionId, auctionData) {
+    console.log(`Executing auto-bid for auction ${auctionId}`);
     const auction = this.monitoredAuctions.get(auctionId);
     if (!auction) return;
+
+    if (auction.isWinning) {
+      return; // Already winning, no need to bid
+    }
 
     // Check strategy
     if (auction.config.strategy === 'manual') {
@@ -172,6 +179,7 @@ class AuctionMonitor extends EventEmitter {
     const nextBid = auctionData.nextBid || auctionData.currentBid + auction.config.bidIncrement;
 
     if (nextBid <= auction.config.maxBid) {
+      auction.maxBidReached = false;
       try {
         console.log(`Executing auto-bid on auction ${auctionId}: $${nextBid} (strategy: ${auction.config.strategy})`);
         const result = await nellisApi.placeBid(auctionId, nextBid);
@@ -197,6 +205,7 @@ class AuctionMonitor extends EventEmitter {
             if (result.data.data) {
               auctionData.currentBid = result.data.data.currentAmount;
               auctionData.nextBid = result.data.data.minimumNextBid;
+              auctionData.minimumBid = result.data.data.minimumNextBid; // Keep both for consistency
               auctionData.bidCount = result.data.data.bidCount;
               auctionData.bidderCount = result.data.data.bidderCount;
             }

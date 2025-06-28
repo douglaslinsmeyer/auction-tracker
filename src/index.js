@@ -4,7 +4,17 @@ const WebSocket = require('ws');
 const http = require('http');
 const winston = require('winston');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
+
+// Conditionally load Swagger dependencies if available
+let swaggerUi, YAML;
+try {
+  swaggerUi = require('swagger-ui-express');
+  YAML = require('yamljs');
+} catch (error) {
+  console.log('Swagger dependencies not available, skipping Swagger UI setup');
+}
 
 const auctionMonitor = require('./services/auctionMonitor');
 const nellisApi = require('./services/nellisApi');
@@ -58,6 +68,32 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Setup Swagger UI if available
+if (swaggerUi && YAML) {
+  const swaggerPath = path.join(__dirname, '..', 'swagger.yaml');
+  if (fs.existsSync(swaggerPath)) {
+    try {
+      const swaggerDocument = YAML.load(swaggerPath);
+      app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
+        customSiteTitle: 'Nellis Auction Helper API',
+        customfavIcon: '/favicon.ico',
+        customCss: '.swagger-ui .topbar { display: none }',
+        swaggerOptions: {
+          persistAuthorization: true,
+          displayRequestDuration: true,
+          docExpansion: 'none',
+          defaultModelsExpandDepth: -1
+        }
+      }));
+      console.log('Swagger UI available at /api-docs');
+    } catch (error) {
+      console.error('Error loading Swagger documentation:', error.message);
+    }
+  } else {
+    console.log('swagger.yaml not found, skipping Swagger UI setup');
+  }
+}
 
 // Serve static files for the monitoring UI
 app.use(express.static(path.join(__dirname, '..', 'public')));

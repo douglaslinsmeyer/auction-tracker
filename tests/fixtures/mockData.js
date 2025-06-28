@@ -19,6 +19,7 @@ module.exports = {
     title: 'Test Auction Item',
     currentBid: 25,
     nextBid: 30,
+    minimumBid: 30, // Same as nextBid - minimum required bid
     bidCount: 5,
     bidderCount: 3,
     isWinning: false,

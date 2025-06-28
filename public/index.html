@@ -46,6 +46,29 @@
         </main>
     </div>
 
+    <!-- Bid History Modal -->
+    <div id="bid-history-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="bid-history-title">Bid History</h2>
+                <button class="modal-close" onclick="monitorUI.closeBidHistory()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="bid-history-loading" class="loading-state">
+                    <div class="spinner"></div>
+                    <p>Loading bid history...</p>
+                </div>
+                <div id="bid-history-content" class="bid-history-content">
+                    <!-- Bid history will be inserted here -->
+                </div>
+                <div id="bid-history-empty" class="empty-state" style="display: none;">
+                    <p>No bids placed yet</p>
+                    <small>Bid history will appear here once you start bidding</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>

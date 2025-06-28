@@ -181,6 +181,7 @@ h1 {
 
 .auction-header {
     padding: 16px 16px 12px;
+    position: relative;
 }
 
 .auction-title {
@@ -193,6 +194,32 @@ h1 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
+    padding-right: 60px; /* Make space for autobid badge */
+}
+
+.autobid-badge {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.autobid-badge.active {
+    background: #22c55e;
+    color: white;
+}
+
+.autobid-badge svg {
+    width: 12px;
+    height: 12px;
 }
 
 /* Removed status badges - cleaner design */
@@ -315,6 +342,78 @@ h1 {
     font-weight: 600;
     box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08);
     cursor: default;
+}
+
+/* Autobid Control */
+.autobid-control {
+    margin-bottom: 12px;
+}
+
+.autobid-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 2px solid;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.autobid-toggle.enabled {
+    border-color: #22c55e;
+    background: #f0fdf4;
+    color: #166534;
+}
+
+.autobid-toggle.enabled:hover {
+    background: #dcfce7;
+    border-color: #16a34a;
+}
+
+.autobid-toggle.disabled {
+    border-color: #e5e7eb;
+    background: #f9fafb;
+    color: #6b7280;
+}
+
+.autobid-toggle.disabled:hover {
+    background: #f3f4f6;
+    border-color: #d1d5db;
+}
+
+.autobid-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+.autobid-label {
+    flex: 1;
+    text-align: left;
+}
+
+.autobid-status {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.autobid-status.active {
+    background: #22c55e;
+    color: white;
+}
+
+.autobid-status.inactive {
+    background: #e5e7eb;
+    color: #6b7280;
 }
 
 /* Max bid section */
@@ -491,4 +590,235 @@ input[type="number"] {
 
 .auction-card {
     animation: slideIn 0.3s ease-out;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.auction-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.auction-card .auction-header::after {
+    content: "Click to view bid history";
+    font-size: 11px;
+    color: #6b7280;
+    font-weight: normal;
+    opacity: 0;
+    transition: opacity 0.2s;
+    display: block;
+    margin-top: 4px;
+}
+
+.auction-card:hover .auction-header::after {
+    opacity: 1;
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    animation: fadeIn 0.2s ease-in-out;
+}
+
+.modal.show {
+    display: block;
+}
+
+.modal-content {
+    background-color: white;
+    margin: 5% auto;
+    padding: 0;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    animation: slideInModal 0.3s ease-out;
+    overflow: hidden;
+}
+
+.modal-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #f9fafb;
+}
+
+.modal-header h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #111827;
+    margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #6b7280;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.modal-close:hover {
+    background-color: #e5e7eb;
+    color: #374151;
+}
+
+.modal-body {
+    padding: 24px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+/* Loading State */
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    text-align: center;
+}
+
+.spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid #f3f4f6;
+    border-top: 3px solid #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 16px;
+}
+
+/* Bid History Content */
+.bid-history-content {
+    display: none;
+}
+
+.bid-history-content.show {
+    display: block;
+}
+
+.bid-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.bid-history-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    background-color: #f9fafb;
+    border-radius: 8px;
+    border-left: 4px solid transparent;
+}
+
+.bid-history-item.success {
+    border-left-color: #22c55e;
+    background-color: #f0fdf4;
+}
+
+.bid-history-item.failed {
+    border-left-color: #ef4444;
+    background-color: #fef2f2;
+}
+
+.bid-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.bid-amount {
+    font-size: 18px;
+    font-weight: 600;
+    color: #111827;
+}
+
+.bid-timestamp {
+    font-size: 14px;
+    color: #6b7280;
+}
+
+.bid-strategy {
+    font-size: 12px;
+    padding: 2px 8px;
+    background-color: #e5e7eb;
+    color: #374151;
+    border-radius: 12px;
+    text-transform: uppercase;
+    font-weight: 500;
+}
+
+.bid-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.bid-status-icon {
+    width: 20px;
+    height: 20px;
+}
+
+.bid-status-icon.success {
+    color: #22c55e;
+}
+
+.bid-status-icon.failed {
+    color: #ef4444;
+}
+
+.bid-error {
+    font-size: 12px;
+    color: #dc2626;
+    margin-top: 4px;
+    font-style: italic;
+}
+
+/* Additional Animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideInModal {
+    from { 
+        opacity: 0;
+        transform: translateY(-50px) scale(0.95);
+    }
+    to { 
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes price-flash {
+    0% { background-color: #22c55e; color: white; transform: scale(1.05); }
+    50% { background-color: #16a34a; color: white; transform: scale(1.1); }
+    100% { background-color: transparent; color: inherit; transform: scale(1); }
 }

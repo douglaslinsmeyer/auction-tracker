@@ -1,0 +1,871 @@
+openapi: 3.0.3
+info:
+  title: Nellis Auction Helper API
+  description: |
+    REST API for the Nellis Auction Helper backend service. This API provides endpoints for monitoring auctions, placing bids, and managing authentication with nellisauction.com.
+    
+    ## Features
+    - Monitor multiple auctions simultaneously
+    - Automated bidding with configurable strategies
+    - Real-time auction status updates
+    - Authentication management
+    - Bid history tracking
+    
+    ## Authentication
+    The API uses session cookies from nellisauction.com for authentication. Use the `/auth` endpoint to set authentication credentials.
+  version: 1.0.0
+  contact:
+    name: Nellis Auction Helper
+    email: support@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3000/api
+    description: Local development server
+  - url: https://api.nellisauctionhelper.com/api
+    description: Production server
+
+tags:
+  - name: auctions
+    description: Auction monitoring and management
+  - name: bidding
+    description: Bid placement and management
+  - name: authentication
+    description: Authentication and session management
+  - name: system
+    description: System status and health checks
+
+paths:
+  /auctions:
+    get:
+      tags:
+        - auctions
+      summary: Get all monitored auctions
+      description: Retrieve a list of all currently monitored auctions with their status and configuration
+      responses:
+        '200':
+          description: Successfully retrieved monitored auctions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  auctions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MonitoredAuction'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /auctions/{id}:
+    get:
+      tags:
+        - auctions
+      summary: Get specific auction details
+      description: Retrieve detailed information about a specific auction from nellisauction.com
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Auction ID from nellisauction.com
+          schema:
+            type: string
+            example: "57947099"
+      responses:
+        '200':
+          description: Successfully retrieved auction data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/AuctionDetails'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /auctions/{id}/monitor:
+    post:
+      tags:
+        - auctions
+      summary: Start monitoring an auction
+      description: Begin monitoring an auction with optional bidding configuration
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Auction ID to monitor
+          schema:
+            type: string
+            example: "57947099"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                config:
+                  $ref: '#/components/schemas/AuctionConfig'
+      responses:
+        '200':
+          description: Successfully started monitoring auction
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Started monitoring auction 57947099"
+        '400':
+          description: Auction already being monitored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - auctions
+      summary: Stop monitoring an auction
+      description: Stop monitoring a specific auction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Auction ID to stop monitoring
+          schema:
+            type: string
+            example: "57947099"
+      responses:
+        '200':
+          description: Successfully stopped monitoring auction
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Stopped monitoring auction 57947099"
+        '404':
+          description: Auction not being monitored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /auctions/{id}/stop:
+    post:
+      tags:
+        - auctions
+      summary: Stop monitoring an auction (POST method)
+      description: Alternative POST endpoint to stop monitoring an auction (for UI compatibility)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Auction ID to stop monitoring
+          schema:
+            type: string
+            example: "57947099"
+      responses:
+        '200':
+          description: Successfully stopped monitoring auction
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Stopped monitoring auction 57947099"
+        '404':
+          description: Auction not being monitored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /auctions/clear:
+    post:
+      tags:
+        - auctions
+      summary: Clear all monitored auctions
+      description: Stop monitoring all currently monitored auctions
+      responses:
+        '200':
+          description: Successfully cleared all auctions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Cleared 3 auctions"
+                  cleared:
+                    type: integer
+                    example: 3
+                    description: Number of auctions that were cleared
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /auctions/{id}/config:
+    put:
+      tags:
+        - auctions
+      summary: Update auction configuration
+      description: Update the bidding configuration for a monitored auction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Auction ID to update
+          schema:
+            type: string
+            example: "57947099"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                config:
+                  $ref: '#/components/schemas/AuctionConfig'
+      responses:
+        '200':
+          description: Successfully updated auction configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  config:
+                    $ref: '#/components/schemas/AuctionConfig'
+        '404':
+          description: Auction not being monitored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /auctions/{id}/bids:
+    get:
+      tags:
+        - bidding
+      summary: Get bid history for an auction
+      description: Retrieve the bid history for a specific auction, including both successful and failed bids
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Auction ID to get bid history for
+          schema:
+            type: string
+            example: "57947099"
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of bids to return (max 100)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+            example: 25
+      responses:
+        '200':
+          description: Successfully retrieved bid history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  auctionId:
+                    type: string
+                    example: "57947099"
+                  bidHistory:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        timestamp:
+                          type: string
+                          format: date-time
+                          example: "2024-01-15T10:30:00.000Z"
+                        amount:
+                          type: number
+                          example: 150
+                        success:
+                          type: boolean
+                          example: true
+                        error:
+                          type: string
+                          nullable: true
+                          example: null
+                        strategy:
+                          type: string
+                          example: "increment"
+                  count:
+                    type: integer
+                    example: 5
+                    description: Number of bids returned
+        '400':
+          description: Invalid limit parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /auctions/{id}/bid:
+    post:
+      tags:
+        - bidding
+      summary: Place a bid on an auction
+      description: |
+        Place a bid on a specific auction. Requires valid authentication cookies to be set.
+        
+        **Note**: This places a real bid on nellisauction.com. Make sure you want to bid the specified amount.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Auction ID to place bid on
+          schema:
+            type: string
+            example: "57947099"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - amount
+              properties:
+                amount:
+                  type: number
+                  minimum: 1
+                  example: 150
+                  description: Bid amount in dollars (will be rounded down to whole number)
+      responses:
+        '200':
+          description: Bid placement result (success or failure)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/BidSuccessResponse'
+                  - $ref: '#/components/schemas/BidFailureResponse'
+        '400':
+          description: Invalid bid amount or bid too low
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BidErrorResponse'
+        '401':
+          description: Authentication error - invalid or expired cookies
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BidErrorResponse'
+        '409':
+          description: Conflict - duplicate bid amount or user was outbid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BidErrorResponse'
+        '410':
+          description: Auction has ended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BidErrorResponse'
+        '502':
+          description: Bad gateway - error from nellisauction.com
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BidErrorResponse'
+        '503':
+          description: Service unavailable - connection error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BidErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /auth:
+    post:
+      tags:
+        - authentication
+      summary: Set authentication credentials
+      description: |
+        Set authentication cookies for nellisauction.com. These cookies should be obtained from an authenticated browser session.
+        
+        The cookies are used for all subsequent API calls that interact with nellisauction.com.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - cookies
+              properties:
+                cookies:
+                  type: string
+                  example: "sessionid=abc123; csrftoken=def456; userid=789"
+                  description: Raw cookie string from authenticated browser session
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        '400':
+          description: Missing cookies in request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /auth/validate:
+    post:
+      tags:
+        - authentication
+      summary: Validate authentication and test functionality
+      description: |
+        Comprehensive authentication validation that:
+        1. Checks if cookies are set
+        2. Tests fetching auction data
+        3. Optionally tests bid placement (dry run)
+        
+        This endpoint helps verify that authentication is working correctly.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                auctionId:
+                  type: string
+                  example: "57947099"
+                  description: Auction ID to test with (optional, uses default if not provided)
+                testBidAmount:
+                  type: number
+                  example: 50
+                  description: Amount to test bid placement with (will use safe amount below current bid)
+      responses:
+        '200':
+          description: Authentication validation results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  authenticated:
+                    type: boolean
+                    example: true
+                    description: Whether user appears to be authenticated
+                  cookiesSet:
+                    type: boolean
+                    example: true
+                    description: Whether cookies are configured
+                  auctionDataFetched:
+                    type: boolean
+                    example: true
+                    description: Whether auction data could be retrieved
+                  userState:
+                    type: object
+                    properties:
+                      isWatching:
+                        type: boolean
+                        nullable: true
+                      isWinning:
+                        type: boolean
+                        nullable: true
+                  bidTestResult:
+                    type: object
+                    nullable: true
+                    description: Results of bid placement test (if requested)
+                  testAuction:
+                    $ref: '#/components/schemas/AuctionDetails'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /auth/status:
+    get:
+      tags:
+        - authentication
+      summary: Get authentication status
+      description: Check the current authentication status and cookie information
+      responses:
+        '200':
+          description: Authentication status information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authenticated:
+                    type: boolean
+                    example: true
+                  cookieCount:
+                    type: integer
+                    example: 5
+                    description: Number of cookies currently set
+                  cookiesSet:
+                    type: boolean
+                    example: true
+                  cookies:
+                    type: string
+                    nullable: true
+                    example: "sessionid=abc123; csrftoken=def456; userid=789"
+                    description: Raw cookie string currently set for authentication
+                  message:
+                    type: string
+                    example: "Cookies are set"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /status:
+    get:
+      tags:
+        - system
+      summary: Get system status
+      description: Retrieve comprehensive system status including monitored auctions, uptime, and storage health
+      responses:
+        '200':
+          description: System status information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  status:
+                    type: string
+                    example: "running"
+                  monitoredAuctions:
+                    type: integer
+                    example: 3
+                    description: Number of currently monitored auctions
+                  uptime:
+                    type: number
+                    example: 3600.5
+                    description: Server uptime in seconds
+                  memory:
+                    type: object
+                    properties:
+                      rss:
+                        type: integer
+                        description: Resident Set Size
+                      heapTotal:
+                        type: integer
+                        description: Total heap size
+                      heapUsed:
+                        type: integer
+                        description: Used heap size
+                      external:
+                        type: integer
+                        description: External memory usage
+                      arrayBuffers:
+                        type: integer
+                        description: Array buffer memory usage
+                  hotReload:
+                    type: boolean
+                    example: true
+                    description: Whether hot reload is enabled
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: "2024-01-15T10:30:00.000Z"
+                  storage:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                        enum: [redis, memory]
+                        example: "redis"
+                      connected:
+                        type: boolean
+                        example: true
+                      healthy:
+                        type: boolean
+                        example: true
+
+components:
+  schemas:
+    AuctionConfig:
+      type: object
+      properties:
+        strategy:
+          type: string
+          enum: [manual, increment, sniping]
+          default: manual
+          description: |
+            Bidding strategy:
+            - manual: No automatic bidding
+            - increment: Continuously bid up to max bid amount
+            - sniping: Only bid in the last 30 seconds of auction
+        maxBid:
+          type: number
+          minimum: 1
+          maximum: 10000
+          example: 200
+          description: Maximum amount to bid (required for increment and sniping strategies, max $10,000)
+        increment:
+          type: number
+          minimum: 1
+          maximum: 1000
+          default: 5
+          example: 5
+          description: Amount to increment bids by (max $1,000)
+        enabled:
+          type: boolean
+          default: true
+          description: Whether automatic bidding is enabled
+        dailyLimit:
+          type: number
+          minimum: 1
+          maximum: 50000
+          example: 1000
+          description: Maximum amount to spend per day across all auctions (max $50,000)
+        totalLimit:
+          type: number
+          minimum: 1
+          maximum: 100000
+          example: 5000
+          description: Maximum total amount to spend across all auctions (max $100,000)
+      example:
+        strategy: "sniping"
+        maxBid: 200
+        increment: 5
+        enabled: true
+        dailyLimit: 1000
+        totalLimit: 5000
+
+    MonitoredAuction:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "57947099"
+        title:
+          type: string
+          example: "Dobyns Rods Hyperlite Series"
+        currentBid:
+          type: number
+          example: 125.00
+        nextBid:
+          type: number
+          example: 130.00
+        timeRemaining:
+          type: string
+          example: "2h 15m"
+        isWinning:
+          type: boolean
+          example: false
+        isClosed:
+          type: boolean
+          example: false
+        config:
+          $ref: '#/components/schemas/AuctionConfig'
+        status:
+          type: string
+          enum: [monitoring, bidding, ended, error]
+          example: "monitoring"
+        lastUpdate:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00.000Z"
+
+    AuctionDetails:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "57947099"
+        title:
+          type: string
+          example: "Dobyns Rods Hyperlite Series"
+        description:
+          type: string
+          example: "JJ12-2CR Med/Heavy Mod Action, 10'0\" Length"
+        currentBid:
+          type: number
+          example: 125.00
+        nextBid:
+          type: number
+          example: 130.00
+        timeRemaining:
+          type: string
+          example: "2h 15m"
+        endTime:
+          type: string
+          format: date-time
+          example: "2024-01-15T12:45:00.000Z"
+        isWinning:
+          type: boolean
+          example: false
+        isWatching:
+          type: boolean
+          example: true
+        isClosed:
+          type: boolean
+          example: false
+        bidHistory:
+          type: array
+          items:
+            type: object
+            properties:
+              amount:
+                type: number
+              timestamp:
+                type: string
+                format: date-time
+              bidder:
+                type: string
+        images:
+          type: array
+          items:
+            type: string
+            format: uri
+
+    BidSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          description: Response data from nellisauction.com
+        amount:
+          type: number
+          example: 150
+          description: Actual bid amount placed
+
+    BidFailureResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: "Bid amount is too low"
+        data:
+          type: object
+          nullable: true
+          description: Additional error data from nellisauction.com
+
+    BidErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: "You already placed a bid with the same price. Please raise your bid instead."
+          description: Human-readable error message from nellisauction.com
+        errorType:
+          type: string
+          enum: 
+            - DUPLICATE_BID_AMOUNT
+            - BID_TOO_LOW
+            - AUCTION_ENDED
+            - AUTHENTICATION_ERROR
+            - OUTBID
+            - CONNECTION_ERROR
+            - SERVER_ERROR
+            - UNKNOWN_ERROR
+          example: "DUPLICATE_BID_AMOUNT"
+          description: Categorized error type for programmatic handling
+        retryable:
+          type: boolean
+          example: false
+          description: Whether this error condition might be resolved by retrying
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: "Error message describing what went wrong"
+
+  responses:
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: nellisauction_session
+      description: Session cookies from nellisauction.com (set via /auth endpoint)
+
+security:
+  - cookieAuth: []

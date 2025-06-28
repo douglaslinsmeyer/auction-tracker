@@ -27,16 +27,89 @@ router.get('/auctions/:id', async (req, res) => {
   }
 });
 
+// Validate auction configuration
+function validateAuctionConfig(config) {
+  const errors = [];
+  
+  // Validate strategy
+  const validStrategies = ['manual', 'increment', 'sniping'];
+  if (config.strategy && !validStrategies.includes(config.strategy)) {
+    errors.push(`Invalid strategy: ${config.strategy}. Must be one of: ${validStrategies.join(', ')}`);
+  }
+  
+  // Validate maxBid for non-manual strategies
+  if (config.strategy && config.strategy !== 'manual') {
+    if (!config.maxBid) {
+      errors.push(`maxBid is required for ${config.strategy} strategy`);
+    } else if (typeof config.maxBid !== 'number' || isNaN(config.maxBid)) {
+      errors.push('maxBid must be a valid number');
+    } else if (config.maxBid <= 0) {
+      errors.push('maxBid must be greater than 0');
+    } else if (config.maxBid > 10000) {
+      errors.push('maxBid cannot exceed $10,000 for safety');
+    }
+  }
+  
+  // Validate spending limits
+  if (config.dailyLimit !== undefined) {
+    if (typeof config.dailyLimit !== 'number' || isNaN(config.dailyLimit)) {
+      errors.push('dailyLimit must be a valid number');
+    } else if (config.dailyLimit <= 0) {
+      errors.push('dailyLimit must be greater than 0');
+    } else if (config.dailyLimit > 50000) {
+      errors.push('dailyLimit cannot exceed $50,000');
+    }
+  }
+  
+  if (config.totalLimit !== undefined) {
+    if (typeof config.totalLimit !== 'number' || isNaN(config.totalLimit)) {
+      errors.push('totalLimit must be a valid number');
+    } else if (config.totalLimit <= 0) {
+      errors.push('totalLimit must be greater than 0');
+    } else if (config.totalLimit > 100000) {
+      errors.push('totalLimit cannot exceed $100,000');
+    }
+  }
+  
+  // Validate increment
+  if (config.increment !== undefined) {
+    if (typeof config.increment !== 'number' || isNaN(config.increment)) {
+      errors.push('increment must be a valid number');
+    } else if (config.increment <= 0) {
+      errors.push('increment must be greater than 0');
+    } else if (config.increment > 1000) {
+      errors.push('increment cannot exceed $1,000');
+    }
+  }
+  
+  // Validate enabled flag
+  if (config.enabled !== undefined && typeof config.enabled !== 'boolean') {
+    errors.push('enabled must be a boolean value');
+  }
+  
+  return errors;
+}
+
 // Start monitoring an auction
 router.post('/auctions/:id/monitor', (req, res) => {
   try {
     const auctionId = req.params.id;
     const config = req.body.config || {};
     
+    // Validate configuration
+    const validationErrors = validateAuctionConfig(config);
+    if (validationErrors.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Configuration validation failed',
+        details: validationErrors
+      });
+    }
+    
     const success = auctionMonitor.addAuction(auctionId, config);
     
     if (success) {
-      res.json({ success: true, message: `Started monitoring auction ${auctionId}` });
+      res.json({ success: true, message: `Started monitoring auction ${auctionId}`, config });
     } else {
       res.status(400).json({ success: false, error: 'Auction already being monitored' });
     }
@@ -114,11 +187,49 @@ router.put('/auctions/:id/config', (req, res) => {
       return res.status(404).json({ success: false, error: 'Auction not being monitored' });
     }
     
+    // Merge new config with existing and validate
+    const mergedConfig = { ...auction.config, ...config };
+    const validationErrors = validateAuctionConfig(mergedConfig);
+    if (validationErrors.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Configuration validation failed',
+        details: validationErrors
+      });
+    }
+    
     // Update configuration
-    auction.config = { ...auction.config, ...config };
+    auction.config = mergedConfig;
+    
+    // Save updated auction to storage
+    auctionMonitor.updateAuctionConfig(auctionId, mergedConfig);
+    
     res.json({ success: true, config: auction.config });
   } catch (error) {
     console.error(`Error updating config for auction ${req.params.id}:`, error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get bid history for an auction
+router.get('/auctions/:id/bids', async (req, res) => {
+  try {
+    const auctionId = req.params.id;
+    const limit = parseInt(req.query.limit) || 50;
+    
+    if (limit > 100) {
+      return res.status(400).json({ success: false, error: 'Limit cannot exceed 100' });
+    }
+    
+    const bidHistory = await storage.getBidHistory(auctionId, limit);
+    res.json({
+      success: true,
+      auctionId,
+      bidHistory,
+      count: bidHistory.length
+    });
+  } catch (error) {
+    console.error(`Error getting bid history for auction ${req.params.id}:`, error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -134,6 +245,24 @@ router.post('/auctions/:id/bid', async (req, res) => {
     }
     
     const result = await nellisApi.placeBid(auctionId, amount);
+    
+    // Handle different error types with appropriate HTTP status codes
+    if (!result.success && result.errorType) {
+      const statusMap = {
+        'DUPLICATE_BID_AMOUNT': 409, // Conflict
+        'BID_TOO_LOW': 400,          // Bad Request
+        'AUCTION_ENDED': 410,        // Gone
+        'AUTHENTICATION_ERROR': 401, // Unauthorized
+        'OUTBID': 409,              // Conflict
+        'CONNECTION_ERROR': 503,     // Service Unavailable
+        'SERVER_ERROR': 502,         // Bad Gateway
+        'UNKNOWN_ERROR': 500         // Internal Server Error
+      };
+      
+      const statusCode = statusMap[result.errorType] || 500;
+      return res.status(statusCode).json(result);
+    }
+    
     res.json(result);
   } catch (error) {
     console.error(`Error placing bid on auction ${req.params.id}:`, error);
@@ -259,6 +388,7 @@ router.get('/auth/status', async (req, res) => {
       authenticated: authStatus.authenticated,
       cookieCount: authStatus.cookieCount,
       cookiesSet: authStatus.authenticated,
+      cookies: nellisApi.cookies || null,
       message: authStatus.authenticated ? 'Cookies are set' : 'No cookies set - please sync from extension'
     });
   } catch (error) {

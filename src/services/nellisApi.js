@@ -52,6 +52,7 @@ class NellisApi {
           title: product.title,
           currentBid: product.currentPrice || 0,
           nextBid: product.userState?.nextBid || product.currentPrice + 1,
+          minimumBid: product.userState?.nextBid || product.currentPrice + 1, // Alias for nextBid
           bidCount: product.bidCount || 0,
           bidderCount: product.bidderCount || 0,
           isWinning: product.userState?.isWinning || false,
@@ -168,13 +169,38 @@ class NellisApi {
       
       // Extract meaningful error message
       let errorMessage = error.message;
+      let errorType = 'UNKNOWN_ERROR';
+      
       if (error.response) {
-        errorMessage = error.response.data?.error || error.response.data?.message || `Server error: ${error.response.status}`;
+        const responseError = error.response.data?.error || error.response.data?.message;
+        if (responseError) {
+          errorMessage = responseError;
+          
+          // Categorize specific error types
+          if (responseError.includes('already placed a bid with the same price')) {
+            errorType = 'DUPLICATE_BID_AMOUNT';
+          } else if (responseError.includes('bid is too low') || responseError.includes('minimum bid')) {
+            errorType = 'BID_TOO_LOW';
+          } else if (responseError.includes('auction has ended') || responseError.includes('closed')) {
+            errorType = 'AUCTION_ENDED';
+          } else if (responseError.includes('authentication') || responseError.includes('login')) {
+            errorType = 'AUTHENTICATION_ERROR';
+          } else if (responseError.includes('outbid') || responseError.includes('higher bid')) {
+            errorType = 'OUTBID';
+          }
+        } else {
+          errorMessage = `Server error: ${error.response.status}`;
+          errorType = 'SERVER_ERROR';
+        }
+      } else if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+        errorType = 'CONNECTION_ERROR';
       }
       
       return {
         success: false,
-        error: errorMessage
+        error: errorMessage,
+        errorType: errorType,
+        retryable: ['CONNECTION_ERROR', 'SERVER_ERROR'].includes(errorType)
       };
     }
   }
