@@ -106,25 +106,60 @@ class AuctionMonitor extends EventEmitter {
       this.handleOutbid(auctionId, newData);
     }
 
-    // Execute auto-bid if enabled
-    if (auction.config.autoBid && !newData.isWinning) {
+    // Execute auto-bid based on strategy
+    if (auction.config.strategy !== 'manual' && !newData.isWinning && !auction.maxBidReached) {
       this.executeAutoBid(auctionId, newData);
     }
   }
 
   async executeAutoBid(auctionId, auctionData) {
     const auction = this.monitoredAuctions.get(auctionId);
-    if (!auction || !auction.config.autoBid) return;
+    if (!auction) return;
+
+    // Check strategy
+    if (auction.config.strategy === 'manual') {
+      return; // No auto-bidding for manual strategy
+    }
+
+    // For sniping strategy, only bid in the last 30 seconds
+    if (auction.config.strategy === 'sniping' && auctionData.timeRemaining > 30) {
+      return;
+    }
 
     const nextBid = auctionData.nextBid || auctionData.currentBid + auction.config.bidIncrement;
 
     if (nextBid <= auction.config.maxBid) {
       try {
-        console.log(`Executing auto-bid on auction ${auctionId}: $${nextBid}`);
+        console.log(`Executing auto-bid on auction ${auctionId}: $${nextBid} (strategy: ${auction.config.strategy})`);
         const result = await nellisApi.placeBid(auctionId, nextBid);
         
         if (result.success) {
-          this.emit('bidPlaced', { auctionId, amount: nextBid });
+          auction.lastBidAmount = nextBid;
+          auction.lastBidTime = Date.now();
+          
+          // Check if bid was accepted but we're still not winning
+          if (result.data && result.data.message && 
+              result.data.message.includes('another user has a higher maximum bid')) {
+            console.log(`Bid accepted but outbid on auction ${auctionId}. Current: $${result.data.data.currentAmount}, Next min: $${result.data.data.minimumNextBid}`);
+            
+            // Update auction data with the new values
+            if (result.data.data) {
+              auctionData.currentBid = result.data.data.currentAmount;
+              auctionData.nextBid = result.data.data.minimumNextBid;
+              auctionData.bidCount = result.data.data.bidCount;
+              auctionData.bidderCount = result.data.data.bidderCount;
+            }
+            
+            // For incremental strategy, immediately try to bid again if we're still under max
+            if (auction.config.strategy === 'increment' && 
+                result.data.data.minimumNextBid <= auction.config.maxBid) {
+              setTimeout(() => {
+                this.executeAutoBid(auctionId, auctionData);
+              }, 2000); // Wait 2 seconds before next bid
+            }
+          }
+          
+          this.emit('bidPlaced', { auctionId, amount: nextBid, result: result.data });
         } else {
           console.error(`Auto-bid failed for auction ${auctionId}:`, result.error);
         }
@@ -133,6 +168,7 @@ class AuctionMonitor extends EventEmitter {
       }
     } else {
       console.warn(`Auto-bid skipped for auction ${auctionId}: Next bid $${nextBid} exceeds max bid $${auction.config.maxBid}`);
+      auction.maxBidReached = true;
     }
   }
 

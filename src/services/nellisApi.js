@@ -83,38 +83,55 @@ class NellisApi {
 
   async placeBid(auctionId, amount) {
     try {
-      // This would implement the bid placement
-      // The actual implementation would need to reverse-engineer the bid endpoint
       console.info(`Placing bid on auction ${auctionId} for $${amount}`);
       
-      // Placeholder response
-      return {
-        success: false,
-        error: 'Bid placement not yet implemented'
-      };
+      // Ensure amount is a whole number
+      const bidAmount = Math.floor(amount);
       
-      // Actual implementation would look something like:
-      /*
-      const response = await axios.post(`${this.apiUrl}/auctions/${auctionId}/bid`, {
-        amount: amount
+      const response = await axios.post(`${this.baseUrl}/api/bids`, {
+        productId: parseInt(auctionId),
+        bid: bidAmount
       }, {
         headers: {
           ...this.headers,
           'Cookie': this.cookies,
-          'Content-Type': 'application/json'
+          'Content-Type': 'text/plain;charset=UTF-8',
+          'Accept': '*/*',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'Referer': `${this.baseUrl}/p/product/${auctionId}`,
+          'Origin': this.baseUrl
         }
       });
       
-      return {
-        success: true,
-        data: response.data
-      };
-      */
+      // Check if response indicates success
+      if (response.status === 200 || response.status === 201) {
+        console.info(`Successfully placed bid of $${bidAmount} on auction ${auctionId}`);
+        return {
+          success: true,
+          data: response.data,
+          amount: bidAmount
+        };
+      } else {
+        console.error(`Bid placement failed with status ${response.status}`);
+        return {
+          success: false,
+          error: `Bid failed with status ${response.status}`,
+          data: response.data
+        };
+      }
     } catch (error) {
       console.error(`Error placing bid on auction ${auctionId}:`, error);
+      
+      // Extract meaningful error message
+      let errorMessage = error.message;
+      if (error.response) {
+        errorMessage = error.response.data?.error || error.response.data?.message || `Server error: ${error.response.status}`;
+      }
+      
       return {
         success: false,
-        error: error.message
+        error: errorMessage
       };
     }
   }
