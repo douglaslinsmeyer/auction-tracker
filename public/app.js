@@ -158,25 +158,7 @@ class AuctionMonitorUI {
         // Update every second for time remaining
         setInterval(() => this.updateTimeRemaining(), 1000);
         
-        // Delegate event listeners for config changes
-        document.addEventListener('change', (e) => {
-            if (e.target.matches('.config-select, .config-input')) {
-                const auctionId = e.target.dataset.auctionId;
-                const configType = e.target.dataset.config;
-                const value = configType === 'maxBid' ? parseInt(e.target.value) || 0 : e.target.value;
-                
-                this.updateAuctionConfig(auctionId, configType, value);
-            }
-        });
-        
-        // Ensure max bid is always whole dollars
-        document.addEventListener('input', (e) => {
-            if (e.target.matches('.config-input[data-config="maxBid"]')) {
-                // Remove any decimal points or non-numeric characters
-                let value = e.target.value.replace(/[^\d]/g, '');
-                e.target.value = value;
-            }
-        });
+        // No longer needed - using inline event handlers
     }
     
     async loadAuctions() {
@@ -275,6 +257,15 @@ class AuctionMonitorUI {
         console.log(`Sending ${configType} update for auction ${auctionId} to ${value}`);
     }
     
+    updateStrategy(auctionId, strategy) {
+        this.updateAuctionConfig(auctionId, 'strategy', strategy);
+    }
+    
+    updateMaxBid(auctionId, value) {
+        const maxBid = parseInt(value) || 0;
+        this.updateAuctionConfig(auctionId, 'maxBid', maxBid);
+    }
+    
     render() {
         const auctionCount = this.auctions.size;
         this.elements.auctionCount.textContent = auctionCount;
@@ -288,7 +279,7 @@ class AuctionMonitorUI {
             this.elements.emptyState.style.display = 'none';
             
             this.elements.auctionsGrid.innerHTML = '';
-            this.auctions.forEach((auction, id) => {
+            this.auctions.forEach((auction) => {
                 this.elements.auctionsGrid.appendChild(this.createAuctionCard(auction));
             });
         }
@@ -313,142 +304,194 @@ class AuctionMonitorUI {
             return;
         }
         
-        // Update only the elements that might have changed
         const data = auction.data || {};
+        const timeRemaining = data.timeRemaining || 0;
+        const isWinning = data.isWinning || false;
         
-        // Update status badge
-        const statusBadge = card.querySelector('.auction-status');
-        if (statusBadge) {
-            statusBadge.className = `auction-status status-${auction.status}`;
-            statusBadge.textContent = auction.status;
+        // Update card status classes
+        card.className = 'auction-card';
+        if (isWinning) card.classList.add('winning');
+        else if (timeRemaining <= 30 && timeRemaining > 0) card.classList.add('urgent');
+        else if (timeRemaining <= 300 && timeRemaining > 0) card.classList.add('warning');
+        
+        // Status badges removed for cleaner design
+        
+        // Update current bid with flash animation
+        const priceElement = card.querySelector('.current-price');
+        if (priceElement && data.currentBid !== undefined) {
+            const oldPrice = priceElement.textContent;
+            const newPrice = `$${data.currentBid}`;
+            if (oldPrice !== newPrice) {
+                priceElement.textContent = newPrice;
+                priceElement.classList.add('price-flash');
+                setTimeout(() => priceElement.classList.remove('price-flash'), 500);
+            }
         }
         
-        // Update current bid
-        const currentBidElement = card.querySelector('.info-value.price');
-        if (currentBidElement && data.currentBid !== undefined) {
-            currentBidElement.textContent = `$${data.currentBid}`;
+        // Update price section class
+        const priceSection = card.querySelector('.price-section');
+        if (priceSection) {
+            priceSection.className = `price-section ${isWinning ? 'winning' : 'losing'}`;
         }
         
-        // Update time remaining
-        const timeElement = card.querySelector('.info-item:nth-child(2) .info-value');
-        if (timeElement && data.timeRemaining !== undefined) {
-            timeElement.textContent = this.formatTimeRemaining(data.timeRemaining);
-            timeElement.className = data.timeRemaining <= 30 && data.timeRemaining > 0 ? 'info-value time' : 'info-value';
+        // Update time bar
+        const timeBar = card.querySelector('.time-bar-fill');
+        if (timeBar && data.timeRemaining !== undefined) {
+            const maxTime = 3600;
+            const timePercentage = Math.min((timeRemaining / maxTime) * 100, 100);
+            timeBar.style.width = `${timePercentage}%`;
+            timeBar.className = `time-bar-fill ${timeRemaining <= 30 ? 'urgent' : timeRemaining <= 300 ? 'warning' : ''}`;
+        }
+        
+        // Update time remaining text
+        const timeText = card.querySelector('.time-remaining');
+        if (timeText && data.timeRemaining !== undefined) {
+            timeText.textContent = this.formatTimeRemaining(timeRemaining);
+        }
+        
+        // Update bidders count
+        const biddersElement = card.querySelector('.meta-item:first-child .meta-value');
+        if (biddersElement && data.bidderCount !== undefined) {
+            biddersElement.textContent = data.bidderCount;
         }
         
         // Update bid count
-        const bidCountElement = card.querySelector('.info-item:nth-child(3) .info-value');
+        const bidCountElement = card.querySelector('.meta-item:last-child .meta-value');
         if (bidCountElement && data.bidCount !== undefined) {
             bidCountElement.textContent = data.bidCount;
         }
         
-        // Update winning status
-        const statusElement = card.querySelector('.info-item:nth-child(4) .info-value');
-        if (statusElement && data.isWinning !== undefined) {
-            statusElement.textContent = data.isWinning ? 'Winning' : 'Watching';
-        }
-        
-        // Update config values if they changed
+        // Update strategy pills
         if (auction.config) {
-            // Update strategy select
-            const strategySelect = card.querySelector('.config-select[data-config="strategy"]');
-            if (strategySelect && strategySelect.value !== auction.config.strategy) {
-                strategySelect.value = auction.config.strategy;
-            }
+            const pills = card.querySelectorAll('.strategy-pill');
+            pills.forEach(pill => {
+                // Get strategy from the onclick attribute or text content
+                let strategy = '';
+                if (pill.textContent.trim() === 'Manual') strategy = 'manual';
+                else if (pill.textContent.trim() === 'Auto') strategy = 'increment';
+                else if (pill.textContent.trim() === 'Snipe') strategy = 'sniping';
+                
+                if (strategy === auction.config.strategy) {
+                    pill.classList.add('active');
+                    pill.setAttribute('disabled', 'true');
+                } else {
+                    pill.classList.remove('active');
+                    pill.removeAttribute('disabled');
+                }
+            });
             
-            // Update max bid input
-            const maxBidInput = card.querySelector('.config-input[data-config="maxBid"]');
+            // Update max bid
+            const maxBidInput = card.querySelector('.max-bid-input');
             if (maxBidInput && parseInt(maxBidInput.value) !== auction.config.maxBid) {
                 maxBidInput.value = auction.config.maxBid;
-            }
-            
-            // Update increment display
-            const incrementElement = card.querySelector('.config-row:last-child .config-value');
-            if (incrementElement && auction.config.bidIncrement !== undefined) {
-                incrementElement.textContent = `$${auction.config.bidIncrement}`;
             }
         }
     }
     
     createAuctionCard(auction) {
         const card = document.createElement('div');
-        card.className = 'auction-card';
-        card.setAttribute('data-auction-id', auction.id);
-        
-        const timeRemaining = this.formatTimeRemaining(auction.data?.timeRemaining || 0);
+        const timeRemaining = auction.data?.timeRemaining || 0;
         const currentBid = auction.data?.currentBid || 0;
         const bidCount = auction.data?.bidCount || 0;
+        const bidderCount = auction.data?.bidderCount || 0;
         const isWinning = auction.data?.isWinning || false;
+        
+        // Determine card status class
+        let cardClass = 'auction-card';
+        if (isWinning) cardClass += ' winning';
+        else if (timeRemaining <= 30 && timeRemaining > 0) cardClass += ' urgent';
+        else if (timeRemaining <= 300 && timeRemaining > 0) cardClass += ' warning';
+        
+        card.className = cardClass;
+        card.setAttribute('data-auction-id', auction.id);
+        
+        // Calculate time percentage for progress bar
+        const maxTime = 3600; // Assume 1 hour max for visualization
+        const timePercentage = Math.min((timeRemaining / maxTime) * 100, 100);
         
         card.innerHTML = `
             ${auction.imageUrl ? `
             <div class="auction-image">
-                <img src="${auction.imageUrl}" alt="${this.escapeHtml(auction.title)}" />
+                <img src="${auction.imageUrl}" alt="${this.escapeHtml(auction.title)}" onerror="this.parentElement.classList.add('no-image')" />
             </div>
-            ` : ''}
+            ` : '<div class="auction-image no-image"></div>'}
+            
             <div class="auction-header">
-                <div>
-                    <div class="auction-title">${this.escapeHtml(auction.title)}</div>
-                    <div class="auction-id">ID: ${auction.id}</div>
-                </div>
-                <span class="auction-status status-${auction.status}">${auction.status}</span>
+                <div class="auction-title">${this.escapeHtml(auction.title)}</div>
             </div>
             
             <div class="auction-body">
-                <div class="auction-info">
-                    <div class="info-item">
-                        <span class="info-label">Current Bid</span>
-                        <span class="info-value price">$${currentBid}</span>
+                <div class="price-section ${isWinning ? 'winning' : 'losing'}">
+                    <div class="current-price">$${currentBid}</div>
+                    <div class="time-bar">
+                        <div class="time-bar-fill ${timeRemaining <= 30 ? 'urgent' : timeRemaining <= 300 ? 'warning' : ''}" 
+                             style="width: ${timePercentage}%"></div>
                     </div>
-                    <div class="info-item">
-                        <span class="info-label">Time Remaining</span>
-                        <span class="info-value time">${timeRemaining}</span>
+                    <div class="time-remaining">${this.formatTimeRemaining(timeRemaining)}</div>
+                </div>
+                
+                <div class="auction-meta">
+                    <div class="meta-item">
+                        <svg fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
+                        </svg>
+                        <span class="meta-value">${bidderCount}</span>
+                        <span>bidders</span>
                     </div>
-                    <div class="info-item">
-                        <span class="info-label">Bid Count</span>
-                        <span class="info-value">${bidCount}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Status</span>
-                        <span class="info-value">${isWinning ? 'Winning' : 'Watching'}</span>
+                    <div class="meta-item">
+                        <svg fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="meta-value">${bidCount}</span>
+                        <span>bids</span>
                     </div>
                 </div>
                 
-                <div class="bid-config">
-                    <div class="config-row">
-                        <span class="config-label">Strategy:</span>
-                        <select class="config-select" data-auction-id="${auction.id}" data-config="strategy">
-                            <option value="manual" ${auction.config.strategy === 'manual' ? 'selected' : ''}>Manual Only</option>
-                            <option value="increment" ${auction.config.strategy === 'increment' ? 'selected' : ''}>Incremental</option>
-                            <option value="sniping" ${auction.config.strategy === 'sniping' ? 'selected' : ''}>Snipe (Last 30s)</option>
-                        </select>
-                    </div>
-                    <div class="config-row">
-                        <span class="config-label">Max Bid:</span>
-                        <div class="config-input-group">
-                            <span class="currency">$</span>
-                            <input type="number" 
-                                class="config-input" 
-                                data-auction-id="${auction.id}" 
-                                data-config="maxBid"
-                                value="${auction.config.maxBid}" 
-                                min="0" 
-                                step="1"
-                                placeholder="0">
-                        </div>
-                    </div>
-                    <div class="config-row">
-                        <span class="config-label">Increment:</span>
-                        <span class="config-value">$${auction.config.bidIncrement}</span>
-                    </div>
+                <div class="strategy-pills">
+                    <button class="strategy-pill ${auction.config.strategy === 'manual' ? 'active' : ''}" 
+                            onclick="monitorUI.updateStrategy('${auction.id}', 'manual')"
+                            ${auction.config.strategy === 'manual' ? 'disabled' : ''}>
+                        Manual
+                    </button>
+                    <button class="strategy-pill ${auction.config.strategy === 'increment' ? 'active' : ''}" 
+                            onclick="monitorUI.updateStrategy('${auction.id}', 'increment')"
+                            ${auction.config.strategy === 'increment' ? 'disabled' : ''}>
+                        Auto
+                    </button>
+                    <button class="strategy-pill ${auction.config.strategy === 'sniping' ? 'active' : ''}" 
+                            onclick="monitorUI.updateStrategy('${auction.id}', 'sniping')"
+                            ${auction.config.strategy === 'sniping' ? 'disabled' : ''}>
+                        Snipe
+                    </button>
                 </div>
-            </div>
-            
-            <div class="auction-actions">
-                <a href="${auction.url}" target="_blank" class="btn btn-primary btn-small">View Auction</a>
-                <button class="btn btn-danger btn-small" onclick="monitorUI.stopMonitoring('${auction.id}')">
-                    Stop Monitoring
-                </button>
+                
+                <div class="max-bid-section">
+                    <span class="max-bid-label">Max bid</span>
+                    <input type="number" 
+                        class="max-bid-input" 
+                        value="${auction.config.maxBid}" 
+                        min="0" 
+                        step="1"
+                        placeholder="0"
+                        onchange="monitorUI.updateMaxBid('${auction.id}', this.value)"
+                        onfocus="this.select()">
+                </div>
+                
+                <div class="quick-actions">
+                    <a href="${auction.url}" target="_blank" class="action-btn primary">
+                        <svg fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
+                            <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
+                        </svg>
+                        View
+                    </a>
+                    <button class="action-btn danger" onclick="monitorUI.stopMonitoring('${auction.id}')">
+                        <svg fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                        </svg>
+                        Stop
+                    </button>
+                </div>
             </div>
         `;
         
@@ -483,9 +526,32 @@ class AuctionMonitorUI {
             const auctionId = card.getAttribute('data-auction-id');
             const auction = this.auctions.get(auctionId);
             if (auction && auction.data) {
-                const timeElement = card.querySelector('.info-value.time');
+                const timeRemaining = auction.data.timeRemaining || 0;
+                
+                // Update time text
+                const timeElement = card.querySelector('.time-remaining');
                 if (timeElement) {
-                    timeElement.textContent = this.formatTimeRemaining(auction.data.timeRemaining);
+                    timeElement.textContent = this.formatTimeRemaining(timeRemaining);
+                }
+                
+                // Update time bar
+                const timeBar = card.querySelector('.time-bar-fill');
+                if (timeBar) {
+                    const maxTime = 3600;
+                    const timePercentage = Math.min((timeRemaining / maxTime) * 100, 100);
+                    timeBar.style.width = `${timePercentage}%`;
+                    timeBar.className = `time-bar-fill ${timeRemaining <= 30 ? 'urgent' : timeRemaining <= 300 ? 'warning' : ''}`;
+                }
+                
+                // Update card urgency class
+                if (timeRemaining <= 30 && timeRemaining > 0 && !card.classList.contains('urgent')) {
+                    card.classList.add('urgent');
+                    card.classList.remove('warning');
+                } else if (timeRemaining <= 300 && timeRemaining > 30 && !card.classList.contains('warning')) {
+                    card.classList.add('warning');
+                    card.classList.remove('urgent');
+                } else if (timeRemaining > 300) {
+                    card.classList.remove('warning', 'urgent');
                 }
             }
         });
