@@ -172,9 +172,9 @@ class WebSocketHandler {
       return;
     }
 
-    const { auctionId, config } = data;
+    const { auctionId, config, metadata } = data;
     console.log(`Adding auction ${auctionId} to monitor`);
-    const success = auctionMonitor.addAuction(auctionId, config);
+    const success = auctionMonitor.addAuction(auctionId, config, metadata);
     console.log(`Auction ${auctionId} monitoring result: ${success}`);
     
     const response = {

@@ -16,7 +16,7 @@ class AuctionMonitor extends EventEmitter {
     console.log('Auction monitor initialized');
   }
 
-  addAuction(auctionId, config = {}) {
+  addAuction(auctionId, config = {}, metadata = {}) {
     if (this.monitoredAuctions.has(auctionId)) {
       console.warn(`Auction ${auctionId} is already being monitored`);
       return false;
@@ -24,6 +24,8 @@ class AuctionMonitor extends EventEmitter {
 
     const auction = {
       id: auctionId,
+      title: metadata.title || 'Unknown',
+      url: metadata.url || '',
       config: {
         maxBid: config.maxBid || 0,
         bidIncrement: config.bidIncrement || 1,
@@ -235,6 +237,8 @@ class AuctionMonitor extends EventEmitter {
   getMonitoredAuctions() {
     return Array.from(this.monitoredAuctions.values()).map(auction => ({
       id: auction.id,
+      title: auction.title,
+      url: auction.url,
       status: auction.status,
       config: auction.config,
       data: auction.data,
