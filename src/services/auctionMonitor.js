@@ -11,10 +11,12 @@ class AuctionMonitor extends EventEmitter {
     this.pollingIntervals = new Map();
     this.wss = null;
     this.storageInitialized = false;
+    this.broadcastHandler = null;
   }
 
-  async initialize(wss) {
+  async initialize(wss, broadcastHandler = null) {
     this.wss = wss;
+    this.broadcastHandler = broadcastHandler;
     
     // Initialize storage
     await storage.initialize();
@@ -24,6 +26,10 @@ class AuctionMonitor extends EventEmitter {
     await this.recoverPersistedState();
     
     console.log('Auction monitor initialized with persistence');
+  }
+  
+  setBroadcastHandler(handler) {
+    this.broadcastHandler = handler;
   }
   
   async recoverPersistedState() {
@@ -54,18 +60,20 @@ class AuctionMonitor extends EventEmitter {
       return false;
     }
 
+    // Get global settings
+    const globalSettings = await storage.getSettings();
+
     const auction = {
       id: auctionId,
       title: metadata.title || 'Unknown',
       url: metadata.url || '',
       imageUrl: metadata.imageUrl || null,
       config: {
-        maxBid: config.maxBid || 0,
+        maxBid: config.maxBid || globalSettings.general.defaultMaxBid || 100,
         bidIncrement: config.bidIncrement || 1,
-        strategy: config.strategy || 'manual',
-        autoBid: config.autoBid || false,
-        notifyOnOutbid: config.notifyOnOutbid || true,
-        notifyOnEnd: config.notifyOnEnd || true
+        strategy: config.strategy || globalSettings.general.defaultStrategy || 'increment',
+        autoBid: config.autoBid !== undefined ? config.autoBid : globalSettings.general.autoBidDefault,
+        // Notification settings removed
       },
       lastUpdate: Date.now(),
       status: 'monitoring',
@@ -171,12 +179,17 @@ class AuctionMonitor extends EventEmitter {
       return; // No auto-bidding for manual strategy
     }
 
-    // For sniping strategy, only bid in the last 30 seconds
-    if (auction.config.strategy === 'sniping' && auctionData.timeRemaining > 30) {
+    // Get global settings for bidding logic
+    const globalSettings = await storage.getSettings();
+
+    // For sniping strategy, use configured snipe timing
+    if (auction.config.strategy === 'sniping' && auctionData.timeRemaining > globalSettings.bidding.snipeTiming) {
       return;
     }
 
-    const nextBid = auctionData.nextBid || auctionData.currentBid + auction.config.bidIncrement;
+    // Calculate next bid with buffer
+    const minimumBid = auctionData.nextBid || auctionData.currentBid + auction.config.bidIncrement;
+    const nextBid = minimumBid + globalSettings.bidding.bidBuffer;
 
     if (nextBid <= auction.config.maxBid) {
       auction.maxBidReached = false;
@@ -230,6 +243,8 @@ class AuctionMonitor extends EventEmitter {
             success: false,
             error: result.error
           });
+          
+          // Error notification removed
         }
       } catch (error) {
         console.error(`Error placing auto-bid for auction ${auctionId}:`, error);
@@ -241,6 +256,8 @@ class AuctionMonitor extends EventEmitter {
           success: false,
           error: error.message
         });
+        
+        // Error notification removed
       }
     } else {
       console.warn(`Auto-bid skipped for auction ${auctionId}: Next bid $${nextBid} exceeds max bid $${auction.config.maxBid}`);
@@ -252,19 +269,18 @@ class AuctionMonitor extends EventEmitter {
     console.log(`User outbid on auction ${auctionId}`);
     this.emit('outbid', { auctionId, currentBid: data.currentBid });
     
-    // Send notification through WebSocket
-    this.broadcastNotification({
-      type: 'outbid',
-      auctionId,
-      title: data.title,
-      currentBid: data.currentBid,
-      nextBid: data.nextBid
-    });
+    const auction = this.monitoredAuctions.get(auctionId);
+    if (!auction) return;
+    
+    // Outbid notification removed
   }
 
   handleAuctionEnd(auctionId, data) {
     console.log(`Auction ${auctionId} has ended`);
     this.stopPolling(auctionId);
+    
+    const auction = this.monitoredAuctions.get(auctionId);
+    if (!auction) return;
     
     this.emit('auctionEnded', { 
       auctionId, 
@@ -272,14 +288,7 @@ class AuctionMonitor extends EventEmitter {
       won: data.isWinning 
     });
 
-    // Send notification
-    this.broadcastNotification({
-      type: 'ended',
-      auctionId,
-      title: data.title,
-      finalPrice: data.currentBid,
-      won: data.isWinning
-    });
+    // End notification removed
 
     // Remove from monitoring after a delay
     setTimeout(() => {
@@ -317,10 +326,17 @@ class AuctionMonitor extends EventEmitter {
   }
 
   broadcastAuctionState(auctionId) {
-    if (!this.wss) return;
-    
     const auction = this.monitoredAuctions.get(auctionId);
     if (!auction) return;
+    
+    // If we have a broadcast handler, use it
+    if (this.broadcastHandler) {
+      this.broadcastHandler(auctionId);
+      return;
+    }
+    
+    // Fallback to direct broadcast if no handler is set
+    if (!this.wss) return;
     
     // Get full auction data
     const auctionState = {
@@ -346,20 +362,7 @@ class AuctionMonitor extends EventEmitter {
     });
   }
 
-  broadcastNotification(notification) {
-    if (!this.wss) return;
-    
-    const message = JSON.stringify({
-      type: 'notification',
-      ...notification
-    });
-
-    this.wss.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(message);
-      }
-    });
-  }
+  // Notification broadcast method removed
 
   getMonitoredAuctions() {
     return Array.from(this.monitoredAuctions.values()).map(auction => ({
@@ -389,6 +392,9 @@ class AuctionMonitor extends EventEmitter {
     
     // Persist the updated auction
     await storage.saveAuction(auctionId, auction);
+    
+    // Broadcast the updated state to all connected clients
+    this.broadcastAuctionState(auctionId);
     
     return true;
   }

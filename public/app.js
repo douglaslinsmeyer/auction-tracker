@@ -9,16 +9,14 @@ class AuctionMonitorUI {
         
         this.elements = {
             connectionStatus: document.getElementById('connection-status'),
-            statusDot: document.querySelector('#connection-status .status-dot'),
-            statusText: document.querySelector('#connection-status .status-text'),
+            statusDot: document.getElementById('connection-dot'),
+            statusText: document.getElementById('connection-text'),
             authStatus: document.getElementById('auth-status'),
-            authStatusDot: document.querySelector('#auth-status .status-dot'),
-            authStatusText: document.querySelector('#auth-status .status-text'),
-            auctionCount: document.getElementById('auction-count'),
+            authStatusDot: document.getElementById('auth-dot'),
+            authStatusText: document.getElementById('auth-text'),
             auctionsGrid: document.getElementById('auctions-grid'),
             emptyState: document.getElementById('empty-state'),
-            refreshBtn: document.getElementById('refresh-btn'),
-            clearAllBtn: document.getElementById('clear-all-btn')
+            auctionCount: document.getElementById('auction-count')
         };
         
         this.init();
@@ -91,8 +89,16 @@ class AuctionMonitorUI {
     }
     
     updateConnectionStatus(status) {
-        this.elements.statusDot.className = `status-dot ${status}`;
-        this.elements.statusText.textContent = status === 'connected' ? 'Connected' : 'Disconnected';
+        const connectionDot = document.getElementById('connection-dot');
+        const connectionText = document.getElementById('connection-text');
+        
+        if (status === 'connected') {
+            connectionDot.className = 'inline-block w-2 h-2 rounded-full bg-green-500';
+            connectionText.textContent = 'Connected';
+        } else {
+            connectionDot.className = 'inline-block w-2 h-2 rounded-full bg-red-500';
+            connectionText.textContent = 'Disconnected';
+        }
     }
     
     handleWebSocketMessage(data) {
@@ -157,23 +163,11 @@ class AuctionMonitorUI {
     }
     
     attachEventListeners() {
-        this.elements.refreshBtn.addEventListener('click', () => this.loadAuctions());
-        
-        this.elements.clearAllBtn.addEventListener('click', () => {
-            if (confirm('Are you sure you want to stop monitoring all auctions?')) {
-                this.clearAllAuctions();
-            }
-        });
-        
         // Update every second for time remaining
         setInterval(() => this.updateTimeRemaining(), 1000);
-        
-        // No longer needed - using inline event handlers
     }
     
     async loadAuctions() {
-        this.elements.refreshBtn.disabled = true;
-        
         try {
             const response = await fetch('/api/auctions');
             const data = await response.json();
@@ -183,8 +177,6 @@ class AuctionMonitorUI {
             }
         } catch (error) {
             console.error('Failed to load auctions:', error);
-        } finally {
-            this.elements.refreshBtn.disabled = false;
         }
     }
     
@@ -199,21 +191,22 @@ class AuctionMonitorUI {
     }
     
     handleAuctionState(auction) {
-        console.log('Received auction state:', auction.id);
+        console.log('Received auction state:', auction.id, 'Config:', auction.config);
         
         const existingAuction = this.auctions.get(auction.id);
         
         // Store the auction state
         this.auctions.set(auction.id, auction);
         
-        // Update count
-        this.elements.auctionCount.textContent = this.auctions.size;
+        // Count update removed
         
         if (!existingAuction) {
             // New auction - need full render
+            console.log('New auction, performing full render');
             this.render();
         } else {
             // Existing auction - patch the card
+            console.log('Existing auction, patching card');
             this.patchAuctionCard(auction);
         }
     }
@@ -283,7 +276,7 @@ class AuctionMonitorUI {
         // When strategy is changed, also update autoBid flag
         const configUpdate = {
             strategy: strategy,
-            autoBid: strategy !== 'manual'  // Enable autoBid for non-manual strategies
+            autoBid: true  // Always enable autoBid since we removed manual
         };
         
         // Send both updates together
@@ -294,7 +287,7 @@ class AuctionMonitorUI {
             requestId: this.generateRequestId()
         });
         
-        console.log(`Updating strategy for auction ${auctionId} to ${strategy} with autoBid: ${strategy !== 'manual'}`);
+        console.log(`Updating strategy for auction ${auctionId} to ${strategy} with autoBid: true`);
     }
     
     validateMaxBidInput(inputElement, auctionId) {
@@ -303,19 +296,23 @@ class AuctionMonitorUI {
         
         if (auction && auction.data && auction.data.nextBid) {
             const minimumBid = auction.data.nextBid;
+            const isWinning = auction.data.isWinning || false;
             
             // Update input attributes in real-time
             inputElement.min = minimumBid;
             inputElement.placeholder = minimumBid;
-            inputElement.title = `Minimum bid: $${minimumBid}`;
+            inputElement.title = `Maximum bid (minimum: $${minimumBid})`;
             
-            // Visual feedback for invalid values
-            if (value > 0 && value < minimumBid) {
-                inputElement.style.borderColor = '#ef4444';
-                inputElement.style.backgroundColor = '#fef2f2';
-            } else {
-                inputElement.style.borderColor = '';
-                inputElement.style.backgroundColor = '';
+            // Get the container div for visual validation
+            const maxBidContainer = inputElement.closest('div.flex.items-center.gap-3');
+            if (maxBidContainer) {
+                // Visual feedback for invalid values on the container
+                // Don't show error if user is winning, even if max bid is less than next bid
+                if (value > 0 && value < minimumBid && !isWinning) {
+                    maxBidContainer.className = 'flex items-center gap-3 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg px-4 py-3';
+                } else {
+                    maxBidContainer.className = 'flex items-center gap-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-4 py-3';
+                }
             }
         }
     }
@@ -352,14 +349,13 @@ class AuctionMonitorUI {
     render() {
         const auctionCount = this.auctions.size;
         this.elements.auctionCount.textContent = auctionCount;
-        this.elements.clearAllBtn.disabled = auctionCount === 0;
         
         if (auctionCount === 0) {
-            this.elements.auctionsGrid.style.display = 'none';
-            this.elements.emptyState.style.display = 'block';
+            this.elements.auctionsGrid.classList.add('hidden');
+            this.elements.emptyState.classList.remove('hidden');
         } else {
-            this.elements.auctionsGrid.style.display = 'grid';
-            this.elements.emptyState.style.display = 'none';
+            this.elements.auctionsGrid.classList.remove('hidden');
+            this.elements.emptyState.classList.add('hidden');
             
             this.elements.auctionsGrid.innerHTML = '';
             this.auctions.forEach((auction) => {
@@ -383,145 +379,192 @@ class AuctionMonitorUI {
         const card = document.querySelector(`[data-auction-id="${auction.id}"]`);
         if (!card) {
             // Card doesn't exist, create it
+            console.log('Card not found for auction:', auction.id, '- performing full render');
             this.render();
             return;
         }
+        
+        console.log('Patching card for auction:', auction.id, 'with config:', auction.config);
         
         const data = auction.data || {};
         const timeRemaining = data.timeRemaining || 0;
         const isWinning = data.isWinning || false;
         
-        // Update card status classes
-        card.className = 'auction-card';
+        // Update card status classes without removing base classes
+        // Keep the base classes and only update status
+        card.classList.remove('winning', 'urgent', 'warning');
         if (isWinning) card.classList.add('winning');
         else if (timeRemaining <= 30 && timeRemaining > 0) card.classList.add('urgent');
         else if (timeRemaining <= 300 && timeRemaining > 0) card.classList.add('warning');
         
         // Status badges removed for cleaner design
         
-        // Update current bid with flash animation
-        const priceElement = card.querySelector('.current-price');
+        // Update current bid
+        const priceElement = card.querySelector('.text-2xl.font-bold');
         if (priceElement && data.currentBid !== undefined) {
-            const oldPrice = priceElement.textContent;
             const newPrice = `$${data.currentBid}`;
-            if (oldPrice !== newPrice) {
-                priceElement.textContent = newPrice;
-                priceElement.classList.add('price-flash');
-                setTimeout(() => priceElement.classList.remove('price-flash'), 500);
+            priceElement.textContent = newPrice;
+            // Update price color based on winning status
+            priceElement.className = `text-2xl font-bold ${isWinning ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}`;
+        }
+        
+        // Update status badge
+        const imageContainer = card.querySelector('.h-56.overflow-hidden');
+        if (imageContainer) {
+            // Find existing status badge
+            let statusBadge = imageContainer.querySelector('.absolute.top-2.left-2');
+            
+            // Determine new badge content
+            let newBadgeHTML = '';
+            if (isWinning) {
+                newBadgeHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>WINNING';
+            } else if (timeRemaining <= 30 && timeRemaining > 0) {
+                newBadgeHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>ENDING';
+            } else if (timeRemaining <= 300 && timeRemaining > 0) {
+                newBadgeHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>WARNING';
+            }
+            
+            if (newBadgeHTML) {
+                if (statusBadge) {
+                    // Update existing badge
+                    statusBadge.innerHTML = newBadgeHTML;
+                    statusBadge.className = `absolute top-2 left-2 px-3 py-1.5 ${isWinning ? 'bg-green-500' : timeRemaining <= 30 ? 'bg-red-500' : 'bg-yellow-500'} text-white text-xs font-bold rounded-full shadow-lg flex items-center gap-1.5`;
+                } else {
+                    // Create new badge
+                    statusBadge = document.createElement('div');
+                    statusBadge.className = `absolute top-2 left-2 px-3 py-1.5 ${isWinning ? 'bg-green-500' : timeRemaining <= 30 ? 'bg-red-500' : 'bg-yellow-500'} text-white text-xs font-bold rounded-full shadow-lg flex items-center gap-1.5`;
+                    statusBadge.innerHTML = newBadgeHTML;
+                    // Insert after gradient overlay
+                    const gradient = imageContainer.querySelector('.bg-gradient-to-t');
+                    if (gradient) {
+                        gradient.insertAdjacentElement('afterend', statusBadge);
+                    }
+                }
+            } else if (statusBadge) {
+                // Remove badge if no longer needed
+                statusBadge.remove();
             }
         }
         
-        // Update price section class
-        const priceSection = card.querySelector('.price-section');
-        if (priceSection) {
-            priceSection.className = `price-section ${isWinning ? 'winning' : 'losing'}`;
-        }
-        
         // Update time bar
-        const timeBar = card.querySelector('.time-bar-fill');
+        const timeBar = card.querySelector('.bg-gray-200.dark\\:bg-gray-600.rounded-full.h-1\\.5 > div');
         if (timeBar && data.timeRemaining !== undefined) {
             const maxTime = 3600;
             const timePercentage = Math.min((timeRemaining / maxTime) * 100, 100);
             timeBar.style.width = `${timePercentage}%`;
-            timeBar.className = `time-bar-fill ${timeRemaining <= 30 ? 'urgent' : timeRemaining <= 300 ? 'warning' : ''}`;
+            timeBar.className = `h-full rounded-full transition-all duration-300 ${timeRemaining <= 30 ? 'bg-red-500' : timeRemaining <= 300 ? 'bg-yellow-500' : 'bg-primary-500'}`;
         }
         
         // Update time remaining text
-        const timeText = card.querySelector('.time-remaining');
+        const timeText = card.querySelector('.text-right .text-lg.font-semibold');
         if (timeText && data.timeRemaining !== undefined) {
             timeText.textContent = this.formatTimeRemaining(timeRemaining);
+            timeText.className = `text-lg font-semibold ${timeRemaining <= 30 ? 'text-red-600 dark:text-red-400' : timeRemaining <= 300 ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-700 dark:text-gray-300'}`;
         }
         
         // Update bidders count
-        const biddersElement = card.querySelector('.meta-item:first-child .meta-value');
-        if (biddersElement && data.bidderCount !== undefined) {
-            biddersElement.textContent = data.bidderCount;
+        const statsContainer = card.querySelector('.flex.items-center.justify-center.gap-6');
+        if (statsContainer) {
+            const biddersStrong = statsContainer.querySelector('div:first-child strong');
+            if (biddersStrong && data.bidderCount !== undefined) {
+                biddersStrong.textContent = data.bidderCount;
+            }
+            
+            // Update bid count
+            const bidCountStrong = statsContainer.querySelector('div:last-child strong');
+            if (bidCountStrong && data.bidCount !== undefined) {
+                bidCountStrong.textContent = data.bidCount;
+            }
         }
         
-        // Update bid count
-        const bidCountElement = card.querySelector('.meta-item:last-child .meta-value');
-        if (bidCountElement && data.bidCount !== undefined) {
-            bidCountElement.textContent = data.bidCount;
-        }
-        
-        // Update strategy pills
+        // Update strategy buttons
         if (auction.config) {
-            const pills = card.querySelectorAll('.strategy-pill');
-            pills.forEach(pill => {
-                // Get strategy from the onclick attribute or text content
-                let strategy = '';
-                if (pill.textContent.trim() === 'Manual') strategy = 'manual';
-                else if (pill.textContent.trim() === 'Auto') strategy = 'increment';
-                else if (pill.textContent.trim() === 'Snipe') strategy = 'sniping';
-                
-                if (strategy === auction.config.strategy) {
-                    pill.classList.add('active');
-                    pill.setAttribute('disabled', 'true');
-                } else {
-                    pill.classList.remove('active');
-                    pill.removeAttribute('disabled');
+            const strategyContainer = card.querySelector('.grid.grid-cols-2.gap-1\\.5');
+            if (strategyContainer) {
+                const buttons = strategyContainer.querySelectorAll('button');
+                buttons.forEach(button => {
+                    // Get strategy from the onclick attribute
+                    const onclickAttr = button.getAttribute('onclick');
+                    let strategy = '';
+                    if (onclickAttr && onclickAttr.includes("'increment'")) strategy = 'increment';
+                    else if (onclickAttr && onclickAttr.includes("'sniping'")) strategy = 'sniping';
+                    
+                    if (strategy === auction.config.strategy) {
+                        // Active strategy styling
+                        button.className = 'px-2 py-1.5 text-xs font-medium rounded-md transition-all bg-primary-600 text-white shadow-sm';
+                        button.setAttribute('disabled', 'true');
+                    } else {
+                        // Inactive strategy styling
+                        button.className = 'px-2 py-1.5 text-xs font-medium rounded-md transition-all bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600';
+                        button.removeAttribute('disabled');
+                    }
+                });
+            }
+            
+            // Update autobid toggle button
+            const autoBidButtons = card.querySelectorAll('button');
+            autoBidButtons.forEach(button => {
+                const onclickAttr = button.getAttribute('onclick');
+                if (onclickAttr && onclickAttr.includes('toggleAutoBid')) {
+                    const isEnabled = auction.config.autoBid;
+                    
+                    // Update button styling
+                    button.className = `w-full px-3 py-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${isEnabled ? 'bg-green-500 hover:bg-green-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`;
+                    button.title = `${isEnabled ? 'Pause' : 'Enable'} auto-bidding`;
+                    
+                    // Update icon
+                    const svg = button.querySelector('svg path');
+                    if (svg) {
+                        svg.setAttribute('d', isEnabled ? 
+                            'M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zM11 8a1 1 0 112 0v4a1 1 0 11-2 0V8z' :
+                            'M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z');
+                    }
+                    
+                    // Update text content
+                    const textSpans = button.querySelectorAll('span');
+                    textSpans.forEach(span => {
+                        if (span.textContent.includes('Auto-bid')) {
+                            span.textContent = `${isEnabled ? 'Pause' : 'Enable'} Auto-bid`;
+                        } else if (span.className.includes('text-xs')) {
+                            span.className = `text-xs font-medium px-2 py-0.5 rounded-full ${isEnabled ? 'bg-green-400/20 text-green-700 dark:text-green-300' : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-400'}`;
+                            span.textContent = isEnabled ? 'ACTIVE' : 'PAUSED';
+                        }
+                    });
                 }
             });
             
-            // Update autobid toggle
-            const autoBidToggle = card.querySelector('.autobid-toggle');
-            if (autoBidToggle) {
-                const isEnabled = auction.config.autoBid;
-                autoBidToggle.className = `autobid-toggle ${isEnabled ? 'enabled' : 'disabled'}`;
-                autoBidToggle.title = `${isEnabled ? 'Pause' : 'Enable'} auto-bidding`;
-                
-                // Update icon
-                const icon = autoBidToggle.querySelector('.autobid-icon');
-                if (icon) {
-                    icon.innerHTML = isEnabled ? 
-                        '<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zM11 8a1 1 0 112 0v4a1 1 0 11-2 0V8z" clip-rule="evenodd"/>' :
-                        '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/>';
-                }
-                
-                // Update label
-                const label = autoBidToggle.querySelector('.autobid-label');
-                if (label) {
-                    label.textContent = `${isEnabled ? 'Pause' : 'Enable'} Auto-bid`;
-                }
-                
-                // Update status
-                const status = autoBidToggle.querySelector('.autobid-status');
-                if (status) {
-                    status.className = `autobid-status ${isEnabled ? 'active' : 'inactive'}`;
-                    status.textContent = isEnabled ? 'ACTIVE' : 'PAUSED';
-                }
-            }
             
-            // Update autobid badge
-            const header = card.querySelector('.auction-header');
-            if (header) {
-                const existingBadge = header.querySelector('.autobid-badge');
-                const shouldShowBadge = auction.config.autoBid && auction.config.strategy !== 'manual';
-                
-                if (shouldShowBadge && !existingBadge) {
-                    // Add badge
-                    const badge = document.createElement('div');
-                    badge.className = 'autobid-badge active';
-                    badge.innerHTML = '<svg fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg>AUTO';
-                    header.appendChild(badge);
-                } else if (!shouldShowBadge && existingBadge) {
-                    // Remove badge
-                    existingBadge.remove();
+            // Update max bid input
+            const maxBidInput = card.querySelector('input[type="number"]');
+            if (maxBidInput) {
+                // Only update value if it's different to avoid losing user input
+                if (parseInt(maxBidInput.value) !== auction.config.maxBid) {
+                    maxBidInput.value = auction.config.maxBid;
                 }
-            }
-            
-            // Update max bid and validation
-            const maxBidInput = card.querySelector('.max-bid-input');
-            if (maxBidInput && parseInt(maxBidInput.value) !== auction.config.maxBid) {
-                maxBidInput.value = auction.config.maxBid;
-            }
-            
-            // Update minimum bid validation attributes
-            if (maxBidInput && auction.data && auction.data.nextBid) {
-                const minimumBid = auction.data.nextBid;
-                maxBidInput.min = minimumBid;
-                maxBidInput.placeholder = minimumBid;
-                maxBidInput.title = `Minimum bid: $${minimumBid}`;
+                
+                // Update minimum bid validation attributes
+                if (auction.data && auction.data.nextBid) {
+                    const minimumBid = auction.data.nextBid;
+                    const isWinning = auction.data.isWinning || false;
+                    
+                    maxBidInput.min = minimumBid;
+                    maxBidInput.placeholder = minimumBid;
+                    maxBidInput.title = `Maximum bid (minimum: $${minimumBid})`;
+                    
+                    // Get the container div for visual validation
+                    const maxBidContainer = maxBidInput.closest('div.flex.items-center.gap-3');
+                    if (maxBidContainer) {
+                        const currentValue = parseInt(maxBidInput.value) || 0;
+                        // Don't show error if user is winning, even if max bid is less than next bid
+                        if (currentValue > 0 && currentValue < minimumBid && !isWinning) {
+                            // Show error state on container
+                            maxBidContainer.className = 'flex items-center gap-3 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg px-4 py-3';
+                        } else {
+                            // Reset to normal state
+                            maxBidContainer.className = 'flex items-center gap-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-4 py-3';
+                        }
+                    }
+                }
             }
         }
     }
@@ -534,13 +577,21 @@ class AuctionMonitorUI {
         const bidderCount = auction.data?.bidderCount || 0;
         const isWinning = auction.data?.isWinning || false;
         
-        // Determine card status class
-        let cardClass = 'auction-card';
-        if (isWinning) cardClass += ' winning';
-        else if (timeRemaining <= 30 && timeRemaining > 0) cardClass += ' urgent';
-        else if (timeRemaining <= 300 && timeRemaining > 0) cardClass += ' warning';
+        // Determine card status
+        let statusClass = '';
+        let statusColor = '';
+        if (isWinning) {
+            statusClass = 'winning';
+            statusColor = 'bg-green-500';
+        } else if (timeRemaining <= 30 && timeRemaining > 0) {
+            statusClass = 'urgent';
+            statusColor = 'bg-red-500';
+        } else if (timeRemaining <= 300 && timeRemaining > 0) {
+            statusClass = 'warning';
+            statusColor = 'bg-yellow-500';
+        }
         
-        card.className = cardClass;
+        card.className = `group bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden border border-gray-100 dark:border-gray-700 ${statusClass}`;
         card.setAttribute('data-auction-id', auction.id);
         card.addEventListener('click', (e) => {
             // Don't trigger on button clicks
@@ -554,111 +605,133 @@ class AuctionMonitorUI {
         const maxTime = 3600; // Assume 1 hour max for visualization
         const timePercentage = Math.min((timeRemaining / maxTime) * 100, 100);
         
+        // Determine status badge
+        let statusBadge = '';
+        if (isWinning) {
+            statusBadge = '<div class="absolute top-2 left-2 px-3 py-1.5 bg-green-500 text-white text-xs font-bold rounded-full shadow-lg flex items-center gap-1.5"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>WINNING</div>';
+        } else if (timeRemaining <= 30 && timeRemaining > 0) {
+            statusBadge = '<div class="absolute top-2 left-2 px-3 py-1.5 bg-red-500 text-white text-xs font-bold rounded-full shadow-lg flex items-center gap-1.5"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>ENDING</div>';
+        } else if (timeRemaining <= 300 && timeRemaining > 0) {
+            statusBadge = '<div class="absolute top-2 left-2 px-3 py-1.5 bg-yellow-500 text-white text-xs font-bold rounded-full shadow-lg flex items-center gap-1.5"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>WARNING</div>';
+        }
+
         card.innerHTML = `
-            ${auction.imageUrl ? `
-            <div class="auction-image">
-                <img src="${auction.imageUrl}" alt="${this.escapeHtml(auction.title)}" onerror="this.parentElement.classList.add('no-image')" />
+            <div class="relative">
+                ${auction.imageUrl ? `
+                <div class="h-56 overflow-hidden bg-gray-100 dark:bg-gray-700 relative">
+                    <img src="${auction.imageUrl}" alt="${this.escapeHtml(auction.title)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onerror="this.parentElement.innerHTML='<div class=\\'flex items-center justify-center h-full text-gray-400\\'>No Image</div>'" />
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
+                    ${statusBadge}
+                    <div class="absolute bottom-0 left-0 right-0 p-4">
+                        <h3 class="text-white font-semibold text-lg line-clamp-2 drop-shadow-lg">${this.escapeHtml(auction.title)}</h3>
+                    </div>
+                </div>
+                ` : `<div class="h-56 bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-400 relative">
+                    <span class="text-gray-400">No Image</span>
+                    ${statusBadge}
+                    <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-gray-200 dark:from-gray-800 to-transparent">
+                        <h3 class="text-gray-700 dark:text-gray-300 font-semibold text-lg line-clamp-2">${this.escapeHtml(auction.title)}</h3>
+                    </div>
+                </div>`}
             </div>
-            ` : '<div class="auction-image no-image"></div>'}
             
-            <div class="auction-header">
-                <div class="auction-title">${this.escapeHtml(auction.title)}</div>
-                ${auction.config.autoBid && auction.config.strategy !== 'manual' ? 
-                    '<div class="autobid-badge active"><svg fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg>AUTO</div>' : 
-                    ''
-                }
-            </div>
-            
-            <div class="auction-body">
-                <div class="price-section ${isWinning ? 'winning' : 'losing'}">
-                    <div class="current-price">$${currentBid}</div>
-                    <div class="time-bar">
-                        <div class="time-bar-fill ${timeRemaining <= 30 ? 'urgent' : timeRemaining <= 300 ? 'warning' : ''}" 
-                             style="width: ${timePercentage}%"></div>
-                    </div>
-                    <div class="time-remaining">${this.formatTimeRemaining(timeRemaining)}</div>
-                </div>
+            <div class="p-5">
                 
-                <div class="auction-meta">
-                    <div class="meta-item">
-                        <svg fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
-                        </svg>
-                        <span class="meta-value">${bidderCount}</span>
-                        <span>bidders</span>
+                <div class="space-y-3">
+                    <!-- Price and Time -->
+                    <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <div>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Current Bid</p>
+                                <p class="text-2xl font-bold ${isWinning ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}">$${currentBid}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Time Left</p>
+                                <p class="text-lg font-semibold ${timeRemaining <= 30 ? 'text-red-600 dark:text-red-400' : timeRemaining <= 300 ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-700 dark:text-gray-300'}">${this.formatTimeRemaining(timeRemaining)}</p>
+                            </div>
+                        </div>
+                        <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-1.5 overflow-hidden">
+                            <div class="h-full rounded-full transition-all duration-300 ${timeRemaining <= 30 ? 'bg-red-500' : timeRemaining <= 300 ? 'bg-yellow-500' : 'bg-primary-500'}" style="width: ${timePercentage}%"></div>
+                        </div>
                     </div>
-                    <div class="meta-item">
-                        <svg fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
-                        </svg>
-                        <span class="meta-value">${bidCount}</span>
-                        <span>bids</span>
+                    
+                    <!-- Stats -->
+                    <div class="flex items-center justify-center gap-6 text-sm">
+                        <div class="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
+                            </svg>
+                            <span><strong class="font-semibold text-gray-900 dark:text-white">${bidderCount}</strong> bidders</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252zM10 8V2.002A8.001 8.001 0 1018 10h-6a2 2 0 01-2-2z" clip-rule="evenodd"/>
+                            </svg>
+                            <span><strong class="font-semibold text-gray-900 dark:text-white">${bidCount}</strong> bids</span>
+                        </div>
                     </div>
-                </div>
-                
-                <div class="strategy-pills">
-                    <button class="strategy-pill ${auction.config.strategy === 'manual' ? 'active' : ''}" 
-                            onclick="monitorUI.updateStrategy('${auction.id}', 'manual')"
-                            ${auction.config.strategy === 'manual' ? 'disabled' : ''}>
-                        Manual
-                    </button>
-                    <button class="strategy-pill ${auction.config.strategy === 'increment' ? 'active' : ''}" 
-                            onclick="monitorUI.updateStrategy('${auction.id}', 'increment')"
-                            ${auction.config.strategy === 'increment' ? 'disabled' : ''}>
-                        Auto
-                    </button>
-                    <button class="strategy-pill ${auction.config.strategy === 'sniping' ? 'active' : ''}" 
-                            onclick="monitorUI.updateStrategy('${auction.id}', 'sniping')"
-                            ${auction.config.strategy === 'sniping' ? 'disabled' : ''}>
-                        Snipe
-                    </button>
-                </div>
-                
-                <div class="autobid-control">
-                    <button class="autobid-toggle ${auction.config.autoBid ? 'enabled' : 'disabled'}" 
+                    
+                    <!-- Bidding Strategy -->
+                    <div class="grid grid-cols-2 gap-1.5">
+                        <button class="px-2 py-1.5 text-xs font-medium rounded-md transition-all ${auction.config.strategy === 'increment' ? 'bg-primary-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}" 
+                                onclick="monitorUI.updateStrategy('${auction.id}', 'increment')"
+                                ${auction.config.strategy === 'increment' ? 'disabled' : ''}>
+                            Auto
+                        </button>
+                        <button class="px-2 py-1.5 text-xs font-medium rounded-md transition-all ${auction.config.strategy === 'sniping' ? 'bg-primary-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}" 
+                                onclick="monitorUI.updateStrategy('${auction.id}', 'sniping')"
+                                ${auction.config.strategy === 'sniping' ? 'disabled' : ''}>
+                            Snipe
+                        </button>
+                    </div>
+                    
+                    <!-- Max Bid -->
+                    <div class="flex items-center gap-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-4 py-3">
+                        <label class="text-sm font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">Max Bid:</label>
+                        <div class="relative flex-1">
+                            <span class="absolute left-0 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 font-semibold text-base">$</span>
+                            <input type="number" 
+                                class="w-full pl-5 bg-transparent border-0 text-base font-medium text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-0" 
+                                value="${auction.config.maxBid}" 
+                                min="${auction.data?.nextBid || 0}" 
+                                step="1"
+                                placeholder="${auction.data?.nextBid || 0}"
+                                title="Maximum bid (minimum: $${auction.data?.nextBid || 0})"
+                                onchange="monitorUI.updateMaxBid('${auction.id}', this.value)"
+                                oninput="monitorUI.validateMaxBidInput(this, '${auction.id}')"
+                                onfocus="this.select()">
+                        </div>
+                    </div>
+                    
+                    <!-- Auto-bid Toggle -->
+                    <button class="w-full px-3 py-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${auction.config.autoBid ? 'bg-green-500 hover:bg-green-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}" 
                             onclick="monitorUI.toggleAutoBid('${auction.id}')"
                             title="${auction.config.autoBid ? 'Pause' : 'Enable'} auto-bidding">
-                        <svg class="autobid-icon" fill="currentColor" viewBox="0 0 20 20">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                             ${auction.config.autoBid ? 
                                 '<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zM11 8a1 1 0 112 0v4a1 1 0 11-2 0V8z" clip-rule="evenodd"/>' :
                                 '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/>'
                             }
                         </svg>
-                        <span class="autobid-label">${auction.config.autoBid ? 'Pause' : 'Enable'} Auto-bid</span>
-                        <span class="autobid-status ${auction.config.autoBid ? 'active' : 'inactive'}">
-                            ${auction.config.autoBid ? 'ACTIVE' : 'PAUSED'}
-                        </span>
+                        <span class="text-sm">${auction.config.autoBid ? 'Auto-Bidding Active' : 'Enable Auto-Bidding'}</span>
                     </button>
-                </div>
-                
-                <div class="max-bid-section">
-                    <span class="max-bid-label">Max bid</span>
-                    <input type="number" 
-                        class="max-bid-input" 
-                        value="${auction.config.maxBid}" 
-                        min="${auction.data?.nextBid || 0}" 
-                        step="1"
-                        placeholder="${auction.data?.nextBid || 0}"
-                        title="Minimum bid: $${auction.data?.nextBid || 0}"
-                        onchange="monitorUI.updateMaxBid('${auction.id}', this.value)"
-                        oninput="monitorUI.validateMaxBidInput(this, '${auction.id}')"
-                        onfocus="this.select()">
-                </div>
-                
-                <div class="quick-actions">
-                    <a href="${auction.url}" target="_blank" class="action-btn primary">
-                        <svg fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
-                            <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
-                        </svg>
-                        View
-                    </a>
-                    <button class="action-btn danger" onclick="monitorUI.stopMonitoring('${auction.id}')">
-                        <svg fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
-                        </svg>
-                        Stop
-                    </button>
+                    
+                    <!-- Actions -->
+                    <div class="flex gap-2 pt-2">
+                        <a href="${auction.url}" target="_blank" class="flex-1 px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-center rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center justify-center gap-1.5 text-sm font-medium">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
+                                <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
+                            </svg>
+                            View Auction
+                        </a>
+                        <button class="px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors flex items-center justify-center gap-1.5 text-sm font-medium" onclick="monitorUI.stopMonitoring('${auction.id}')">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                            </svg>
+                            Stop
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
@@ -749,12 +822,15 @@ class AuctionMonitorUI {
     }
     
     updateAuthStatus(isAuthenticated, cookieCount = 0) {
+        const authDot = document.getElementById('auth-dot');
+        const authText = document.getElementById('auth-text');
+        
         if (isAuthenticated) {
-            this.elements.authStatusDot.className = 'status-dot connected';
-            this.elements.authStatusText.textContent = `Authenticated (${cookieCount} cookies)`;
+            authDot.className = 'inline-block w-2 h-2 rounded-full bg-green-500';
+            authText.textContent = `Authenticated (${cookieCount})`;
         } else {
-            this.elements.authStatusDot.className = 'status-dot disconnected';
-            this.elements.authStatusText.textContent = 'Not Authenticated';
+            authDot.className = 'inline-block w-2 h-2 rounded-full bg-red-500';
+            authText.textContent = 'Not Authenticated';
         }
     }
     
@@ -767,12 +843,12 @@ class AuctionMonitorUI {
         
         // Set title and show modal
         title.textContent = `Bid History - ${auctionTitle}`;
-        modal.classList.add('show');
+        modal.classList.remove('hidden');
         
         // Show loading state
-        loading.style.display = 'flex';
-        content.style.display = 'none';
-        empty.style.display = 'none';
+        loading.classList.remove('hidden');
+        content.classList.add('hidden');
+        empty.classList.add('hidden');
         
         try {
             const response = await fetch(`/api/auctions/${auctionId}/bids?limit=50`);
@@ -780,8 +856,8 @@ class AuctionMonitorUI {
             
             if (data.success && data.bidHistory.length > 0) {
                 this.renderBidHistory(data.bidHistory);
-                loading.style.display = 'none';
-                content.style.display = 'block';
+                loading.classList.add('hidden');
+                content.classList.remove('hidden');
             } else {
                 // No bid history - show sample data for demo
                 const sampleData = [
@@ -807,19 +883,19 @@ class AuctionMonitorUI {
                 ];
                 
                 this.renderBidHistory(sampleData);
-                loading.style.display = 'none';
-                content.style.display = 'block';
+                loading.classList.add('hidden');
+                content.classList.remove('hidden');
             }
         } catch (error) {
             console.error('Failed to load bid history:', error);
-            loading.style.display = 'none';
+            loading.classList.add('hidden');
             content.innerHTML = `
-                <div class="error-state">
-                    <p>Failed to load bid history</p>
-                    <small>${error.message}</small>
+                <div class="text-center py-4 text-red-600 dark:text-red-400">
+                    <p class="font-medium">Failed to load bid history</p>
+                    <p class="text-sm mt-1">${error.message}</p>
                 </div>
             `;
-            content.style.display = 'block';
+            content.classList.remove('hidden');
         }
     }
     
@@ -832,15 +908,17 @@ class AuctionMonitorUI {
             const strategy = bid.strategy || 'manual';
             
             return `
-                <div class="bid-history-item ${isSuccess ? 'success' : 'failed'}">
-                    <div class="bid-info">
-                        <div class="bid-amount">$${bid.amount}</div>
-                        <div class="bid-timestamp">${timestamp}</div>
-                        <span class="bid-strategy">${strategy}</span>
-                        ${!isSuccess && bid.error ? `<div class="bid-error">${bid.error}</div>` : ''}
+                <div class="flex items-start justify-between p-4 border rounded-lg ${isSuccess ? 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20' : 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20'}">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3 mb-1">
+                            <span class="text-lg font-semibold ${isSuccess ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}">$${bid.amount}</span>
+                            <span class="px-2 py-0.5 text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full">${strategy}</span>
+                        </div>
+                        <div class="text-sm text-gray-600 dark:text-gray-400">${timestamp}</div>
+                        ${!isSuccess && bid.error ? `<div class="mt-2 text-sm text-red-600 dark:text-red-400">${bid.error}</div>` : ''}
                     </div>
-                    <div class="bid-status">
-                        <svg class="bid-status-icon ${isSuccess ? 'success' : 'failed'}" 
+                    <div class="ml-4">
+                        <svg class="w-6 h-6 ${isSuccess ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}" 
                              fill="currentColor" viewBox="0 0 20 20">
                             ${isSuccess ? 
                                 '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>' :
@@ -852,16 +930,12 @@ class AuctionMonitorUI {
             `;
         }).join('');
         
-        content.innerHTML = `
-            <div class="bid-history-list">
-                ${historyHTML}
-            </div>
-        `;
+        content.innerHTML = historyHTML;
     }
     
     closeBidHistory() {
         const modal = document.getElementById('bid-history-modal');
-        modal.classList.remove('show');
+        modal.classList.add('hidden');
     }
     
     initModalHandlers() {
