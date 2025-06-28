@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nellis Auction Monitor</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Nellis Auction Monitor</h1>
+            <div class="status-bar">
+                <span class="status-indicator" id="connection-status">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Connecting...</span>
+                </span>
+                <span class="stats">
+                    <span id="auction-count">0</span> auctions monitored
+                </span>
+            </div>
+        </header>
+
+        <main>
+            <div class="controls">
+                <button id="refresh-btn" class="btn btn-primary">Refresh</button>
+                <button id="clear-all-btn" class="btn btn-danger">Clear All</button>
+            </div>
+
+            <div id="auctions-grid" class="auctions-grid">
+                <!-- Auction cards will be inserted here -->
+            </div>
+
+            <div id="empty-state" class="empty-state">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M12 6v6l4 2"></path>
+                </svg>
+                <p>No auctions being monitored</p>
+                <small>Auctions will appear here when added from the browser extension</small>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

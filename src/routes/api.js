@@ -62,6 +62,46 @@ router.delete('/auctions/:id/monitor', (req, res) => {
   }
 });
 
+// Stop monitoring an auction (POST endpoint for UI compatibility)
+router.post('/auctions/:id/stop', (req, res) => {
+  try {
+    const auctionId = req.params.id;
+    const success = auctionMonitor.removeAuction(auctionId);
+    
+    if (success) {
+      res.json({ success: true, message: `Stopped monitoring auction ${auctionId}` });
+    } else {
+      res.status(404).json({ success: false, error: 'Auction not being monitored' });
+    }
+  } catch (error) {
+    console.error(`Error stopping monitoring for auction ${req.params.id}:`, error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Clear all monitored auctions
+router.post('/auctions/clear', (req, res) => {
+  try {
+    const auctions = auctionMonitor.getMonitoredAuctions();
+    let cleared = 0;
+    
+    auctions.forEach(auction => {
+      if (auctionMonitor.removeAuction(auction.id)) {
+        cleared++;
+      }
+    });
+    
+    res.json({ 
+      success: true, 
+      message: `Cleared ${cleared} auctions`,
+      cleared 
+    });
+  } catch (error) {
+    console.error('Error clearing all auctions:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Update auction configuration
 router.put('/auctions/:id/config', (req, res) => {
   try {

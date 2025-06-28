@@ -3,6 +3,7 @@ const cors = require('cors');
 const WebSocket = require('ws');
 const http = require('http');
 const winston = require('winston');
+const path = require('path');
 require('dotenv').config();
 
 const auctionMonitor = require('./services/auctionMonitor');
@@ -55,6 +56,9 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve static files for the monitoring UI
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // Health check endpoint
 app.get('/health', (req, res) => {

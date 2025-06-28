@@ -1,3 +1,4 @@
+const WebSocket = require('ws');
 const auctionMonitor = require('./auctionMonitor');
 
 class WebSocketHandler {
@@ -78,7 +79,7 @@ class WebSocketHandler {
           break;
           
         case 'updateConfig':
-          this.handleUpdateConfig(clientId, data);
+          this.handleUpdateConfig(clientId, data, requestId);
           break;
           
         case 'placeBid':
@@ -88,6 +89,10 @@ class WebSocketHandler {
         case 'ping':
           console.log(`Received ping from client ${clientId}, sending pong`);
           client.ws.send(JSON.stringify({ type: 'pong' }));
+          break;
+          
+        case 'getMonitoredAuctions':
+          this.handleGetMonitoredAuctions(clientId, requestId);
           break;
           
         default:
@@ -189,6 +194,8 @@ class WebSocketHandler {
 
     if (success) {
       client.subscriptions.add(auctionId);
+      // Broadcast full auction state to all clients
+      setTimeout(() => this.broadcastAuctionState(auctionId), 100);
     }
   }
 
@@ -213,25 +220,31 @@ class WebSocketHandler {
     }
   }
 
-  handleUpdateConfig(clientId, data) {
+  handleUpdateConfig(clientId, data, requestId) {
     const client = this.clients.get(clientId);
     if (!client || !client.authenticated) {
-      this.sendError(clientId, 'Not authenticated');
+      console.log(`Client ${clientId} not authenticated for updateConfig`);
+      this.sendError(clientId, 'Not authenticated', requestId);
       return;
     }
 
     const { auctionId, config } = data;
-    const auction = auctionMonitor.monitoredAuctions.get(auctionId);
+    console.log(`Updating config for auction ${auctionId}:`, config);
     
-    if (auction) {
-      auction.config = { ...auction.config, ...config };
+    const success = auctionMonitor.updateAuctionConfig(auctionId, config);
+    
+    if (success) {
+      // Send success response
       client.ws.send(JSON.stringify({
-        type: 'configUpdated',
-        auctionId: auctionId,
-        config: auction.config
+        type: 'response',
+        requestId: requestId,
+        data: { success: true }
       }));
+      
+      // Broadcast full auction state to all clients
+      this.broadcastAuctionState(auctionId);
     } else {
-      this.sendError(clientId, 'Auction not found');
+      this.sendError(clientId, `Auction ${auctionId} not found`, requestId);
     }
   }
 
@@ -255,6 +268,20 @@ class WebSocketHandler {
     } catch (error) {
       this.sendError(clientId, error.message);
     }
+  }
+
+  handleGetMonitoredAuctions(clientId, requestId) {
+    const client = this.clients.get(clientId);
+    if (!client) return;
+
+    const auctions = auctionMonitor.getMonitoredAuctions();
+    client.ws.send(JSON.stringify({
+      type: 'response',
+      requestId: requestId,
+      data: {
+        auctions: auctions
+      }
+    }));
   }
 
   handleDisconnection(clientId) {
@@ -299,11 +326,28 @@ class WebSocketHandler {
 
   // Broadcast to all authenticated clients
   broadcastToAll(message) {
+    console.log(`Broadcasting message to all authenticated clients:`, message.type);
+    let broadcastCount = 0;
     this.clients.forEach((client, clientId) => {
       if (client.authenticated && client.ws.readyState === WebSocket.OPEN) {
         client.ws.send(JSON.stringify(message));
+        broadcastCount++;
       }
     });
+    console.log(`Broadcast sent to ${broadcastCount} clients`);
+  }
+
+  // Broadcast full auction state
+  broadcastAuctionState(auctionId) {
+    const auctions = auctionMonitor.getMonitoredAuctions();
+    const auction = auctions.find(a => a.id === auctionId);
+    
+    if (auction) {
+      this.broadcastToAll({
+        type: 'auctionState',
+        auction: auction
+      });
+    }
   }
 }
 

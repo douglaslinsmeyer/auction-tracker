@@ -86,8 +86,8 @@ class AuctionMonitor extends EventEmitter {
         this.adjustPollingRate(auctionId, 2000); // Poll every 2 seconds
       }
 
-      // Broadcast update to WebSocket clients
-      this.broadcastUpdate(auctionId, data);
+      // Broadcast full auction state to WebSocket clients
+      this.broadcastAuctionState(auctionId);
 
     } catch (error) {
       console.error(`Error updating auction ${auctionId}:`, error);
@@ -240,13 +240,27 @@ class AuctionMonitor extends EventEmitter {
     }
   }
 
-  broadcastUpdate(auctionId, data) {
+  broadcastAuctionState(auctionId) {
     if (!this.wss) return;
     
+    const auction = this.monitoredAuctions.get(auctionId);
+    if (!auction) return;
+    
+    // Get full auction data
+    const auctionState = {
+      id: auction.id,
+      title: auction.title,
+      url: auction.url,
+      imageUrl: auction.imageUrl,
+      status: auction.status,
+      config: auction.config,
+      data: auction.data,
+      lastUpdate: auction.lastUpdate
+    };
+    
     const message = JSON.stringify({
-      type: 'auctionUpdate',
-      auctionId,
-      data
+      type: 'auctionState',
+      auction: auctionState
     });
 
     this.wss.clients.forEach((client) => {
@@ -286,6 +300,17 @@ class AuctionMonitor extends EventEmitter {
 
   getMonitoredCount() {
     return this.monitoredAuctions.size;
+  }
+
+  updateAuctionConfig(auctionId, config) {
+    const auction = this.monitoredAuctions.get(auctionId);
+    if (!auction) {
+      return false;
+    }
+    
+    auction.config = { ...auction.config, ...config };
+    console.log(`Updated config for auction ${auctionId}:`, config);
+    return true;
   }
 
   shutdown() {
