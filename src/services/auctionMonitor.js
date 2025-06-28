@@ -26,6 +26,7 @@ class AuctionMonitor extends EventEmitter {
       id: auctionId,
       title: metadata.title || 'Unknown',
       url: metadata.url || '',
+      imageUrl: metadata.imageUrl || null,
       config: {
         maxBid: config.maxBid || 0,
         bidIncrement: config.bidIncrement || 1,
@@ -239,6 +240,7 @@ class AuctionMonitor extends EventEmitter {
       id: auction.id,
       title: auction.title,
       url: auction.url,
+      imageUrl: auction.imageUrl,
       status: auction.status,
       config: auction.config,
       data: auction.data,
