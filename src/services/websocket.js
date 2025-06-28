@@ -179,11 +179,12 @@ class WebSocketHandler {
 
     const { auctionId, config, metadata } = data;
     console.log(`Adding auction ${auctionId} to monitor`);
-    const success = auctionMonitor.addAuction(auctionId, config, metadata);
+    const success = await auctionMonitor.addAuction(auctionId, config, metadata);
     console.log(`Auction ${auctionId} monitoring result: ${success}`);
     
     const response = {
-      type: 'monitoringStarted',
+      type: 'response',
+      action: 'startMonitoring',
       auctionId: auctionId,
       success: success,
       requestId: requestId
@@ -199,17 +200,18 @@ class WebSocketHandler {
     }
   }
 
-  handleStopMonitoring(clientId, auctionId, requestId) {
+  async handleStopMonitoring(clientId, auctionId, requestId) {
     const client = this.clients.get(clientId);
     if (!client || !client.authenticated) {
       this.sendError(clientId, 'Not authenticated', requestId);
       return;
     }
 
-    const success = auctionMonitor.removeAuction(auctionId);
+    const success = await auctionMonitor.removeAuction(auctionId);
     
     client.ws.send(JSON.stringify({
-      type: 'monitoringStopped',
+      type: 'response',
+      action: 'stopMonitoring',
       auctionId: auctionId,
       success: success,
       requestId: requestId
@@ -220,7 +222,7 @@ class WebSocketHandler {
     }
   }
 
-  handleUpdateConfig(clientId, data, requestId) {
+  async handleUpdateConfig(clientId, data, requestId) {
     const client = this.clients.get(clientId);
     if (!client || !client.authenticated) {
       console.log(`Client ${clientId} not authenticated for updateConfig`);
@@ -231,7 +233,7 @@ class WebSocketHandler {
     const { auctionId, config } = data;
     console.log(`Updating config for auction ${auctionId}:`, config);
     
-    const success = auctionMonitor.updateAuctionConfig(auctionId, config);
+    const success = await auctionMonitor.updateAuctionConfig(auctionId, config);
     
     if (success) {
       // Send success response

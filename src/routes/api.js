@@ -251,16 +251,19 @@ router.post('/auth/validate', async (req, res) => {
 });
 
 // Get authentication status
-router.get('/auth/status', (req, res) => {
-  const hasCookies = !!nellisApi.cookies && nellisApi.cookies.length > 0;
-  const cookieCount = hasCookies ? nellisApi.cookies.split(';').length : 0;
-  
-  res.json({
-    authenticated: hasCookies,
-    cookieCount: cookieCount,
-    cookiesSet: hasCookies,
-    message: hasCookies ? 'Cookies are set' : 'No cookies set - please sync from extension'
-  });
+router.get('/auth/status', async (req, res) => {
+  try {
+    const authStatus = await nellisApi.checkAuth();
+    
+    res.json({
+      authenticated: authStatus.authenticated,
+      cookieCount: authStatus.cookieCount,
+      cookiesSet: authStatus.authenticated,
+      message: authStatus.authenticated ? 'Cookies are set' : 'No cookies set - please sync from extension'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // Get system status

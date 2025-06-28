@@ -104,6 +104,26 @@ class NellisApi {
     }
   }
 
+  // Alias for authenticate - sets cookies directly
+  async setCookies(cookieString) {
+    this.cookies = cookieString || '';
+    if (this.cookies) {
+      await storage.saveCookies(this.cookies);
+    }
+    return true;
+  }
+
+  // Check authentication status
+  async checkAuth() {
+    const hasCookies = !!this.cookies && this.cookies.length > 0;
+    const cookieCount = hasCookies ? this.cookies.split(';').length : 0;
+    
+    return {
+      authenticated: hasCookies,
+      cookieCount: cookieCount
+    };
+  }
+
   async placeBid(auctionId, amount) {
     try {
       console.info(`Placing bid on auction ${auctionId} for $${amount}`);
