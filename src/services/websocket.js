@@ -49,12 +49,15 @@ class WebSocketHandler {
 
     try {
       const data = JSON.parse(message);
+      console.log(`Received message from client ${clientId}:`, data);
       
       // Store requestId to include in response
       const requestId = data.requestId;
+      console.log(`RequestId for this message: ${requestId}`);
       
       switch (data.type) {
         case 'authenticate':
+          console.log(`Calling handleAuthentication with requestId: ${requestId}`);
           this.handleAuthentication(clientId, data, requestId);
           break;
           
@@ -83,6 +86,7 @@ class WebSocketHandler {
           break;
           
         case 'ping':
+          console.log(`Received ping from client ${clientId}, sending pong`);
           client.ws.send(JSON.stringify({ type: 'pong' }));
           break;
           
@@ -108,11 +112,13 @@ class WebSocketHandler {
     
     if (data.token === validToken) {
       client.authenticated = true;
-      client.ws.send(JSON.stringify({
+      const response = {
         type: 'authenticated',
         success: true,
         requestId: requestId
-      }));
+      };
+      console.log(`Sending auth response to client ${clientId}:`, response);
+      client.ws.send(JSON.stringify(response));
       console.info(`Client ${clientId} authenticated successfully`);
     } else {
       client.ws.send(JSON.stringify({
@@ -157,21 +163,29 @@ class WebSocketHandler {
   }
 
   async handleStartMonitoring(clientId, data, requestId) {
+    console.log(`Handling startMonitoring for client ${clientId}, requestId: ${requestId}`, data);
+    
     const client = this.clients.get(clientId);
     if (!client || !client.authenticated) {
+      console.log(`Client ${clientId} not authenticated`);
       this.sendError(clientId, 'Not authenticated', requestId);
       return;
     }
 
     const { auctionId, config } = data;
+    console.log(`Adding auction ${auctionId} to monitor`);
     const success = auctionMonitor.addAuction(auctionId, config);
+    console.log(`Auction ${auctionId} monitoring result: ${success}`);
     
-    client.ws.send(JSON.stringify({
+    const response = {
       type: 'monitoringStarted',
       auctionId: auctionId,
       success: success,
       requestId: requestId
-    }));
+    };
+    
+    console.log(`Sending response to client ${clientId}:`, response);
+    client.ws.send(JSON.stringify(response));
 
     if (success) {
       client.subscriptions.add(auctionId);
