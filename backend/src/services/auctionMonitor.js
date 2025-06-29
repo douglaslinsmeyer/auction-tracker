@@ -115,7 +115,8 @@ class AuctionMonitor extends EventEmitter {
     }
 
     // Get global settings
-    const globalSettings = await storage.getSettings();
+    const globalSettings = await storage.getSettings() || {};
+    const generalSettings = globalSettings.general || {};
 
     const auction = {
       id: auctionId,
@@ -123,10 +124,10 @@ class AuctionMonitor extends EventEmitter {
       url: metadata.url || '',
       imageUrl: metadata.imageUrl || null,
       config: {
-        maxBid: config.maxBid || globalSettings.general.defaultMaxBid || 100,
+        maxBid: config.maxBid || generalSettings.defaultMaxBid || 100,
         incrementAmount: config.incrementAmount || 1,
-        strategy: config.strategy || globalSettings.general.defaultStrategy || 'increment',
-        autoBid: config.autoBid !== undefined ? config.autoBid : globalSettings.general.autoBidDefault,
+        strategy: config.strategy || generalSettings.defaultStrategy || 'increment',
+        autoBid: config.autoBid !== undefined ? config.autoBid : generalSettings.autoBidDefault !== undefined ? generalSettings.autoBidDefault : true,
         // Notification settings removed
       },
       lastUpdate: Date.now(),
@@ -235,7 +236,7 @@ class AuctionMonitor extends EventEmitter {
     }
 
     // Get global settings for bidding logic
-    const globalSettings = await storage.getSettings();
+    const globalSettings = await storage.getSettings() || {};
     const biddingSettings = globalSettings.bidding || {};
 
     // For sniping strategy, use configured snipe timing
@@ -252,7 +253,11 @@ class AuctionMonitor extends EventEmitter {
       ? SafeMath.validateBidAmount(auctionData.nextBid)
       : SafeMath.calculateNextBid(currentBid, increment, 0);
     
-    const nextBid = SafeMath.calculateNextBid(minimumBid, 0, buffer);
+    // If we have a specific nextBid from auction data, use it directly with buffer
+    // Otherwise calculate with increment
+    const nextBid = auctionData.nextBid 
+      ? SafeMath.addMoney(minimumBid, buffer)
+      : SafeMath.calculateNextBid(minimumBid, 0, buffer);
 
     if (SafeMath.isWithinBudget(nextBid, auction.config.maxBid)) {
       auction.maxBidReached = false;
