@@ -13,4 +13,13 @@ services:
       - DEBUG=  # Disable debug logging
     volumes:
       # Only logs volume in production (no source code mounting)
-      - ./logs:/app/logs
+      - ./backend/logs:/app/logs
+
+  dashboard:
+    build:
+      target: production
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+    volumes: []  # No volumes in production

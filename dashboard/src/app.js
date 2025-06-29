@@ -33,10 +33,29 @@ class AuctionMonitorUI {
         setInterval(() => this.checkAuthStatus(), 30000); // Every 30 seconds
     }
     
-    connectWebSocket() {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}`;
+    async connectWebSocket() {
+        let wsUrl;
         
+        // Try to get configuration from server
+        try {
+            const response = await fetch('/api/config');
+            if (response.ok) {
+                const config = await response.json();
+                wsUrl = config.wsUrl;
+            }
+        } catch (error) {
+            console.log('Could not fetch config, using defaults');
+        }
+        
+        // Fallback to environment-based URL
+        if (!wsUrl) {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.hostname;
+            const port = '3000'; // Default backend port
+            wsUrl = `${protocol}//${host}:${port}`;
+        }
+        
+        console.log('Connecting to WebSocket:', wsUrl);
         this.ws = new WebSocket(wsUrl);
         
         this.ws.onopen = () => {
@@ -190,7 +209,12 @@ class AuctionMonitorUI {
     
     async loadAuctions() {
         try {
-            const response = await fetch('/api/auctions');
+            // Get backend URL from config
+            const configResponse = await fetch('/api/config');
+            const config = await configResponse.json();
+            const backendUrl = config.backendUrl || 'http://localhost:3000';
+            
+            const response = await fetch(`${backendUrl}/api/auctions`);
             const data = await response.json();
             
             if (data.auctions) {

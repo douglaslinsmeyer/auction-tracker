@@ -64,9 +64,9 @@ const corsOptions = {
       return callback(null, true);
     }
     
-    // Allow specific origins from environment variable
-    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
-    if (allowedOrigins.some(allowed => origin === allowed || (allowed.includes('*') && origin.match(new RegExp(allowed.replace('*', '.*')))))) {
+    // Allow specific origins from environment variable (including dashboard)
+    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [];
+    if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
     
@@ -148,7 +148,7 @@ app.use(addSignatureInfo);
 
 // Setup Swagger UI if available
 if (swaggerUi && YAML) {
-  const swaggerPath = path.join(__dirname, '..', 'swagger.yaml');
+  const swaggerPath = path.join(__dirname, '..', '..', 'swagger.yaml');
   if (fs.existsSync(swaggerPath)) {
     try {
       const swaggerDocument = YAML.load(swaggerPath);
@@ -172,8 +172,7 @@ if (swaggerUi && YAML) {
   }
 }
 
-// Serve static files for the monitoring UI
-app.use(express.static(path.join(__dirname, '..', 'public')));
+// Note: UI is now served separately - backend is API only
 
 // Health check endpoint
 app.get('/health', (req, res) => {

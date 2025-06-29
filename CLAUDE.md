@@ -3,10 +3,11 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
-Full-stack auction monitoring and bidding system for nellisauction.com:
-- **Backend**: `nellis-auction-backend/` - Node.js/Express service with WebSocket support
-- **Extension**: `nellis-auction-helper/` - Chrome extension (Manifest V3)
-- These are separate repositories that work together via WebSocket and REST APIs
+Full-stack auction monitoring and bidding system for nellisauction.com with three independent applications:
+- **Backend** (`backend/`): Standalone Node.js/Express API server with WebSocket support (port 3000)
+- **Dashboard** (`dashboard/`): Standalone web application for monitoring and control (port 3001)
+- **Extension** (`extension/`): Chrome extension (Manifest V3)
+- These applications communicate via WebSocket and REST APIs
 
 ## Project Documentation Guidelines
 - For this project, all documentation should be consolidated into the @docs/ folder
@@ -15,8 +16,8 @@ Full-stack auction monitoring and bidding system for nellisauction.com:
 
 ### Backend Development
 ```bash
-# Start with Docker (includes Redis)
-docker-compose up
+# Navigate to backend directory
+cd backend
 
 # Development without Docker
 npm run dev                    # Hot-reload with nodemon
@@ -38,12 +39,33 @@ npm run test:all              # Run all test types sequentially
 npm test -- tests/unit/auctionMonitor.test.js
 ```
 
+### Dashboard Development
+```bash
+# Navigate to dashboard directory
+cd dashboard
+
+# Install dependencies
+npm install
+
+# Development mode
+npm run dev                    # Hot-reload development server
+npm start                      # Production mode
+```
+
 ### Docker Commands
 ```bash
+# From project root - starts all services (backend, dashboard, redis)
 docker-compose up              # Development mode (default)
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up  # Production
-docker-compose build --no-cache  # Rebuild containers
-docker-compose logs -f         # View logs
+docker-compose up backend      # Start only backend and redis
+docker-compose up dashboard    # Start only dashboard (and dependencies)
+
+# Production mode
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
+
+# Other commands
+docker-compose build --no-cache  # Rebuild all containers
+docker-compose logs -f backend   # View backend logs
+docker-compose logs -f dashboard # View dashboard logs
 ```
 
 ## Architecture
@@ -70,6 +92,13 @@ docker-compose logs -f         # View logs
 - **Backend Client**: `backend-client.js` - WebSocket connection to backend service
 - **Message Passing**: Between popup, service worker, and content scripts
 - **Note**: Extension continues to use WebSocket to communicate with backend; SSE is backend-to-Nellis only
+
+### Dashboard Architecture
+- **Standalone Web App**: Can be deployed separately or served by backend
+- **WebSocket Client**: `app.js` - Real-time connection to backend service
+- **Settings Management**: `settings.js` - User preferences and configuration
+- **Responsive Design**: Tailwind CSS with dark mode support
+- **Authentication**: Token-based auth synchronized with backend
 
 ## Key Implementation Details
 

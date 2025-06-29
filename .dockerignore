@@ -1,19 +1,46 @@
-node_modules
-npm-debug.log
-.env
-.env.local
-.env.*.local
-*.log
-.DS_Store
-.git
+# Common
+node_modules/
+npm-debug.log*
+.git/
 .gitignore
+.env
+.env.*
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# Testing
+coverage/
+.nyc_output/
+jest.config.*
+cucumber.js
+tests/
+test/
+*.test.js
+*.spec.js
+
+# Documentation
 README.md
-.vscode
-.idea
-coverage
-.nyc_output
-.npm
-.eslintcache
+docs/
+*.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+dist/
+build/
+
+# Docker files
 docker-compose*.yml
-Dockerfile
+Dockerfile*
 .dockerignore

@@ -14,7 +14,7 @@ module.exports = {
   },
   
   // Default timeout
-  testTimeout: 30000,
+  // testTimeout: 30000, // Moved to setupFilesAfterEnv
   
   // Projects for different test types
   projects: [
@@ -35,7 +35,7 @@ module.exports = {
     {
       displayName: 'performance',
       testMatch: ['<rootDir>/tests/performance/**/*.test.js'],
-      testTimeout: 60000 // Longer timeout for performance tests
+      setupFilesAfterEnv: ['<rootDir>/tests/__support__/setup.js', '<rootDir>/tests/performance/setup.js']
     }
   ],
   

@@ -3,9 +3,9 @@ version: '3.8'
 services:
   backend:
     build:
-      context: .
+      context: ./backend
       target: ${BUILD_TARGET:-development}
-    container_name: nellis-auction-backend
+    container_name: auction-backend
     ports:
       - "${PORT:-3000}:3000"
       - "9229:9229"  # Debug port (only used in development)
@@ -18,20 +18,39 @@ services:
       - DEBUG=${DEBUG:-}
     volumes:
       # Development volumes - disabled in production via env var
-      - ${SRC_VOLUME:-./src:/app/src}
-      - ${PUBLIC_VOLUME:-./public:/app/public}
+      - ${SRC_VOLUME:-./backend/src:/app/src}
       - /app/node_modules  # Prevent node_modules from being overwritten
-      - ./logs:/app/logs
+      - ./backend/logs:/app/logs
     restart: unless-stopped
     depends_on:
       redis:
         condition: service_healthy
     networks:
-      - nellis-network
+      - auction-network
+
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: auction-dashboard
+    ports:
+      - "${DASHBOARD_PORT:-3001}:3001"
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=3001
+      - BACKEND_URL=http://backend:3000
+    volumes:
+      - ./dashboard/src:/app/src
+      - /app/node_modules
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - auction-network
 
   redis:
     image: redis:7-alpine
-    container_name: nellis-redis
+    container_name: auction-redis
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
@@ -44,10 +63,10 @@ services:
       retries: 5
     restart: unless-stopped
     networks:
-      - nellis-network
+      - auction-network
 
 networks:
-  nellis-network:
+  auction-network:
     driver: bridge
 
 volumes:

@@ -1,9 +1,9 @@
 const puppeteer = require('puppeteer');
 
-describe('Nellis Auction Monitor UI', () => {
+describe('Auction Dashboard UI', () => {
   let browser;
   let page;
-  const baseURL = 'http://localhost:3000';
+  const baseURL = 'http://localhost:3001';
 
   beforeAll(async () => {
     browser = await puppeteer.launch({

@@ -1,11 +1,8 @@
 const { mockAuction, mockCookies } = require('../__fixtures__/mockData');
 const testUtils = require('../__support__/testUtils');
 
-// Mock ioredis
-jest.mock('ioredis', () => {
-  const RedisMock = require('../__mocks__/redis.mock');
-  return RedisMock;
-});
+// Mock ioredis - using the module name mapper from jest.config.js
+// The mock is configured in jest.config.js moduleNameMapper
 
 describe('Storage Service Integration Tests', () => {
   let storage;

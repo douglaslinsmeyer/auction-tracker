@@ -5,14 +5,11 @@
 module.exports = {
   default: {
     paths: [
-      'tests/features/auction-monitoring/**/*.feature', 
-      'tests/features/bidding-strategies/**/*.feature',
-      'tests/features/performance/**/*.feature'
+      'tests/bdd/features/**/*.feature'
     ],
     require: [
-      'tests/step-definitions/**/*.steps.js',
-      'tests/features/step_definitions/**/*.steps.js',
-      'tests/support/**/*.js'
+      'tests/bdd/step-definitions/**/*.steps.js',
+      'tests/bdd/support/**/*.js'
     ],
     format: [
       'progress-bar',
@@ -27,14 +24,11 @@ module.exports = {
   // CI configuration with more detailed output
   ci: {
     paths: [
-      'tests/features/auction-monitoring/**/*.feature', 
-      'tests/features/bidding-strategies/**/*.feature',
-      'tests/features/performance/**/*.feature'
+      'tests/bdd/features/**/*.feature'
     ],
     require: [
-      'tests/step-definitions/**/*.steps.js',
-      'tests/features/step_definitions/**/*.steps.js',
-      'tests/support/**/*.js'
+      'tests/bdd/step-definitions/**/*.steps.js',
+      'tests/bdd/support/**/*.js'
     ],
     format: [
       'progress',

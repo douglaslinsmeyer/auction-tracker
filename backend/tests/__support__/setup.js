@@ -19,6 +19,9 @@ process.env.AUTH_TOKEN = 'test-auth-token';
 process.env.ENCRYPTION_SECRET = 'test-encryption-secret-32-characters!';
 process.env.LOG_LEVEL = 'error'; // Reduce log noise in tests
 
+// Set default test timeout
+jest.setTimeout(30000);
+
 // Global test utilities
 global.testUtils = {
   /**
