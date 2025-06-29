@@ -118,7 +118,10 @@ const auctionIdSchema = Joi.string()
 const metadataSchema = Joi.object({
   source: Joi.string().valid('api', 'extension', 'web').optional(),
   userAgent: Joi.string().max(500).optional(),
-  timestamp: Joi.number().integer().optional()
+  timestamp: Joi.number().integer().optional(),
+  title: Joi.string().max(200).optional(),
+  url: Joi.string().uri().max(1000).optional(),
+  imageUrl: Joi.string().uri().max(1000).allow(null).optional()
 }).optional();
 
 // Combined schema for starting monitoring
