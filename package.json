@@ -11,6 +11,8 @@
     "test:integration": "jest --selectProjects=integration",
     "test:e2e": "jest --selectProjects=e2e",
     "test:e2e:headful": "HEADLESS=false npm run test:e2e",
+    "test:e2e:extension": "jest --config jest.config.extension.js",
+    "test:e2e:extension:headful": "HEADLESS=false npm run test:e2e:extension",
     "test:bdd": "cucumber-js tests/bdd/features --require tests/bdd/step-definitions --require tests/bdd/support",
     "test:bdd:watch": "nodemon --watch tests/bdd --exec 'npm run test:bdd'",
     "test:all": "npm run test:unit && npm run test:integration && npm run test:bdd && npm run test:e2e",
