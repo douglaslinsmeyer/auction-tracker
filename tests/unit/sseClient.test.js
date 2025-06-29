@@ -18,7 +18,9 @@ const MockEventSource = jest.fn().mockImplementation((url, options) => {
   return eventSource;
 });
 
-jest.mock('eventsource', () => MockEventSource);
+jest.mock('eventsource', () => ({
+  EventSource: MockEventSource
+}));
 
 // Mock logger
 jest.mock('../../src/utils/logger', () => ({

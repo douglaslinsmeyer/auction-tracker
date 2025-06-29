@@ -8,6 +8,7 @@ const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 const logger = require('./utils/logger');
+const metrics = require('./utils/metrics');
 const { createSigningMiddleware, addSignatureInfo } = require('./middleware/requestSigning');
 
 // Conditionally load Swagger dependencies if available
@@ -190,6 +191,41 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Metrics endpoint
+app.get('/metrics', (req, res) => {
+  try {
+    const allMetrics = metrics.getAllMetrics();
+    const sseMetrics = metrics.getSSEMetrics();
+    
+    res.json({
+      all: allMetrics,
+      sse: sseMetrics,
+      application: {
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        auctions: {
+          monitored: auctionMonitor.getMonitoredCount(),
+          memoryStats: auctionMonitor.getMemoryStats()
+        }
+      }
+    });
+  } catch (error) {
+    logger.error('Error retrieving metrics', { error: error.message });
+    res.status(500).json({ error: 'Failed to retrieve metrics' });
+  }
+});
+
+// SSE-specific metrics endpoint
+app.get('/metrics/sse', (req, res) => {
+  try {
+    const sseMetrics = metrics.getSSEMetrics();
+    res.json(sseMetrics);
+  } catch (error) {
+    logger.error('Error retrieving SSE metrics', { error: error.message });
+    res.status(500).json({ error: 'Failed to retrieve SSE metrics' });
+  }
+});
+
 // API routes
 app.use('/api', apiRoutes);
 
@@ -252,6 +288,10 @@ async function startServer() {
     // Initialize feature flags
     const featureFlags = require('./config/features');
     await featureFlags.initialize(storage.redis);
+    
+    // Initialize global metrics for monitoring
+    global.metrics = metrics;
+    logger.info('Metrics system initialized');
     
     // Initialize storage first
     await storage.initialize();

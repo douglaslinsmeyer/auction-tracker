@@ -31,6 +31,11 @@ module.exports = {
       preset: 'jest-puppeteer',
       testMatch: ['<rootDir>/tests/e2e/**/*.test.js'],
       setupFilesAfterEnv: ['<rootDir>/tests/e2e/setup.js']
+    },
+    {
+      displayName: 'performance',
+      testMatch: ['<rootDir>/tests/performance/**/*.test.js'],
+      testTimeout: 60000 // Longer timeout for performance tests
     }
   ],
   

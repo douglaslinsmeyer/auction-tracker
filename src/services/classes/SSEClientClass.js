@@ -1,15 +1,19 @@
-const { EventSource } = require('eventsource');
-const logger = require('../utils/logger');
-const features = require('../config/features');
-
 /**
- * SSE Client for real-time auction updates from Nellis
- * Manages Server-Sent Events connections for monitored auctions
+ * SSE Client Class Implementation
+ * Class-based implementation of ISSEClient for dependency injection
  */
-class SSEClient {
-  constructor(storage, eventEmitter) {
+
+const { EventSource } = require('eventsource');
+const ISSEClient = require('../../interfaces/ISSEClient');
+
+class SSEClientClass extends ISSEClient {
+  constructor(storage, eventEmitter, logger, features) {
+    super();
     this.storage = storage;
     this.eventEmitter = eventEmitter;
+    this.logger = logger;
+    this.features = features;
+    
     this.connections = new Map(); // productId -> EventSource
     this.reconnectAttempts = new Map(); // productId -> attempt count
     this.sessionIds = new Map(); // productId -> sessionId
@@ -19,53 +23,43 @@ class SSEClient {
       sseEndpoint: process.env.SSE_ENDPOINT || 'https://sse.nellisauction.com',
       reconnectInterval: parseInt(process.env.SSE_RECONNECT_INTERVAL) || 5000,
       maxReconnectAttempts: parseInt(process.env.SSE_MAX_RECONNECT_ATTEMPTS) || 3,
-      enabled: features.isEnabled('USE_SSE')
+      enabled: false // Will be set during initialization
     };
     
     this.initialized = false;
   }
-  
+
   async initialize() {
     // Update config from current feature flag state
-    this.config.enabled = features.isEnabled('USE_SSE');
+    this.config.enabled = this.features.isEnabled('USE_SSE');
     
     if (!this.config.enabled) {
-      logger.info('SSE Client disabled by feature flag');
+      this.logger.info('SSE Client disabled by feature flag');
       this.initialized = true;
       return;
     }
     
     this.initialized = true;
-    logger.info('SSE Client initialized', { 
+    this.logger.info('SSE Client initialized', { 
       endpoint: this.config.sseEndpoint,
       enabled: this.config.enabled 
     });
   }
-  
-  /**
-   * Connect to SSE endpoint for a specific auction
-   * @param {string} productId - The product ID to monitor
-   * @param {string} auctionId - The auction ID (for reference)
-   */
+
   async connectToAuction(productId, auctionId) {
     if (!this.config.enabled) {
-      logger.debug('SSE disabled, skipping connection', { productId });
+      this.logger.debug('SSE disabled, skipping connection', { productId });
       return false;
     }
     
     if (this.connections.has(productId)) {
-      logger.debug('SSE already connected for product', { productId });
+      this.logger.debug('SSE already connected for product', { productId });
       return true;
     }
     
     try {
       const url = `${this.config.sseEndpoint}/live-products?productId=${productId}`;
-      logger.info('Establishing SSE connection', { productId, url });
-      
-      // Track connection attempt
-      if (global.metrics) {
-        global.metrics.incrementCounter('sse_connections_total');
-      }
+      this.logger.info('Establishing SSE connection', { productId, url });
       
       const eventSource = new EventSource(url, {
         headers: {
@@ -80,40 +74,34 @@ class SSEClient {
       this.connections.set(productId, eventSource);
       this.reconnectAttempts.set(productId, 0);
       
-      // Store SSE connection info (will be handled by auction monitor)
-      
       return true;
     } catch (error) {
-      logger.error('Failed to establish SSE connection', { productId, error: error.message });
+      this.logger.error('Failed to establish SSE connection', { productId, error: error.message });
       this.eventEmitter.emit('sse:error', { productId, error });
       return false;
     }
   }
-  
-  /**
-   * Setup event handlers for an EventSource connection
-   */
+
   setupEventHandlers(eventSource, productId, auctionId) {
     // Connection opened
     eventSource.onopen = () => {
-      logger.info('SSE connection established', { productId });
+      this.logger.info('SSE connection established', { productId });
       this.reconnectAttempts.set(productId, 0);
       this.eventEmitter.emit('sse:connected', { productId, auctionId });
       
       // Update metrics
-      if (global.metrics) {
-        global.metrics.incrementCounter('sse_connections_successful');
-        global.metrics.incrementGauge('sse_active_connections');
+      if (global.metrics?.sseMetrics) {
+        global.metrics.sseMetrics.activeConnections.inc();
       }
     };
     
     // Standard message handler
     eventSource.onmessage = (event) => {
-      logger.debug('SSE message received', { productId, data: event.data });
+      this.logger.debug('SSE message received', { productId, data: event.data });
       
       // Handle ping messages
       if (event.data === 'ping') {
-        logger.debug('SSE ping received', { productId });
+        this.logger.debug('SSE ping received', { productId });
         return;
       }
       
@@ -123,8 +111,7 @@ class SSEClient {
         if (parts.length > 1) {
           const sessionId = parts[1];
           this.sessionIds.set(productId, sessionId);
-          logger.info('SSE session established', { productId, sessionId });
-          // Note: Session tracking handled by auction monitor
+          this.logger.info('SSE session established', { productId, sessionId });
         }
       }
     };
@@ -133,19 +120,16 @@ class SSEClient {
     eventSource.addEventListener(`ch_product_bids:${productId}`, async (event) => {
       try {
         const bidData = JSON.parse(event.data);
-        logger.info('SSE bid update received', { productId, bidData });
+        this.logger.info('SSE bid update received', { productId, bidData: '[REDACTED]' });
         
         await this.handleBidUpdate(productId, auctionId, bidData);
         
         // Update metrics
-        if (global.metrics) {
-          global.metrics.incrementCounter('sse_events_received_total', { event_type: 'bid_update' });
-          const startTime = Date.now();
-          // Record processing time (simplified for this example)
-          global.metrics.recordHistogram('sse_event_processing_duration', Date.now() - startTime);
+        if (global.metrics?.sseMetrics) {
+          global.metrics.sseMetrics.eventsReceived.inc({ event_type: 'bid_update' });
         }
       } catch (error) {
-        logger.error('Error handling bid update', { productId, error: error.message, data: event.data });
+        this.logger.error('Error handling bid update', { productId, error: error.message, data: event.data });
       }
     });
     
@@ -153,27 +137,26 @@ class SSEClient {
     eventSource.addEventListener(`ch_product_closed:${productId}`, async (event) => {
       try {
         const closeData = JSON.parse(event.data);
-        logger.info('SSE auction closed event received', { productId, closeData });
+        this.logger.info('SSE auction closed event received', { productId, closeData });
         
         await this.handleAuctionClosed(productId, auctionId, closeData);
         
         // Update metrics
-        if (global.metrics) {
-          global.metrics.incrementCounter('sse_events_received_total', { event_type: 'auction_closed' });
+        if (global.metrics?.sseMetrics) {
+          global.metrics.sseMetrics.eventsReceived.inc({ event_type: 'auction_closed' });
         }
       } catch (error) {
-        logger.error('Error handling auction closed event', { productId, error: error.message, data: event.data });
+        this.logger.error('Error handling auction closed event', { productId, error: error.message, data: event.data });
       }
     });
     
     // Error handler with reconnection logic
     eventSource.onerror = (error) => {
-      logger.error('SSE connection error', { productId, error: error.message || 'Connection lost' });
+      this.logger.error('SSE connection error', { productId, error: error.message || 'Connection lost' });
       
       // Update metrics
-      if (global.metrics) {
-        global.metrics.incrementCounter('sse_connections_failed');
-        global.metrics.incrementGauge('sse_connection_errors');
+      if (global.metrics?.sseMetrics) {
+        global.metrics.sseMetrics.connectionErrors.inc();
       }
       
       this.eventEmitter.emit('sse:error', { productId, auctionId, error });
@@ -184,10 +167,7 @@ class SSEClient {
       }
     };
   }
-  
-  /**
-   * Handle bid update from SSE
-   */
+
   async handleBidUpdate(productId, auctionId, bidData) {
     const updateData = {
       currentBid: bidData.currentBid || bidData.current_bid,
@@ -196,8 +176,6 @@ class SSEClient {
       lastUpdate: new Date().toISOString(),
       updateSource: 'sse'
     };
-    
-    // Note: Storage updates handled by auction monitor via events
     
     // Emit event for WebSocket relay and auction monitor
     this.eventEmitter.emit('auction:update', {
@@ -210,14 +188,11 @@ class SSEClient {
     });
     
     // Update metrics
-    if (global.metrics) {
-      global.metrics.incrementCounter('update_source_total', { source: 'sse' });
+    if (global.metrics?.pollingMetrics) {
+      global.metrics.pollingMetrics.updateSource.inc({ source: 'sse' });
     }
   }
-  
-  /**
-   * Handle auction closed event from SSE
-   */
+
   async handleAuctionClosed(productId, auctionId, closeData) {
     const updateData = {
       status: 'closed',
@@ -227,8 +202,6 @@ class SSEClient {
       closedAt: closeData.closedAt || new Date().toISOString(),
       updateSource: 'sse'
     };
-    
-    // Note: Storage updates handled by auction monitor via events
     
     // Cleanup SSE connection
     this.disconnect(productId);
@@ -242,47 +215,35 @@ class SSEClient {
       timestamp: new Date().toISOString()
     });
   }
-  
-  /**
-   * Handle reconnection with exponential backoff
-   */
+
   async handleReconnection(productId, auctionId) {
     const attempts = this.reconnectAttempts.get(productId) || 0;
     
     if (attempts >= this.config.maxReconnectAttempts) {
-      logger.warn('Max reconnection attempts reached, falling back to polling', { productId, attempts });
+      this.logger.warn('Max reconnection attempts reached, falling back to polling', { productId, attempts });
       this.eventEmitter.emit('sse:fallback', { productId, auctionId });
       
       // Update metrics
-      if (global.metrics) {
-        global.metrics.incrementCounter('sse_fallback_activations');
+      if (global.metrics?.pollingMetrics) {
+        global.metrics.pollingMetrics.fallbackActivations.inc();
       }
       
       return;
     }
     
     const delay = Math.min(this.config.reconnectInterval * Math.pow(2, attempts), 30000);
-    logger.info('Scheduling SSE reconnection', { productId, attempts: attempts + 1, delay });
+    this.logger.info('Scheduling SSE reconnection', { productId, attempts: attempts + 1, delay });
     
     setTimeout(() => {
       this.reconnectAttempts.set(productId, attempts + 1);
-      
-      // Update metrics
-      if (global.metrics) {
-        global.metrics.incrementCounter('sse_reconnection_attempts');
-      }
-      
       this.connectToAuction(productId, auctionId);
     }, delay);
   }
-  
-  /**
-   * Disconnect SSE for a specific product
-   */
+
   disconnect(productId) {
     const eventSource = this.connections.get(productId);
     if (eventSource) {
-      logger.info('Disconnecting SSE', { productId });
+      this.logger.info('Disconnecting SSE', { productId });
       
       eventSource.close();
       this.connections.delete(productId);
@@ -290,17 +251,14 @@ class SSEClient {
       this.sessionIds.delete(productId);
       
       // Update metrics
-      if (global.metrics) {
-        global.metrics.decrementGauge('sse_active_connections');
+      if (global.metrics?.sseMetrics) {
+        global.metrics.sseMetrics.activeConnections.dec();
       }
     }
   }
-  
-  /**
-   * Disconnect all SSE connections
-   */
+
   disconnectAll() {
-    logger.info('Disconnecting all SSE connections', { count: this.connections.size });
+    this.logger.info('Disconnecting all SSE connections', { count: this.connections.size });
     
     for (const [productId, eventSource] of this.connections) {
       eventSource.close();
@@ -311,29 +269,11 @@ class SSEClient {
     this.sessionIds.clear();
     
     // Reset metrics
-    if (global.metrics) {
-      global.metrics.setGauge('sse_active_connections', 0);
+    if (global.metrics?.sseMetrics) {
+      global.metrics.sseMetrics.activeConnections.set(0);
     }
   }
-  
-  /**
-   * Extract product ID from Nellis auction URL
-   * @param {string} url - The auction URL
-   * @returns {string|null} Product ID or null if not found
-   */
-  static extractProductId(url) {
-    if (!url) return null;
-    
-    // Match patterns like:
-    // https://www.nellisauction.com/p/product-name/12345
-    // https://www.nellisauction.com/p/product-name/12345?_data=...
-    const match = url.match(/\/p\/[^\/]+\/(\d+)(?:\?|$)/);
-    return match ? match[1] : null;
-  }
-  
-  /**
-   * Get connection status
-   */
+
   getConnectionStatus() {
     const status = {
       enabled: this.config.enabled,
@@ -352,11 +292,16 @@ class SSEClient {
     
     return status;
   }
+
+  static extractProductId(url) {
+    if (!url) return null;
+    
+    // Match patterns like:
+    // https://www.nellisauction.com/p/product-name/12345
+    // https://www.nellisauction.com/p/product-name/12345?_data=...
+    const match = url.match(/\/p\/[^\/]+\/(\d+)(?:\?|$)/);
+    return match ? match[1] : null;
+  }
 }
 
-// Export singleton instance
-const storage = require('./storage');
-// Note: We'll set the eventEmitter when auction monitor initializes us
-const sseClient = new SSEClient(storage, null);
-
-module.exports = sseClient;
+module.exports = SSEClientClass;

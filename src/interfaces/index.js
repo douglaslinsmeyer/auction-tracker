@@ -6,6 +6,7 @@
 module.exports = {
   IAuctionMonitor: require('./IAuctionMonitor'),
   INellisApi: require('./INellisApi'),
+  ISSEClient: require('./ISSEClient'),
   IStorage: require('./IStorage'),
   IWebSocketHandler: require('./IWebSocketHandler')
 };

@@ -10,6 +10,7 @@ const container = ServiceContainer.default;
 const {
   IAuctionMonitor,
   INellisApi,
+  ISSEClient,
   IStorage,
   IWebSocketHandler
 } = require('../interfaces');
@@ -17,18 +18,21 @@ const {
 // Import existing singleton services
 const auctionMonitor = require('../services/auctionMonitor');
 const nellisApi = require('../services/nellisApi');
+const sseClient = require('../services/sseClient');
 const storage = require('../services/storage');
 const wsHandler = require('../services/websocket');
 
 // Register interfaces
 container.registerInterface('IAuctionMonitor', IAuctionMonitor);
 container.registerInterface('INellisApi', INellisApi);
+container.registerInterface('ISSEClient', ISSEClient);
 container.registerInterface('IStorage', IStorage);
 container.registerInterface('IWebSocketHandler', IWebSocketHandler);
 
 // Register existing singletons as factories
 container.register('auctionMonitor', () => auctionMonitor, { factory: true });
 container.register('nellisApi', () => nellisApi, { factory: true });
+container.register('sseClient', () => sseClient, { factory: true });
 container.register('storage', () => storage, { factory: true });
 container.register('wsHandler', () => wsHandler, { factory: true });
 
