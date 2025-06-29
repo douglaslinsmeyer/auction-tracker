@@ -1,5 +1,6 @@
 const axios = require('axios');
 const storage = require('./storage');
+const logger = require('../utils/logger');
 
 class NellisApi {
   constructor() {
@@ -22,7 +23,7 @@ class NellisApi {
       const savedCookies = await storage.getCookies();
       if (savedCookies) {
         this.cookies = savedCookies;
-        console.log('Recovered authentication cookies from storage');
+        logger.logAuthActivity('cookies_recovered', true);
       }
       this.initialized = true;
     } catch (error) {
@@ -95,7 +96,7 @@ class NellisApi {
       // Save cookies to storage
       if (this.cookies) {
         await storage.saveCookies(this.cookies);
-        console.log('Saved authentication cookies to storage');
+        logger.logAuthActivity('cookies_saved', true);
       }
       
       return true;
@@ -125,9 +126,9 @@ class NellisApi {
     };
   }
 
-  async placeBid(auctionId, amount) {
+  async placeBid(auctionId, amount, retryCount = 0) {
     try {
-      console.info(`Placing bid on auction ${auctionId} for $${amount}`);
+      logger.logBidActivity('placing_bid', auctionId, amount);
       
       // Ensure amount is a whole number
       const bidAmount = Math.floor(amount);
@@ -145,12 +146,13 @@ class NellisApi {
           'Pragma': 'no-cache',
           'Referer': `${this.baseUrl}/p/product/${auctionId}`,
           'Origin': this.baseUrl
-        }
+        },
+        timeout: 10000 // 10 second timeout
       });
       
       // Check if response indicates success
       if (response.status === 200 || response.status === 201) {
-        console.info(`Successfully placed bid of $${bidAmount} on auction ${auctionId}`);
+        logger.logBidActivity('bid_placed', auctionId, bidAmount, { success: true });
         return {
           success: true,
           data: response.data,
@@ -196,12 +198,26 @@ class NellisApi {
         errorType = 'CONNECTION_ERROR';
       }
       
-      return {
+      const result = {
         success: false,
         error: errorMessage,
         errorType: errorType,
         retryable: ['CONNECTION_ERROR', 'SERVER_ERROR'].includes(errorType)
       };
+      
+      // Retry logic based on settings
+      if (result.retryable && retryCount === 0) {
+        const globalSettings = await storage.getSettings();
+        const maxRetries = globalSettings.bidding.retryAttempts || 3;
+        
+        if (retryCount < maxRetries - 1) {
+          console.log(`Retrying bid (attempt ${retryCount + 2} of ${maxRetries})...`);
+          await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Exponential backoff
+          return this.placeBid(auctionId, amount, retryCount + 1);
+        }
+      }
+      
+      return result;
     }
   }
 

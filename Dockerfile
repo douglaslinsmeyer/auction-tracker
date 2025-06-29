@@ -1,5 +1,5 @@
-# Use Node.js LTS version
-FROM node:18-alpine
+# Multi-stage Dockerfile for development and production
+FROM node:18-alpine AS base
 
 # Set working directory
 WORKDIR /app
@@ -7,26 +7,61 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install production dependencies
+# ===== Development Stage =====
+FROM base AS development
+
+# Install nodemon globally for hot-reloading
+RUN npm install -g nodemon
+
+# Install all dependencies (including dev dependencies)
+RUN npm ci
+
+# Copy application files
+COPY . .
+
+# Expose ports (3000 for app, 9229 for debugging)
+EXPOSE 3000 9229
+
+# Use nodemon for hot-reloading
+CMD ["nodemon", "src/index.js"]
+
+# ===== Production Build Stage =====
+FROM base AS production-build
+
+# Install only production dependencies
 RUN npm ci --only=production
 
 # Copy application code
 COPY . .
 
-# Create log directory
-RUN mkdir -p /app/logs
+# ===== Production Stage =====
+FROM node:18-alpine AS production
+
+# Add curl for healthcheck
+RUN apk add --no-cache curl
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+# Set working directory
+WORKDIR /app
+
+# Copy from build stage
+COPY --from=production-build --chown=nodejs:nodejs /app ./
+
+# Create log directory with proper permissions
+RUN mkdir -p /app/logs && chown -R nodejs:nodejs /app/logs
+
+# Switch to non-root user
+USER nodejs
 
 # Expose port
 EXPOSE 3000
 
-# Run as non-root user
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nodejs -u 1001
-USER nodejs
-
-# Health check
+# Health check using curl (more reliable than node)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); })"
+  CMD curl -f http://localhost:3000/health || exit 1
 
 # Start the application
 CMD ["node", "src/index.js"]

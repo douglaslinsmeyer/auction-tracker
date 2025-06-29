@@ -1,9 +1,9 @@
-const { mockAuction, mockCookies } = require('../fixtures/mockData');
-const testUtils = require('../utils/testUtils');
+const { mockAuction, mockCookies } = require('../__fixtures__/mockData');
+const testUtils = require('../__support__/testUtils');
 
 // Mock ioredis
 jest.mock('ioredis', () => {
-  const RedisMock = require('../mocks/redis.mock');
+  const RedisMock = require('../__mocks__/redis.mock');
   return RedisMock;
 });
 

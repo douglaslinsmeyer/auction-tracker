@@ -48,9 +48,22 @@ class AuctionMonitorUI {
             this.startPingInterval();
             
             // Authenticate first
+            // Get token from localStorage or prompt user
+            let authToken = localStorage.getItem('authToken');
+            if (!authToken) {
+                authToken = prompt('Please enter your authentication token:');
+                if (authToken) {
+                    localStorage.setItem('authToken', authToken);
+                } else {
+                    console.error('Authentication token is required');
+                    this.ws.close();
+                    return;
+                }
+            }
+            
             this.sendMessage({
                 type: 'authenticate',
-                token: 'dev-token',
+                token: authToken,
                 requestId: this.generateRequestId()
             });
         };
@@ -126,14 +139,22 @@ class AuctionMonitorUI {
                 break;
                 
             case 'authenticated':
-                console.log('Authentication successful');
-                // Now request the monitored auctions
-                this.sendMessage({
-                    type: 'getMonitoredAuctions',
-                    requestId: this.generateRequestId()
-                });
-                // Check auth status after WebSocket auth
-                this.checkAuthStatus();
+                if (message.success) {
+                    console.log('Authentication successful');
+                    // Now request the monitored auctions
+                    this.sendMessage({
+                        type: 'getMonitoredAuctions',
+                        requestId: this.generateRequestId()
+                    });
+                    // Check auth status after WebSocket auth
+                    this.checkAuthStatus();
+                } else {
+                    console.error('Authentication failed:', message.error);
+                    // Clear stored token and reconnect
+                    localStorage.removeItem('authToken');
+                    alert('Authentication failed. Please refresh the page and enter a valid token.');
+                    this.ws.close();
+                }
                 break;
         }
     }

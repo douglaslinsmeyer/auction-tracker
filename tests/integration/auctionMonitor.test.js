@@ -1,4 +1,4 @@
-const { mockAuction, mockAuctionData, mockOutbidResponse } = require('../fixtures/mockData');
+const { mockAuction, mockAuctionData, mockOutbidResponse } = require('../__fixtures__/mockData');
 
 // Mock dependencies before requiring the module
 jest.mock('../../src/services/nellisApi');

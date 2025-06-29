@@ -1,5 +1,8 @@
 const WebSocket = require('ws');
 const auctionMonitor = require('./auctionMonitor');
+const schemas = require('../validators/schemas');
+const { sanitizeObject } = require('../middleware/validation');
+const IdGenerator = require('../utils/idGenerator');
 
 class WebSocketHandler {
   constructor() {
@@ -113,7 +116,18 @@ class WebSocketHandler {
 
     // Simple token-based auth for now
     // In production, implement proper JWT or OAuth
-    const validToken = process.env.AUTH_TOKEN || 'dev-token';
+    const validToken = process.env.AUTH_TOKEN;
+    
+    if (!validToken) {
+      console.error('AUTH_TOKEN environment variable is not set');
+      client.ws.send(JSON.stringify({
+        type: 'authenticated',
+        success: false,
+        error: 'Server configuration error',
+        requestId: requestId
+      }));
+      return;
+    }
     
     if (data.token === validToken) {
       client.authenticated = true;
@@ -177,7 +191,25 @@ class WebSocketHandler {
       return;
     }
 
-    const { auctionId, config, metadata } = data;
+    // Validate auction ID
+    const { error: idError } = schemas.validateAuctionId(data.auctionId);
+    if (idError) {
+      this.sendError(clientId, idError.details[0].message, requestId);
+      return;
+    }
+
+    // Validate config
+    const { error: configError, value: validatedData } = schemas.validateStartMonitoring({
+      config: data.config || {},
+      metadata: data.metadata
+    });
+    if (configError) {
+      this.sendError(clientId, configError.details[0].message, requestId);
+      return;
+    }
+
+    const { auctionId } = data;
+    const { config, metadata } = validatedData;
     console.log(`Adding auction ${auctionId} to monitor`);
     const success = await auctionMonitor.addAuction(auctionId, config, metadata);
     console.log(`Auction ${auctionId} monitoring result: ${success}`);
@@ -257,7 +289,22 @@ class WebSocketHandler {
       return;
     }
 
-    const { auctionId, amount } = data;
+    // Validate auction ID
+    const { error: idError } = schemas.validateAuctionId(data.auctionId);
+    if (idError) {
+      this.sendError(clientId, idError.details[0].message);
+      return;
+    }
+
+    // Validate bid amount
+    const { error: bidError, value: validatedBid } = schemas.validateBid({ amount: data.amount });
+    if (bidError) {
+      this.sendError(clientId, bidError.details[0].message);
+      return;
+    }
+
+    const { auctionId } = data;
+    const { amount } = validatedBid;
     const nellisApi = require('./nellisApi');
     
     try {
@@ -314,7 +361,8 @@ class WebSocketHandler {
   }
 
   generateClientId() {
-    return `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Use secure ID generator for cryptographically secure random IDs
+    return IdGenerator.generateClientId();
   }
 
   // Broadcast to subscribed clients

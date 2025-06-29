@@ -1,5 +1,6 @@
 const Redis = require('ioredis');
 const EventEmitter = require('events');
+const cryptoUtil = require('../utils/crypto');
 
 class StorageService extends EventEmitter {
   constructor() {
@@ -150,34 +151,59 @@ class StorageService extends EventEmitter {
   async saveCookies(cookies) {
     const key = this._key('auth', 'cookies');
     
-    if (this.connected) {
-      try {
-        await this.redis.set(key, cookies);
-        await this.redis.expire(key, this.config.cookieTTL);
-        return true;
-      } catch (error) {
-        console.error('Redis save cookies error:', error);
+    try {
+      // Encrypt cookies before storage
+      const encryptedCookies = cryptoUtil.encrypt(cookies);
+      
+      if (this.connected) {
+        try {
+          await this.redis.set(key, encryptedCookies);
+          await this.redis.expire(key, this.config.cookieTTL);
+          return true;
+        } catch (error) {
+          console.error('Redis save cookies error:', error);
+        }
       }
+      
+      // Fallback to memory (still encrypted)
+      this.memoryFallback.set(key, encryptedCookies);
+      return true;
+    } catch (error) {
+      console.error('Failed to encrypt cookies:', error.message);
+      return false;
     }
-    
-    // Fallback to memory
-    this.memoryFallback.set(key, cookies);
-    return true;
   }
 
   async getCookies() {
     const key = this._key('auth', 'cookies');
+    let encryptedCookies = null;
     
     if (this.connected) {
       try {
-        return await this.redis.get(key);
+        encryptedCookies = await this.redis.get(key);
       } catch (error) {
         console.error('Redis get cookies error:', error);
       }
     }
     
-    // Fallback to memory
-    return this.memoryFallback.get(key) || null;
+    // Fallback to memory if Redis failed or returned null
+    if (!encryptedCookies) {
+      encryptedCookies = this.memoryFallback.get(key) || null;
+    }
+    
+    // Decrypt cookies before returning
+    if (encryptedCookies) {
+      try {
+        return cryptoUtil.decrypt(encryptedCookies);
+      } catch (error) {
+        console.error('Failed to decrypt cookies:', error.message);
+        // If decryption fails, cookies may be from old unencrypted version
+        // Return null to force re-authentication
+        return null;
+      }
+    }
+    
+    return null;
   }
 
   // Bid history management
@@ -247,6 +273,54 @@ class StorageService extends EventEmitter {
     }
     
     return this.memoryFallback.get(key) || null;
+  }
+
+  // Settings management
+  async getSettings() {
+    const key = this._key('system', 'settings');
+    
+    if (this.connected) {
+      try {
+        const data = await this.redis.get(key);
+        return data ? JSON.parse(data) : this.getDefaultSettings();
+      } catch (error) {
+        console.error('Redis get settings error:', error);
+      }
+    }
+    
+    return this.memoryFallback.get(key) || this.getDefaultSettings();
+  }
+
+  async saveSettings(settings) {
+    const key = this._key('system', 'settings');
+    const data = JSON.stringify(settings);
+    
+    if (this.connected) {
+      try {
+        await this.redis.set(key, data);
+        return true;
+      } catch (error) {
+        console.error('Redis save settings error:', error);
+      }
+    }
+    
+    this.memoryFallback.set(key, settings);
+    return true;
+  }
+
+  getDefaultSettings() {
+    return {
+      general: {
+        defaultMaxBid: 100,
+        defaultStrategy: 'increment',
+        autoBidDefault: true
+      },
+      bidding: {
+        snipeTiming: 5,
+        bidBuffer: 0,
+        retryAttempts: 3
+      }
+    };
   }
 
   // Cleanup

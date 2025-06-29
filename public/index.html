@@ -1,74 +1,376 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nellis Auction Monitor</title>
-    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            200: '#c7d2fe',
+                            300: '#a5b4fc',
+                            400: '#818cf8',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            800: '#3730a3',
+                            900: '#312e81',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
 </head>
-<body>
-    <div class="container">
-        <header>
-            <h1>Nellis Auction Monitor</h1>
-            <div class="status-bar">
-                <span class="status-indicator" id="connection-status">
-                    <span class="status-dot"></span>
-                    <span class="status-text">Connecting...</span>
-                </span>
-                <span class="status-indicator" id="auth-status">
-                    <span class="status-dot"></span>
-                    <span class="status-text">Not Authenticated</span>
-                </span>
-                <span class="stats">
-                    <span id="auction-count">0</span> auctions monitored
-                </span>
+<body class="h-full bg-gray-50 dark:bg-gray-900">
+    <!-- Navigation Sidebar -->
+    <div id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transform -translate-x-full transition-transform duration-300 ease-in-out">
+        <div class="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Menu</h2>
+            <button id="close-sidebar" class="lg:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <nav class="mt-6 px-4 space-y-2">
+            <a href="#auctions" id="nav-auctions" class="flex items-center px-4 py-3 text-sm font-medium rounded-lg bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-200">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                Auctions
+            </a>
+            <a href="#settings" id="nav-settings" class="flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                Settings
+            </a>
+        </nav>
+    </div>
+
+    <!-- Overlay for mobile -->
+    <div id="sidebar-overlay" class="fixed inset-0 z-30 bg-gray-600 bg-opacity-75 hidden"></div>
+
+    <!-- Main Content Wrapper -->
+    <div id="main-content" class="transition-all duration-300 ease-in-out">
+        <!-- Header -->
+        <header class="w-full bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+            <!-- Main Header Content -->
+            <div class="px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <!-- Logo and Title -->
+                    <div class="flex items-center">
+                        <!-- Hamburger Menu -->
+                        <button id="menu-toggle" class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 mr-4">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                            </svg>
+                        </button>
+                        <h1 class="text-xl font-bold text-gray-900 dark:text-white">Nellis Auction Monitor</h1>
+                    </div>
+                
+                    <!-- Controls -->
+                    <div class="flex items-center">
+                        <!-- Dark Mode Toggle -->
+                        <button id="theme-toggle" class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500">
+                            <!-- Sun Icon -->
+                            <svg class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                            </svg>
+                            <!-- Moon Icon -->
+                            <svg class="w-5 h-5 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
             </div>
         </header>
 
-        <main>
-            <div class="controls">
-                <button id="refresh-btn" class="btn btn-primary">Refresh</button>
-                <button id="clear-all-btn" class="btn btn-danger">Clear All</button>
+        <!-- Main Content -->
+        <main class="flex-1 px-4 sm:px-6 lg:px-8 py-8 pb-16">
+            <!-- Auctions Page -->
+            <div id="auctions-page" class="page">
+                <!-- Auctions Grid -->
+                <div id="auctions-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                    <!-- Auction cards will be inserted here -->
+                </div>
+
+                <!-- Empty State -->
+                <div id="empty-state" class="text-center py-12">
+                    <svg class="mx-auto h-16 w-16 text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" stroke-width="2"></circle>
+                        <path d="M12 6v6l4 2" stroke-width="2" stroke-linecap="round"></path>
+                    </svg>
+                    <p class="mt-4 text-lg font-medium text-gray-900 dark:text-white">No auctions being monitored</p>
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Auctions will appear here when added from the browser extension</p>
+                </div>
             </div>
 
-            <div id="auctions-grid" class="auctions-grid">
-                <!-- Auction cards will be inserted here -->
-            </div>
+            <!-- Settings Page -->
+            <div id="settings-page" class="page hidden">
+                <div class="max-w-4xl mx-auto">
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Settings</h2>
+                    
+                    <!-- Settings Form -->
+                    <div class="space-y-6">
+                        <!-- Bidding Settings -->
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Bidding Settings</h3>
+                            
+                            <div class="space-y-4">
+                                <!-- Default Max Bid -->
+                                <div>
+                                    <label for="default-max-bid" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Maximum Bid</label>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-gray-500 dark:text-gray-400">$</span>
+                                        <input type="number" id="default-max-bid" class="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500" value="100" min="1">
+                                    </div>
+                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Default maximum bid for new auctions</p>
+                                </div>
 
-            <div id="empty-state" class="empty-state">
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <path d="M12 6v6l4 2"></path>
-                </svg>
-                <p>No auctions being monitored</p>
-                <small>Auctions will appear here when added from the browser extension</small>
+                                <!-- Default Strategy -->
+                                <div>
+                                    <label for="default-strategy" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Bidding Strategy</label>
+                                    <select id="default-strategy" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500">
+                                        <option value="increment">Auto (Increment)</option>
+                                        <option value="sniping">Snipe</option>
+                                    </select>
+                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Default strategy for new auctions</p>
+                                </div>
+
+                                <!-- Auto-bid by Default -->
+                                <div>
+                                    <label class="flex items-center space-x-3">
+                                        <input type="checkbox" id="auto-bid-default" class="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 dark:focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600" checked>
+                                        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Enable auto-bidding by default</span>
+                                    </label>
+                                    <p class="mt-1 ml-7 text-xs text-gray-500 dark:text-gray-400">Automatically enable auto-bidding for new auctions</p>
+                                </div>
+
+                                <!-- Snipe Timing -->
+                                <div>
+                                    <label for="snipe-timing" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Snipe Timing (seconds before end)</label>
+                                    <input type="number" id="snipe-timing" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500" value="5" min="1" max="30">
+                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">When to place bid in sniping strategy</p>
+                                </div>
+
+                                <!-- Bid Increment Buffer -->
+                                <div>
+                                    <label for="bid-buffer" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Bid Increment Buffer</label>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-gray-500 dark:text-gray-400">$</span>
+                                        <input type="number" id="bid-buffer" class="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500" value="0" min="0">
+                                    </div>
+                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Extra amount to add above minimum bid increment</p>
+                                </div>
+
+                                <!-- Retry Attempts -->
+                                <div>
+                                    <label for="retry-attempts" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Bid Retry Attempts</label>
+                                    <input type="number" id="retry-attempts" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500" value="3" min="1" max="10">
+                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Number of times to retry failed bids</p>
+                                </div>
+                            </div>
+                        </div>
+
+
+                        <!-- Save Button -->
+                        <div class="flex justify-end">
+                            <button id="save-settings" class="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors">
+                                Save Settings
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
 
-    <!-- Bid History Modal -->
-    <div id="bid-history-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="bid-history-title">Bid History</h2>
-                <button class="modal-close" onclick="monitorUI.closeBidHistory()">&times;</button>
+    <!-- Status Bar (Fixed Bottom) -->
+    <div class="fixed bottom-0 left-0 right-0 w-full border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 z-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center justify-between">
+            <!-- Left side: Connection and Auth Status -->
+            <div class="flex items-center space-x-6">
+                <!-- Connection Status -->
+                <div class="flex items-center space-x-2" id="connection-status">
+                    <span class="inline-block w-2 h-2 rounded-full bg-gray-400" id="connection-dot"></span>
+                    <span class="text-xs text-gray-500 dark:text-gray-400" id="connection-text">Connecting</span>
+                </div>
+                
+                <!-- Auth Status -->
+                <div class="flex items-center space-x-2" id="auth-status">
+                    <span class="inline-block w-2 h-2 rounded-full bg-gray-400" id="auth-dot"></span>
+                    <span class="text-xs text-gray-500 dark:text-gray-400" id="auth-text">Not Authenticated</span>
+                </div>
             </div>
-            <div class="modal-body">
-                <div id="bid-history-loading" class="loading-state">
-                    <div class="spinner"></div>
-                    <p>Loading bid history...</p>
+            
+            <!-- Right side: Auction Count -->
+            <div class="flex items-center space-x-2">
+                <svg class="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span class="text-xs text-gray-600 dark:text-gray-400">
+                    Monitoring <span id="auction-count" class="font-semibold">0</span> auctions
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bid History Modal -->
+    <div id="bid-history-modal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+            <!-- Background overlay -->
+            <div class="fixed inset-0 transition-opacity bg-gray-500 dark:bg-gray-900 bg-opacity-75 dark:bg-opacity-75" onclick="monitorUI.closeBidHistory()"></div>
+
+            <!-- Modal panel -->
+            <div class="relative inline-block w-full max-w-2xl text-left align-middle transition-all transform bg-white dark:bg-gray-800 rounded-lg shadow-xl">
+                <!-- Modal header -->
+                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                    <h2 id="bid-history-title" class="text-lg font-semibold text-gray-900 dark:text-white">Bid History</h2>
+                    <button onclick="monitorUI.closeBidHistory()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
                 </div>
-                <div id="bid-history-content" class="bid-history-content">
-                    <!-- Bid history will be inserted here -->
-                </div>
-                <div id="bid-history-empty" class="empty-state" style="display: none;">
-                    <p>No bids placed yet</p>
-                    <small>Bid history will appear here once you start bidding</small>
+
+                <!-- Modal body -->
+                <div class="px-6 py-4 max-h-96 overflow-y-auto">
+                    <!-- Loading state -->
+                    <div id="bid-history-loading" class="text-center py-8">
+                        <div class="inline-flex items-center justify-center w-12 h-12 mb-4">
+                            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+                        </div>
+                        <p class="text-gray-500 dark:text-gray-400">Loading bid history...</p>
+                    </div>
+
+                    <!-- Bid history content -->
+                    <div id="bid-history-content" class="space-y-3">
+                        <!-- Bid history will be inserted here -->
+                    </div>
+
+                    <!-- Empty state -->
+                    <div id="bid-history-empty" class="text-center py-8 hidden">
+                        <p class="text-gray-900 dark:text-white font-medium">No bids placed yet</p>
+                        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Bid history will appear here once you start bidding</p>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <script src="app.js"></script>
+    <script>
+        // Dark mode toggle
+        const themeToggle = document.getElementById('theme-toggle');
+        const html = document.documentElement;
+        
+        // Check for saved theme preference or default to light
+        const currentTheme = localStorage.getItem('theme') || 'light';
+        html.classList.toggle('dark', currentTheme === 'dark');
+        
+        themeToggle.addEventListener('click', () => {
+            const isDark = html.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        });
+
+        // Sidebar toggle
+        const sidebar = document.getElementById('sidebar');
+        const sidebarOverlay = document.getElementById('sidebar-overlay');
+        const menuToggle = document.getElementById('menu-toggle');
+        const closeSidebar = document.getElementById('close-sidebar');
+        const mainContent = document.getElementById('main-content');
+
+        function openSidebar() {
+            sidebar.classList.remove('-translate-x-full');
+            sidebarOverlay.classList.remove('hidden');
+            if (window.innerWidth >= 1024) {
+                mainContent.classList.add('lg:ml-64');
+            }
+        }
+
+        function closeSidebarMenu() {
+            sidebar.classList.add('-translate-x-full');
+            sidebarOverlay.classList.add('hidden');
+            mainContent.classList.remove('lg:ml-64');
+        }
+
+        menuToggle.addEventListener('click', openSidebar);
+        closeSidebar.addEventListener('click', closeSidebarMenu);
+        sidebarOverlay.addEventListener('click', closeSidebarMenu);
+
+        // Check screen size and adjust sidebar behavior
+        function checkScreenSize() {
+            if (window.innerWidth >= 1024) {
+                sidebarOverlay.classList.add('hidden');
+            }
+        }
+
+        window.addEventListener('resize', checkScreenSize);
+        checkScreenSize();
+
+        // Page routing
+        function showPage(pageName) {
+            // Hide all pages
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.add('hidden');
+            });
+            
+            // Show selected page
+            const selectedPage = document.getElementById(`${pageName}-page`);
+            if (selectedPage) {
+                selectedPage.classList.remove('hidden');
+            }
+            
+            // Update navigation active state
+            document.querySelectorAll('nav a').forEach(link => {
+                link.classList.remove('bg-primary-100', 'dark:bg-primary-900', 'text-primary-700', 'dark:text-primary-200');
+                link.classList.add('text-gray-700', 'dark:text-gray-300', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
+            });
+            
+            const activeLink = document.getElementById(`nav-${pageName}`);
+            if (activeLink) {
+                activeLink.classList.remove('text-gray-700', 'dark:text-gray-300', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
+                activeLink.classList.add('bg-primary-100', 'dark:bg-primary-900', 'text-primary-700', 'dark:text-primary-200');
+            }
+        }
+
+        // Handle navigation clicks
+        document.getElementById('nav-auctions').addEventListener('click', (e) => {
+            e.preventDefault();
+            showPage('auctions');
+            history.pushState({ page: 'auctions' }, '', '#auctions');
+            closeSidebarMenu();
+        });
+
+        document.getElementById('nav-settings').addEventListener('click', (e) => {
+            e.preventDefault();
+            showPage('settings');
+            history.pushState({ page: 'settings' }, '', '#settings');
+            closeSidebarMenu();
+        });
+
+        // Handle browser back/forward
+        window.addEventListener('popstate', (e) => {
+            const page = e.state?.page || 'auctions';
+            showPage(page);
+        });
+
+        // Initialize based on URL hash
+        const initialPage = window.location.hash.slice(1) || 'auctions';
+        showPage(initialPage);
+        history.replaceState({ page: initialPage }, '', `#${initialPage}`);
+    </script>
+    <script src="settings.js"></script>
 </body>
 </html>

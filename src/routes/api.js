@@ -1,31 +1,45 @@
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
 const auctionMonitor = require('../services/auctionMonitor');
 const nellisApi = require('../services/nellisApi');
 const storage = require('../services/storage');
+const { validateBody, validateAuctionId } = require('../middleware/validation');
+const { asyncHandler, createError } = require('../middleware/errorHandler');
+
+// Create a specific rate limiter for bid operations
+const bidLimiter = rateLimit({
+  windowMs: parseInt(process.env.BID_RATE_LIMIT_WINDOW_MS) || 60 * 1000, // 1 minute window
+  max: parseInt(process.env.BID_RATE_LIMIT_MAX) || 10, // limit each IP to 10 bid requests per minute
+  message: 'Too many bid attempts, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    // Rate limit by IP + auction ID to prevent bid spamming on specific auctions
+    return `${req.ip}:${req.params.id}`;
+  },
+  handler: (req, res) => {
+    console.warn(`Bid rate limit exceeded for IP ${req.ip} on auction ${req.params.id}`);
+    res.status(429).json({
+      success: false,
+      error: 'Too many bid attempts on this auction. Please wait before trying again.',
+      code: 'BID_RATE_LIMIT_EXCEEDED'
+    });
+  }
+});
 
 // Get all monitored auctions
-router.get('/auctions', (req, res) => {
-  try {
-    const auctions = auctionMonitor.getMonitoredAuctions();
-    res.json({ success: true, auctions });
-  } catch (error) {
-    console.error('Error getting monitored auctions:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+router.get('/auctions', asyncHandler(async (req, res) => {
+  const auctions = auctionMonitor.getMonitoredAuctions();
+  res.json({ success: true, auctions });
+}));
 
 // Get specific auction details
-router.get('/auctions/:id', async (req, res) => {
-  try {
-    const auctionId = req.params.id;
-    const data = await nellisApi.getAuctionData(auctionId);
-    res.json({ success: true, data });
-  } catch (error) {
-    console.error(`Error getting auction ${req.params.id}:`, error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+router.get('/auctions/:id', validateAuctionId, asyncHandler(async (req, res) => {
+  const auctionId = req.params.id;
+  const data = await nellisApi.getAuctionData(auctionId);
+  res.json({ success: true, data });
+}));
 
 // Validate auction configuration
 function validateAuctionConfig(config) {
@@ -91,36 +105,26 @@ function validateAuctionConfig(config) {
 }
 
 // Start monitoring an auction
-router.post('/auctions/:id/monitor', (req, res) => {
+router.post('/auctions/:id/monitor', validateAuctionId, validateBody('StartMonitoring'), async (req, res) => {
   try {
     const auctionId = req.params.id;
-    const config = req.body.config || {};
+    const { config, metadata } = req.body;
     
-    // Validate configuration
-    const validationErrors = validateAuctionConfig(config);
-    if (validationErrors.length > 0) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Configuration validation failed',
-        details: validationErrors
-      });
-    }
-    
-    const success = auctionMonitor.addAuction(auctionId, config);
+    const success = await auctionMonitor.addAuction(auctionId, config, metadata);
     
     if (success) {
       res.json({ success: true, message: `Started monitoring auction ${auctionId}`, config });
     } else {
-      res.status(400).json({ success: false, error: 'Auction already being monitored' });
+      res.status(409).json({ success: false, error: 'Auction already being monitored' });
     }
   } catch (error) {
-    console.error(`Error starting monitoring for auction ${req.params.id}:`, error);
-    res.status(500).json({ success: false, error: error.message });
+    console.error(`Error starting monitoring for auction ${req.params.id}:`, error.message);
+    next(error);
   }
 });
 
 // Stop monitoring an auction
-router.delete('/auctions/:id/monitor', (req, res) => {
+router.delete('/auctions/:id/monitor', validateAuctionId, (req, res) => {
   try {
     const auctionId = req.params.id;
     const success = auctionMonitor.removeAuction(auctionId);
@@ -177,7 +181,7 @@ router.post('/auctions/clear', (req, res) => {
 });
 
 // Update auction configuration
-router.put('/auctions/:id/config', (req, res) => {
+router.put('/auctions/:id/config', validateAuctionId, validateBody('AuctionConfigUpdate'), async (req, res) => {
   try {
     const auctionId = req.params.id;
     const config = req.body.config;
@@ -234,15 +238,11 @@ router.get('/auctions/:id/bids', async (req, res) => {
   }
 });
 
-// Place a bid
-router.post('/auctions/:id/bid', async (req, res) => {
+// Place a bid (with rate limiting)
+router.post('/auctions/:id/bid', validateAuctionId, bidLimiter, validateBody('Bid'), async (req, res) => {
   try {
     const auctionId = req.params.id;
     const { amount } = req.body;
-    
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ success: false, error: 'Invalid bid amount' });
-    }
     
     const result = await nellisApi.placeBid(auctionId, amount);
     
@@ -271,7 +271,7 @@ router.post('/auctions/:id/bid', async (req, res) => {
 });
 
 // Set authentication credentials
-router.post('/auth', async (req, res) => {
+router.post('/auth', validateBody('Auth'), async (req, res) => {
   try {
     console.log('Auth request received:', {
       body: req.body,
@@ -414,6 +414,127 @@ router.get('/status', async (req, res) => {
       healthy: redisHealthy
     }
   });
+});
+
+// Get global settings
+router.get('/settings', async (req, res) => {
+  try {
+    const settings = await storage.getSettings();
+    res.json({ success: true, settings });
+  } catch (error) {
+    console.error('Error getting settings:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get feature flag status
+router.get('/features', (req, res) => {
+  const featureFlags = require('../config/features');
+  const status = featureFlags.getStatus();
+  res.json({ 
+    success: true, 
+    features: status,
+    phase: 3,
+    description: 'Performance & Architecture improvements'
+  });
+});
+
+// Get circuit breaker status
+router.get('/circuit-breaker', (req, res) => {
+  try {
+    // Check if circuit breaker is in use
+    if (nellisApi.getCircuitBreakerStatus) {
+      const status = nellisApi.getCircuitBreakerStatus();
+      res.json({
+        success: true,
+        circuitBreaker: status
+      });
+    } else {
+      res.json({
+        success: true,
+        circuitBreaker: {
+          enabled: false,
+          message: 'Circuit breaker feature not enabled or not wrapped'
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error getting circuit breaker status:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Update global settings
+router.post('/settings', validateBody('Settings'), async (req, res) => {
+  try {
+    const settings = req.body; // validateBody already handles the validation
+    
+    // Validate settings structure
+    const validationErrors = [];
+    
+    // Validate general settings
+    if (settings.general) {
+      if (settings.general.defaultMaxBid !== undefined) {
+        const maxBid = settings.general.defaultMaxBid;
+        if (typeof maxBid !== 'number' || maxBid < 1 || maxBid > 10000) {
+          validationErrors.push('defaultMaxBid must be between 1 and 10000');
+        }
+      }
+      
+      if (settings.general.defaultStrategy !== undefined) {
+        const validStrategies = ['increment', 'sniping'];
+        if (!validStrategies.includes(settings.general.defaultStrategy)) {
+          validationErrors.push(`defaultStrategy must be one of: ${validStrategies.join(', ')}`);
+        }
+      }
+      
+      if (settings.general.autoBidDefault !== undefined && typeof settings.general.autoBidDefault !== 'boolean') {
+        validationErrors.push('autoBidDefault must be a boolean');
+      }
+    }
+    
+    // Validate bidding settings
+    if (settings.bidding) {
+      if (settings.bidding.snipeTiming !== undefined) {
+        const timing = settings.bidding.snipeTiming;
+        if (typeof timing !== 'number' || timing < 1 || timing > 30) {
+          validationErrors.push('snipeTiming must be between 1 and 30 seconds');
+        }
+      }
+      
+      if (settings.bidding.bidBuffer !== undefined) {
+        const buffer = settings.bidding.bidBuffer;
+        if (typeof buffer !== 'number' || buffer < 0 || buffer > 100) {
+          validationErrors.push('bidBuffer must be between 0 and 100');
+        }
+      }
+      
+      if (settings.bidding.retryAttempts !== undefined) {
+        const attempts = settings.bidding.retryAttempts;
+        if (typeof attempts !== 'number' || attempts < 1 || attempts > 10) {
+          validationErrors.push('retryAttempts must be between 1 and 10');
+        }
+      }
+    }
+    
+    // Notification settings validation removed
+    
+    if (validationErrors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Settings validation failed',
+        details: validationErrors
+      });
+    }
+    
+    // Save settings
+    await storage.saveSettings(settings);
+    
+    res.json({ success: true, settings });
+  } catch (error) {
+    console.error('Error saving settings:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 module.exports = router;

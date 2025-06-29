@@ -1,11 +1,16 @@
-# Production configuration
-# Use with: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
+# Production overrides
+# Use with: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Or with env file: docker-compose --env-file .env.production up -d
 
 services:
-  nellis-backend:
+  backend:
     build:
-      context: .
-      dockerfile: Dockerfile
-    restart: unless-stopped
+      target: production
+    ports:
+      - "3000:3000"  # No debug port in production
     environment:
       - NODE_ENV=production
+      - DEBUG=  # Disable debug logging
+    volumes:
+      # Only logs volume in production (no source code mounting)
+      - ./logs:/app/logs

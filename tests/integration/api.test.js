@@ -5,7 +5,7 @@
 
 const request = require('supertest');
 const express = require('express');
-const { mockAuction, mockCookies } = require('../fixtures/mockData');
+const { mockAuction, mockCookies } = require('../__fixtures__/mockData');
 
 describe('API Integration Tests', () => {
   let app;

@@ -1,32 +1,39 @@
+version: '3.8'
+
 services:
-  nellis-backend:
+  backend:
+    build:
+      context: .
+      target: ${BUILD_TARGET:-development}
     container_name: nellis-auction-backend
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:3000"
+      - "9229:9229"  # Debug port (only used in development)
     environment:
+      - NODE_ENV=${NODE_ENV:-development}
       - PORT=3000
       - AUTH_TOKEN=${AUTH_TOKEN:-dev-token}
-      - LOG_LEVEL=info
+      - LOG_LEVEL=${LOG_LEVEL:-info}
       - REDIS_URL=redis://redis:6379
+      - DEBUG=${DEBUG:-}
     volumes:
+      # Development volumes - disabled in production via env var
+      - ${SRC_VOLUME:-./src:/app/src}
+      - ${PUBLIC_VOLUME:-./public:/app/public}
+      - /app/node_modules  # Prevent node_modules from being overwritten
       - ./logs:/app/logs
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/status"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+    depends_on:
+      redis:
+        condition: service_healthy
     networks:
       - nellis-network
-    depends_on:
-      - redis
 
   redis:
     image: redis:7-alpine
     container_name: nellis-redis
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis-data:/data
     command: redis-server --appendonly yes --appendfsync everysec
@@ -35,6 +42,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
     networks:
       - nellis-network
 

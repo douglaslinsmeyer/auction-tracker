@@ -2,6 +2,17 @@
 
 Backend service for the Nellis Auction Helper Chrome extension. Provides 24/7 auction monitoring and automated bidding capabilities.
 
+## 📚 Documentation
+
+All project documentation is organized in the [`docs/`](./docs/) directory. Start with the [Documentation Index](./docs/README.md).
+
+### Quick Links
+- 🚀 [Development Guide](./docs/development/DEVELOPMENT.md) - Setup and workflow
+- 📊 [Architecture Overview](./docs/phase-0/ARCHITECTURE_ASSESSMENT.md) - System design
+- 🧪 [Testing Strategy](./docs/planning/BDD_TESTING_PLAN.md) - BDD approach
+- 🔧 [API Reference](./docs/api/README.md) - REST and WebSocket APIs
+- 📋 [Production Checklist](./docs/planning/PRODUCTION_READINESS_CHECKLIST.md) - Go-live requirements
+
 ## Features
 
 - 24/7 auction monitoring (works when browser is closed)
@@ -9,6 +20,9 @@ Backend service for the Nellis Auction Helper Chrome extension. Provides 24/7 au
 - REST API for extension communication
 - Automated bidding based on configured strategies
 - Docker containerization for easy deployment
+- **Rate limiting protection** against API abuse and DDoS attacks
+- **Automatic memory cleanup** for ended auctions to prevent memory leaks
+- **Request signing** (optional) for enhanced API security with HMAC-SHA256
 
 ## Quick Start
 
@@ -23,6 +37,11 @@ Backend service for the Nellis Auction Helper Chrome extension. Provides 24/7 au
    ```
    AUTH_TOKEN=your-secure-token-here
    ```
+   
+   **⚠️ CRITICAL**: The AUTH_TOKEN is **required** - the server will not start without it!
+   - No default or fallback values exist for security
+   - Generate a secure token using: `openssl rand -hex 32`
+   - For migration from older versions, see [MIGRATION_AUTH_TOKEN.md](./docs/MIGRATION_AUTH_TOKEN.md)
 
 3. Build and start the service:
    ```bash
@@ -140,12 +159,28 @@ docker build -t nellis-auction-backend .
 docker run -d -p 3000:3000 --env-file .env nellis-auction-backend
 ```
 
-## Security Notes
+## Security Features
 
-- Always use a strong `AUTH_TOKEN` in production
-- The service requires authentication cookies from Nellis to place bids
-- WebSocket connections require authentication
-- CORS is configured to only allow Chrome extension and localhost origins
+### Recent Security Improvements ✅
+All 13 identified security vulnerabilities have been fixed:
+- **Authentication**: No hardcoded tokens - AUTH_TOKEN required at startup
+- **Rate Limiting**: Protection against API abuse and DDoS attacks
+- **Input Validation**: Comprehensive validation on all endpoints using Joi
+- **Data Encryption**: AES-256-GCM encryption for sensitive data at rest
+- **Secure Logging**: Automatic redaction of tokens, cookies, and sensitive data
+- **CORS Protection**: Whitelist-based Chrome extension authorization
+- **Security Headers**: Helmet middleware with CSP, X-Frame-Options, etc.
+- **Request Signing**: Optional HMAC-SHA256 signatures for enhanced security
+- **Safe Math**: Protection against integer overflow in bid calculations
+- **Error Handling**: No stack traces exposed in production
+
+### Security Configuration
+- `AUTH_TOKEN` - Required authentication token (no defaults)
+- `ENCRYPTION_SECRET` - For encrypting sensitive data
+- `API_SIGNING_SECRET` - For request signature verification
+- `ALLOWED_EXTENSION_IDS` - Comma-separated list of authorized Chrome extensions
+
+See [Security Documentation](./docs/phase-0/SECURITY_VULNERABILITIES.md) for details.
 
 ## Monitoring
 
@@ -156,13 +191,43 @@ The service logs to:
 
 ## Architecture
 
+### Core Technologies
 - **Express.js** - REST API server
 - **WebSocket (ws)** - Real-time bidirectional communication
+- **Redis** - Data persistence (with in-memory fallback)
 - **Axios** - HTTP client for Nellis API
-- **Winston** - Logging
-- **Node-cron** - Scheduled tasks (future enhancement)
+- **Winston** - Secure logging with redaction
+
+### Service Architecture
+The backend uses a modular service architecture with:
+- **Service Interfaces** - Clean contracts for all major services
+- **Dependency Injection** - ServiceContainer for flexible instantiation
+- **Backward Compatibility** - Both singleton and class-based usage supported
+
+#### Services
+- `auctionMonitor` - Manages auction monitoring and bidding strategies
+- `nellisApi` - Interfaces with nellisauction.com
+- `storage` - Handles data persistence (Redis/memory)
+- `wsHandler` - Manages WebSocket connections
+
+All services are available as both singletons (legacy) and classes (modern):
+```javascript
+// Legacy (singleton) - still works
+const auctionMonitor = require('./services/auctionMonitor');
+
+// Modern (class-based) - new option
+const { AuctionMonitorClass } = require('./services');
+const monitor = new AuctionMonitorClass(storage, nellisApi, logger);
+
+// Dependency Injection - recommended
+const { container } = require('./container/serviceRegistration');
+const monitor = container.get('auctionMonitor');
+```
 
 ## TODO
 
-- [ ] Add data persistence
-- [ ] Implement actual bid placement (currently placeholder)
+- [x] ~~Add data persistence~~ ✅ Redis persistence implemented with memory fallback
+- [x] ~~Implement actual bid placement~~ ✅ Bid placement implemented with nellisApi
+- [ ] Add circuit breaker for API resilience
+- [ ] Implement auction state machine
+- [ ] Add performance monitoring/metrics

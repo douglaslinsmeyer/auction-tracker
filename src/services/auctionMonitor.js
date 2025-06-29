@@ -3,6 +3,8 @@ const nellisApi = require('./nellisApi');
 const EventEmitter = require('events');
 const WebSocket = require('ws');
 const storage = require('./storage');
+const SafeMath = require('../utils/safeMath');
+const logger = require('../utils/logger');
 
 class AuctionMonitor extends EventEmitter {
   constructor() {
@@ -12,6 +14,7 @@ class AuctionMonitor extends EventEmitter {
     this.wss = null;
     this.storageInitialized = false;
     this.broadcastHandler = null;
+    this.cleanupInterval = null;
   }
 
   async initialize(wss, broadcastHandler = null) {
@@ -24,6 +27,9 @@ class AuctionMonitor extends EventEmitter {
     
     // Recover persisted auctions
     await this.recoverPersistedState();
+    
+    // Start periodic cleanup of ended auctions
+    this.startCleanupTimer();
     
     console.log('Auction monitor initialized with persistence');
   }
@@ -115,7 +121,7 @@ class AuctionMonitor extends EventEmitter {
       const data = await nellisApi.getAuctionData(auctionId);
       const previousData = auction.data;
       auction.data = data;
-      auction.lastUpdate = Date.now();
+      auction.lastUpdated = Date.now();
 
       // Check if auction has ended
       if (data.isClosed || data.timeRemaining <= 0) {
@@ -187,14 +193,21 @@ class AuctionMonitor extends EventEmitter {
       return;
     }
 
-    // Calculate next bid with buffer
-    const minimumBid = auctionData.nextBid || auctionData.currentBid + auction.config.bidIncrement;
-    const nextBid = minimumBid + globalSettings.bidding.bidBuffer;
+    // Calculate next bid with buffer using safe math
+    const currentBid = SafeMath.validateBidAmount(auctionData.currentBid || 0);
+    const increment = auction.config.bidIncrement || globalSettings.bidding.defaultIncrement || 5;
+    const buffer = globalSettings.bidding.bidBuffer || 0;
+    
+    const minimumBid = auctionData.nextBid 
+      ? SafeMath.validateBidAmount(auctionData.nextBid)
+      : SafeMath.calculateNextBid(currentBid, increment, 0);
+    
+    const nextBid = SafeMath.calculateNextBid(minimumBid, 0, buffer);
 
-    if (nextBid <= auction.config.maxBid) {
+    if (SafeMath.isWithinBudget(nextBid, auction.config.maxBid)) {
       auction.maxBidReached = false;
       try {
-        console.log(`Executing auto-bid on auction ${auctionId}: $${nextBid} (strategy: ${auction.config.strategy})`);
+        logger.logBidActivity('auto_bid_executing', auctionId, nextBid, { strategy: auction.config.strategy });
         const result = await nellisApi.placeBid(auctionId, nextBid);
         
         if (result.success) {
@@ -282,6 +295,17 @@ class AuctionMonitor extends EventEmitter {
     const auction = this.monitoredAuctions.get(auctionId);
     if (!auction) return;
     
+    // Mark the auction as ended with timestamp
+    auction.status = 'ended';
+    auction.endedAt = Date.now();
+    auction.finalPrice = data.currentBid;
+    auction.won = data.isWinning;
+    
+    // Save the updated state
+    storage.saveAuction(auctionId, auction).catch(err => {
+      console.error('Failed to save ended auction state:', err);
+    });
+    
     this.emit('auctionEnded', { 
       auctionId, 
       finalPrice: data.currentBid,
@@ -290,10 +314,8 @@ class AuctionMonitor extends EventEmitter {
 
     // End notification removed
 
-    // Remove from monitoring after a delay
-    setTimeout(() => {
-      this.removeAuction(auctionId);
-    }, 60000); // Keep for 1 minute after ending
+    // The cleanup timer will handle removal based on the endedAt timestamp
+    console.log(`Auction ${auctionId} marked as ended. Will be cleaned up after retention period.`);
   }
 
   startPolling(auctionId, interval = 6000) {
@@ -380,6 +402,26 @@ class AuctionMonitor extends EventEmitter {
   getMonitoredCount() {
     return this.monitoredAuctions.size;
   }
+  
+  getMemoryStats() {
+    let endedCount = 0;
+    let activeCount = 0;
+    
+    for (const [, auction] of this.monitoredAuctions) {
+      if (auction.status === 'ended' || auction.status === 'closed') {
+        endedCount++;
+      } else {
+        activeCount++;
+      }
+    }
+    
+    return {
+      total: this.monitoredAuctions.size,
+      active: activeCount,
+      ended: endedCount,
+      pollingIntervals: this.pollingIntervals.size
+    };
+  }
 
   async updateAuctionConfig(auctionId, config) {
     const auction = this.monitoredAuctions.get(auctionId);
@@ -399,7 +441,56 @@ class AuctionMonitor extends EventEmitter {
     return true;
   }
 
+  startCleanupTimer() {
+    // Run cleanup every 5 minutes
+    const CLEANUP_INTERVAL = parseInt(process.env.AUCTION_CLEANUP_INTERVAL_MS) || 5 * 60 * 1000; // 5 minutes
+    const AUCTION_RETENTION_MS = parseInt(process.env.ENDED_AUCTION_RETENTION_MS) || 60 * 1000; // 1 minute
+    
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupEndedAuctions(AUCTION_RETENTION_MS);
+    }, CLEANUP_INTERVAL);
+    
+    // Also run cleanup immediately to clean any existing ended auctions
+    this.cleanupEndedAuctions(AUCTION_RETENTION_MS);
+    
+    console.log(`Auction cleanup timer started (runs every ${CLEANUP_INTERVAL / 1000} seconds)`);
+  }
+  
+  cleanupEndedAuctions(retentionMs) {
+    const now = Date.now();
+    let cleanedCount = 0;
+    
+    for (const [auctionId, auction] of this.monitoredAuctions) {
+      // Check if auction has ended and retention period has passed
+      if (auction.status === 'ended' || auction.status === 'closed') {
+        const endedAt = auction.endedAt || auction.lastUpdated;
+        if (endedAt && (now - endedAt) > retentionMs) {
+          console.log(`Cleaning up ended auction ${auctionId} (ended ${Math.round((now - endedAt) / 1000)} seconds ago)`);
+          this.removeAuction(auctionId);
+          cleanedCount++;
+        }
+      }
+      
+      // Also check for auctions with zero time remaining that might not have proper status
+      if (auction.timeRemaining === 0 && auction.lastUpdated && (now - auction.lastUpdated) > retentionMs) {
+        console.log(`Cleaning up stale auction ${auctionId} with zero time remaining`);
+        this.removeAuction(auctionId);
+        cleanedCount++;
+      }
+    }
+    
+    if (cleanedCount > 0) {
+      console.log(`Cleaned up ${cleanedCount} ended auctions. Active auctions: ${this.monitoredAuctions.size}`);
+    }
+  }
+
   shutdown() {
+    // Stop cleanup timer
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+    
     // Stop all polling
     this.pollingIntervals.forEach((intervalId) => {
       clearInterval(intervalId);
