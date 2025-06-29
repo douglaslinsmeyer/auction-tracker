@@ -1,0 +1,79 @@
+# Docker Compose for monitoring stack
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+
+version: '3.8'
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: nellis-prometheus
+    volumes:
+      - ./backend/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./backend/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--storage.tsdb.retention.time=30d'
+    ports:
+      - "9090:9090"
+    networks:
+      - nellis-network
+    restart: unless-stopped
+    labels:
+      - "com.nellis.component=monitoring"
+      - "com.nellis.description=Prometheus metrics collection"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: nellis-grafana
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=redis-datasource
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/nellis-overview.json
+    ports:
+      - "3003:3000"  # Changed from 3001 to avoid conflict with dashboard
+    networks:
+      - nellis-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    labels:
+      - "com.nellis.component=monitoring"
+      - "com.nellis.description=Grafana visualization"
+
+  # Optional: Redis exporter for Redis metrics
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: nellis-redis-exporter
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+    ports:
+      - "9121:9121"
+    networks:
+      - nellis-network
+    restart: unless-stopped
+    depends_on:
+      - redis
+    labels:
+      - "com.nellis.component=monitoring"
+      - "com.nellis.description=Redis metrics exporter"
+
+volumes:
+  prometheus-data:
+    name: nellis-prometheus-data
+  grafana-data:
+    name: nellis-grafana-data
+
+networks:
+  nellis-network:
+    external: true
+    name: auction-helper_auction-network  # Match the main docker-compose network

@@ -9,6 +9,8 @@ const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 const logger = require('./utils/logger');
 const metrics = require('./utils/metrics');
+const prometheusMetrics = require('./utils/prometheusMetrics');
+const healthChecker = require('./utils/healthCheck');
 const { createSigningMiddleware, addSignatureInfo } = require('./middleware/requestSigning');
 
 // Conditionally load Swagger dependencies if available
@@ -146,6 +148,9 @@ app.use(createSigningMiddleware());
 // Add signature info to responses
 app.use(addSignatureInfo);
 
+// Add Prometheus metrics middleware after other middleware
+app.use(prometheusMetrics.middleware.http);
+
 // Setup Swagger UI if available
 if (swaggerUi && YAML) {
   const swaggerPath = path.join(__dirname, '..', '..', 'swagger.yaml');
@@ -174,24 +179,61 @@ if (swaggerUi && YAML) {
 
 // Note: UI is now served separately - backend is API only
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  const memoryStats = auctionMonitor.getMemoryStats();
-  res.json({ 
-    status: 'healthy', 
-    uptime: process.uptime(),
-    monitoredAuctions: auctionMonitor.getMonitoredCount(),
-    memoryStats: memoryStats,
-    memoryUsage: {
-      heapUsed: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + ' MB',
-      heapTotal: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + ' MB',
-      rss: Math.round(process.memoryUsage().rss / 1024 / 1024) + ' MB'
-    }
-  });
+// Enhanced health check endpoints
+app.get('/health', async (req, res) => {
+  try {
+    const detailed = req.query.detailed === 'true';
+    const health = await healthChecker.getHealth(detailed);
+    
+    // Add auction-specific metrics
+    health.auctions = {
+      monitored: auctionMonitor.getMonitoredCount(),
+      memoryStats: auctionMonitor.getMemoryStats()
+    };
+    
+    const statusCode = health.status === 'healthy' ? 200 : 
+                       health.status === 'degraded' ? 200 : 503;
+    
+    res.status(statusCode).json(health);
+  } catch (error) {
+    logger.error('Health check failed', { error: error.message });
+    res.status(503).json({ 
+      status: 'unhealthy', 
+      error: 'Health check failed' 
+    });
+  }
 });
 
-// Metrics endpoint
-app.get('/metrics', (req, res) => {
+// Simple health check for load balancers
+app.get('/health/live', async (req, res) => {
+  const liveness = await healthChecker.getLiveness();
+  res.json(liveness);
+});
+
+// Readiness check for k8s-style deployments
+app.get('/health/ready', async (req, res) => {
+  const readiness = await healthChecker.getReadiness();
+  res.status(readiness.ready ? 200 : 503).json(readiness);
+});
+
+// Prometheus metrics endpoint
+app.get('/metrics', async (req, res) => {
+  try {
+    // Update some gauges before serving metrics
+    prometheusMetrics.metrics.business.activeAuctions.set(auctionMonitor.getMonitoredCount());
+    prometheusMetrics.metrics.system.websocketConnections.set(wss.clients.size);
+    prometheusMetrics.metrics.system.redisConnected.set(storage.connected ? 1 : 0);
+    
+    res.set('Content-Type', prometheusMetrics.getContentType());
+    res.end(await prometheusMetrics.getMetrics());
+  } catch (error) {
+    logger.error('Error retrieving Prometheus metrics', { error: error.message });
+    res.status(500).json({ error: 'Failed to retrieve metrics' });
+  }
+});
+
+// Legacy metrics endpoint (for backward compatibility)
+app.get('/metrics/legacy', (req, res) => {
   try {
     const allMetrics = metrics.getAllMetrics();
     const sseMetrics = metrics.getSSEMetrics();
@@ -301,6 +343,46 @@ async function startServer() {
     // Initialize auction monitor with WebSocket handler's broadcast method
     await auctionMonitor.initialize(wss, (auctionId) => {
       wsHandler.broadcastAuctionState(auctionId);
+    });
+    
+    // Register service-specific health checks
+    healthChecker.registerCheck('redis', async () => {
+      const connected = storage.connected;
+      return {
+        status: connected ? 'healthy' : 'unhealthy',
+        message: connected ? 'Redis connected' : 'Redis disconnected',
+        details: {
+          connected,
+          url: process.env.REDIS_URL ? 'Configured' : 'Not configured'
+        }
+      };
+    });
+    
+    healthChecker.registerCheck('websocket', async () => {
+      const clientCount = wss.clients.size;
+      return {
+        status: 'healthy',
+        message: `${clientCount} connected clients`,
+        details: {
+          clients: clientCount,
+          maxConnections: parseInt(process.env.WS_MAX_CONNECTIONS_PER_IP) || 10
+        }
+      };
+    });
+    
+    healthChecker.registerCheck('nellis-api', async () => {
+      const circuitBreakerState = prometheusMetrics.metrics.performance.circuitBreakerState._getValue() || 0;
+      const stateMap = ['closed', 'open', 'half-open'];
+      const state = stateMap[circuitBreakerState] || 'unknown';
+      
+      return {
+        status: state === 'closed' ? 'healthy' : state === 'half-open' ? 'degraded' : 'unhealthy',
+        message: `Circuit breaker ${state}`,
+        details: {
+          state,
+          cookiesAvailable: nellisApi.hasCookies ? 'Yes' : 'No'
+        }
+      };
     });
     
     // Start listening

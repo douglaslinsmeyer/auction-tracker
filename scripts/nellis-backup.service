@@ -1,0 +1,27 @@
+[Unit]
+Description=Nellis Auction Helper Backup Service
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/nellis-auction-helper/scripts/backup.sh backup
+WorkingDirectory=/opt/nellis-auction-helper
+StandardOutput=append:/var/log/nellis-backup.log
+StandardError=append:/var/log/nellis-backup.log
+
+# Run as specific user (adjust as needed)
+User=nellis
+Group=nellis
+
+# Environment variables
+Environment="BACKUP_ROOT=/var/backups/nellis"
+Environment="BACKUP_RETENTION_DAYS=7"
+
+# Resource limits
+MemoryLimit=512M
+CPUQuota=50%
+
+# Restart policy
+Restart=on-failure
+RestartSec=300

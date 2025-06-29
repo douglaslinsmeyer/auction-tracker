@@ -6,6 +6,7 @@ const storage = require('./storage');
 const SafeMath = require('../utils/safeMath');
 const logger = require('../utils/logger');
 const features = require('../config/features');
+const prometheusMetrics = require('../utils/prometheusMetrics');
 
 class AuctionMonitor extends EventEmitter {
   constructor() {
@@ -143,6 +144,10 @@ class AuctionMonitor extends EventEmitter {
     // Start monitoring (SSE or polling)
     await this.startMonitoring(auctionId, auction);
     
+    // Update Prometheus metrics
+    prometheusMetrics.metrics.business.totalAuctions.inc();
+    prometheusMetrics.metrics.business.activeAuctions.set(this.monitoredAuctions.size);
+    
     console.log(`Started monitoring auction ${auctionId}`);
     return true;
   }
@@ -277,6 +282,9 @@ class AuctionMonitor extends EventEmitter {
             result: result.data
           });
           
+          // Update Prometheus metrics
+          prometheusMetrics.recordBid(auction.config.strategy, nextBid, true);
+          
           // Check if bid was accepted but we're still not winning
           if (result.data && result.data.message && 
               result.data.message.includes('another user has a higher maximum bid')) {
@@ -312,6 +320,9 @@ class AuctionMonitor extends EventEmitter {
             error: result.error
           });
           
+          // Update Prometheus metrics
+          prometheusMetrics.recordBid(auction.config.strategy, nextBid, false);
+          
           // Error notification removed
         }
       } catch (error) {
@@ -330,6 +341,9 @@ class AuctionMonitor extends EventEmitter {
     } else {
       console.warn(`Auto-bid skipped for auction ${auctionId}: Next bid $${nextBid} exceeds max bid $${auction.config.maxBid}`);
       auction.maxBidReached = true;
+      
+      // Track max bid reached in Prometheus
+      prometheusMetrics.metrics.business.maxBidReached.inc({ strategy: auction.config.strategy });
     }
   }
 
@@ -360,6 +374,18 @@ class AuctionMonitor extends EventEmitter {
     storage.saveAuction(auctionId, auction).catch(err => {
       console.error('Failed to save ended auction state:', err);
     });
+    
+    // Update Prometheus metrics
+    prometheusMetrics.metrics.business.auctionsCompleted.inc({ 
+      result: data.isWinning ? 'won' : 'lost' 
+    });
+    
+    // Track strategy success
+    if (data.isWinning && auction.config && auction.config.strategy) {
+      prometheusMetrics.metrics.business.strategySuccess.inc({ 
+        strategy: auction.config.strategy 
+      });
+    }
     
     this.emit('auctionEnded', { 
       auctionId, 

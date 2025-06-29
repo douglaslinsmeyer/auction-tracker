@@ -1,0 +1,104 @@
+# Alert rules for Nellis Auction Helper
+groups:
+  - name: backend_alerts
+    interval: 30s
+    rules:
+      # Backend service down
+      - alert: BackendServiceDown
+        expr: up{job="nellis-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend service is down"
+          description: "The Nellis backend service at {{ $labels.instance }} has been down for more than 1 minute."
+
+      # Redis connection lost
+      - alert: RedisConnectionLost
+        expr: redis_connection_status == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis connection lost"
+          description: "Backend has lost connection to Redis for more than 2 minutes."
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: nodejs_memory_usage_bytes{type="heap_used"} > 200 * 1024 * 1024
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage detected"
+          description: "Node.js heap usage is above 200MB (current: {{ $value | humanize1024 }}B)"
+
+      # SSE connection failure rate
+      - alert: HighSSEFailureRate
+        expr: rate(sse_connection_errors_total[5m]) / rate(sse_connections_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High SSE connection failure rate"
+          description: "More than 10% of SSE connections are failing ({{ $value | humanizePercentage }})"
+
+      # Too many auctions falling back to polling
+      - alert: ExcessivePollingFallback
+        expr: polling_fallback_activations_total / auction_monitored_total > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Excessive polling fallback"
+          description: "More than 50% of auctions are using polling fallback instead of SSE"
+
+      # Circuit breaker open
+      - alert: CircuitBreakerOpen
+        expr: circuit_breaker_state == 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Circuit breaker is open"
+          description: "The Nellis API circuit breaker has been open for more than 2 minutes"
+
+      # High error rate
+      - alert: HighErrorRate
+        expr: rate(application_errors_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High application error rate"
+          description: "Application is experiencing more than 1 error per second"
+
+      # System health degraded
+      - alert: SystemHealthDegraded
+        expr: system_health_status < 0.7
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "System health is degraded"
+          description: "Overall system health score is below 70% (current: {{ $value | humanizePercentage }})"
+
+      # No active auctions (info alert)
+      - alert: NoActiveAuctions
+        expr: auction_active_count == 0
+        for: 30m
+        labels:
+          severity: info
+        annotations:
+          summary: "No active auctions"
+          description: "No auctions have been monitored for the last 30 minutes"
+
+      # High bid failure rate
+      - alert: HighBidFailureRate
+        expr: rate(bids_placed_total{result="failed"}[5m]) / rate(bids_placed_total[5m]) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High bid failure rate"
+          description: "More than 20% of bids are failing ({{ $value | humanizePercentage }})"

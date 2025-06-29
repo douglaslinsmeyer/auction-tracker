@@ -29,11 +29,6 @@ npm run test:watch            # Watch mode
 npm run test:unit             # Unit tests only
 npm run test:integration      # Integration tests only
 npm run test:coverage         # With coverage report
-npm run test:bdd              # BDD tests with Cucumber
-npm run test:bdd:watch        # BDD tests in watch mode
-npm run test:e2e              # End-to-end tests with Puppeteer
-npm run test:e2e:headful      # E2E tests with visible browser
-npm run test:all              # Run all test types sequentially
 
 # Run a single test file
 npm test -- tests/unit/auctionMonitor.test.js
@@ -80,7 +75,7 @@ docker-compose logs -f dashboard # View dashboard logs
 - **Services** (available as both singletons and classes):
   - `auctionMonitor`: Manages auction monitoring and bidding
   - `nellisApi`: Interface with nellisauction.com
-  - `sseClient`: Connects to Nellis SSE endpoints for real-time updates (planned)
+  - `sseClient`: Connects to Nellis SSE endpoints for real-time updates (enabled by default)
   - `storage`: Redis/memory persistence layer
   - `websocket`: Real-time client communication (relays SSE events to extension)
   - `CircuitBreakerNellisApi`: Circuit breaker pattern for API resilience
@@ -153,6 +148,7 @@ docker-compose logs -f dashboard # View dashboard logs
   PORT=3000
   ```
 - Default auth token: `dev-token` (change in production)
+- See `.env.example` files in each directory for complete configuration options
 
 ### Real-Time Communication
 
@@ -165,6 +161,81 @@ docker-compose logs -f dashboard # View dashboard logs
 - `ch_product_closed:{productId}`: Auction closure notifications
 - Connection management handled by backend SSE client
 - Automatic fallback to polling if SSE unavailable
+
+## Additional Features
+
+### Security Features
+
+#### Request Signing (HMAC-SHA256)
+- Located in `backend/src/middleware/requestSigning.js`
+- Signs outgoing requests to Nellis API with HMAC-SHA256
+- Ensures request integrity and authentication
+- Automatically applied to all Nellis API requests
+
+#### Authentication & Rate Limiting
+- Token-based authentication for API endpoints
+- Configurable rate limiting per API endpoint
+- Separate rate limits for authentication attempts
+- Extension ID validation for Chrome extension requests
+
+### Monitoring & Observability
+
+#### Metrics System
+- Custom metrics tracking in `backend/src/utils/metrics.js`
+- Prometheus integration for production monitoring
+- Tracks:
+  - Request counts and latencies
+  - WebSocket connections
+  - SSE event processing
+  - Circuit breaker state changes
+  - Auction monitoring metrics
+
+#### Logging
+- Structured logging with Winston
+- Log levels: error, warn, info, debug
+- Automatic request/response logging
+- Error tracking with stack traces
+
+### Resilience Patterns
+
+#### Circuit Breaker Pattern
+- `CircuitBreakerNellisApi` class wraps Nellis API calls
+- Prevents cascading failures
+- Configurable failure threshold and timeout
+- Automatic recovery attempts
+- Enable with `USE_CIRCUIT_BREAKER=true` in .env
+
+#### Polling Queue Wrapper
+- Fallback mechanism when SSE is unavailable
+- Manages polling intervals and rate limiting
+- Prevents overwhelming the Nellis API
+- Automatic queue management
+- Enable with `USE_POLLING_QUEUE=true` in .env
+
+### Feature Flag System
+- Located in `backend/src/config/features.js`
+- Enables/disables features without code changes
+- Current feature flags:
+  - `USE_SSE`: Enable/disable Server-Sent Events
+  - `USE_POLLING_QUEUE`: Enable/disable polling fallback
+  - `USE_CIRCUIT_BREAKER`: Enable/disable circuit breaker
+- Configured via environment variables
+
+### Project Structure Details
+
+#### Additional Directories
+- `research/`: Nellis API analysis and reverse engineering tools
+- `docs/`: Comprehensive project documentation and phase summaries
+- `config/`: Configuration files for various environments
+- `coverage/`: Test coverage reports (generated)
+- `logs/`: Application logs (generated)
+- `backups/`: Backup files and scripts
+
+#### Research Tools
+- `research/nellis-api-analysis.js`: API endpoint discovery
+- `research/nellis-sse-monitor.js`: SSE event monitoring
+- `research/nellis-auth-flow.js`: Authentication flow analysis
+- Tools for understanding Nellis auction platform behavior
 
 ## Claude Coding Guidelines
 

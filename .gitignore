@@ -1,5 +1,7 @@
 node_modules/
 .env
+.env.production
+.env.local
 *.log
 logs/
 npm-debug.log*
@@ -11,3 +13,19 @@ coverage/
 *.swp
 *.swo
 *~
+
+# SSL certificates and keys
+ssl/*.pem
+ssl/*.key
+ssl/*.crt
+ssl/private/
+
+# Backup files
+backups/
+*.tar.gz
+*.backup
+
+# Docker volumes
+redis-data/
+grafana-data/
+prometheus-data/

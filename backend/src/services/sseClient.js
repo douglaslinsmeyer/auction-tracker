@@ -1,6 +1,7 @@
 const { EventSource } = require('eventsource');
 const logger = require('../utils/logger');
 const features = require('../config/features');
+const prometheusMetrics = require('../utils/prometheusMetrics');
 
 /**
  * SSE Client for real-time auction updates from Nellis
@@ -105,6 +106,10 @@ class SSEClient {
         global.metrics.incrementCounter('sse_connections_successful');
         global.metrics.incrementGauge('sse_active_connections');
       }
+      
+      // Update Prometheus metrics
+      prometheusMetrics.metrics.sse.totalConnections.inc({ result: 'success' });
+      prometheusMetrics.metrics.sse.activeConnections.inc();
     };
     
     // Standard message handler
@@ -144,6 +149,10 @@ class SSEClient {
           // Record processing time (simplified for this example)
           global.metrics.recordHistogram('sse_event_processing_duration', Date.now() - startTime);
         }
+        
+        // Update Prometheus metrics
+        prometheusMetrics.recordSSEEvent('bid_update', 0.001); // Processing was instant
+        prometheusMetrics.recordAuctionUpdate('sse');
       } catch (error) {
         logger.error('Error handling bid update', { productId, error: error.message, data: event.data });
       }
@@ -175,6 +184,10 @@ class SSEClient {
         global.metrics.incrementCounter('sse_connections_failed');
         global.metrics.incrementGauge('sse_connection_errors');
       }
+      
+      // Update Prometheus metrics
+      prometheusMetrics.metrics.sse.totalConnections.inc({ result: 'failed' });
+      prometheusMetrics.metrics.sse.connectionErrors.inc({ error_type: 'connection' });
       
       this.eventEmitter.emit('sse:error', { productId, auctionId, error });
       

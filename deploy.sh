@@ -41,7 +41,7 @@ case ${1:-dev} in
         fi
         
         # Check AUTH_TOKEN is set
-        if grep -q "your-secure-production-token-here" .env.production; then
+        if grep -q "your-secure-auth-token-here" .env.production; then
             print_error "Please set a secure AUTH_TOKEN in .env.production!"
             exit 1
         fi

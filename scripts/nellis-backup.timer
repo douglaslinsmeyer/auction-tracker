@@ -1,0 +1,17 @@
+[Unit]
+Description=Run Nellis Auction Helper Backup Daily
+Requires=nellis-backup.service
+
+[Timer]
+# Run daily at 3:00 AM
+OnCalendar=daily
+OnCalendar=*-*-* 03:00:00
+
+# Run immediately if system was powered down
+Persistent=true
+
+# Randomize start time by up to 30 minutes to avoid load spikes
+RandomizedDelaySec=1800
+
+[Install]
+WantedBy=timers.target

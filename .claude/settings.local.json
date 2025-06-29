@@ -64,7 +64,8 @@
       "Bash(cucumber-js:*)",
       "Bash(git merge:*)",
       "Bash(npx jest:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(cat:*)"
     ],
     "deny": []
   }
