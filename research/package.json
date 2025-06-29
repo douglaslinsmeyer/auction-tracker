@@ -1,0 +1,17 @@
+{
+  "name": "nellis-auction-research",
+  "version": "1.0.0",
+  "description": "Research tools for analyzing Nellis Auction network behavior",
+  "private": true,
+  "scripts": {
+    "monitor:puppeteer": "node nellis-network-monitor.js",
+    "monitor:playwright": "node nellis-playwright-monitor.js",
+    "analyze:api": "node nellis-api-analyzer.js",
+    "install:browsers": "npx playwright install chromium"
+  },
+  "dependencies": {
+    "puppeteer": "^23.11.1",
+    "playwright": "^1.49.1",
+    "eventsource": "^2.0.2"
+  }
+}

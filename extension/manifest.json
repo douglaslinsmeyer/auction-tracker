@@ -1,0 +1,50 @@
+{
+  "manifest_version": 3,
+  "name": "Nellis Auction Helper",
+  "version": "1.0.0",
+  "description": "Automated bidding assistant for nellisauction.com with 30-second rule support",
+  "permissions": [
+    "storage",
+    "alarms",
+    "notifications",
+    "cookies"
+  ],
+  "host_permissions": [
+    "https://www.nellisauction.com/*",
+    "https://nellisauction.com/*",
+    "https://cargo.prd.nellis.run/*",
+    "https://sse.nellisauction.com/*",
+    "http://localhost:*/*",
+    "http://127.0.0.1:*/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.nellisauction.com/*",
+        "https://nellisauction.com/*"
+      ],
+      "js": ["src/content-isolated.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "assets/icons/icon-16.png",
+      "48": "assets/icons/icon-48.png",
+      "128": "assets/icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "assets/icons/icon-16.png",
+    "48": "assets/icons/icon-48.png",
+    "128": "assets/icons/icon-128.png"
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  }
+}
