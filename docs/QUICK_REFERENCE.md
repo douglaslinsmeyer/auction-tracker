@@ -2,6 +2,45 @@
 
 ## 🚀 Common Tasks
 
+### Deployment Commands
+```bash
+# Development (with hot-reload)
+./deploy.sh dev
+
+# Production
+./deploy.sh prod
+
+# View logs
+./deploy.sh logs
+
+# Stop services
+./deploy.sh stop
+
+# Check status
+./deploy.sh status
+
+# Backup Redis
+./deploy.sh backup
+
+# Clean everything
+./deploy.sh clean
+```
+
+### Docker Quick Commands
+```bash
+# Development (uses .env or .env.development)
+docker-compose up
+
+# Production (uses .env.production)
+docker-compose --env-file .env.production up -d
+
+# Rebuild images
+docker-compose build --no-cache
+
+# View container logs
+docker-compose logs -f backend
+```
+
 ### Adding a New Feature
 ```bash
 # 1. Create feature flag

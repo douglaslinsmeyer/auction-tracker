@@ -32,6 +32,8 @@ Welcome to the comprehensive documentation for the Nellis Auction Backend. This 
 - **[Phase 3 Recommendations](./PHASE3_RECOMMENDATIONS.md)** - Performance optimization approach
 - **[Phase 3 Completion Summary](./PHASE3_COMPLETION_SUMMARY.md)** - Complete results and learnings ✨ NEW
 - **[Master Implementation Plan v2](./MASTER_IMPLEMENTATION_PLAN_V2.md)** - Updated roadmap ✨ NEW
+- **[Phase 4 Revised Objectives](./PHASE_4_REVISED_OBJECTIVES.md)** - Test reorganization + BDD implementation ✨ NEW
+- **[Phase 4 Implementation Guide](./PHASE_4_IMPLEMENTATION_GUIDE.md)** - Detailed implementation approach ✨ NEW
 
 ### 📋 Planning & Strategy
 - **[BDD Testing Plan](./planning/BDD_TESTING_PLAN.md)** - Behavior-driven development approach
@@ -51,6 +53,8 @@ Welcome to the comprehensive documentation for the Nellis Auction Backend. This 
 - **[Testing Strategy v2](./TESTING_STRATEGY_V2.md)** - Proven patterns from Phase 3 ✨ NEW
 - **[BDD Acceptance Criteria](./testing/ACCEPTANCE_CRITERIA.md)** - Feature acceptance criteria
 - **[BDD Test Review](./testing/BDD_TEST_REVIEW.md)** - Test effectiveness review
+- **[Gherkin Best Practices](./testing/GHERKIN_BEST_PRACTICES.md)** - Writing effective Gherkin scenarios ✨ NEW
+- **[Test Organization Recommendations](./testing/TEST_ORGANIZATION_RECOMMENDATIONS.md)** - Jest structure improvements ✨ NEW
 
 ## 🎓 Learning Paths
 
@@ -100,9 +104,10 @@ Write tests before implementing. Update tests when changing code.
 - **Phase 1**: Security & Stability (100%) 
 - **Phase 2**: Foundation & Compatibility (100%)
 - **Phase 3**: Performance & Architecture (100%) ✨ COMPLETE
+- **Phase 4a**: Test Reorganization (100%) ✨ COMPLETE
 
 ### Current 🔄
-- **Phase 4**: BDD Implementation (139 scenarios remaining)
+- **Phase 4b**: BDD Implementation (139 scenarios remaining)
 
 ### Upcoming ⏳
 - **Phase 5**: Integration & Validation
@@ -177,22 +182,33 @@ Write tests before implementing. Update tests when changing code.
 - **Testing Patterns**: Document new proven patterns
 - **Architecture Diagrams**: Maintain visual documentation
 
-## 🎯 Phase 4 Preparation (New Section)
+## 🎯 Phase 4 Progress
 
-### Phase 4 Focus: Complete BDD Test Suite
+### Phase 4a: Test Reorganization ✅ COMPLETE
+- **Jest Consolidation**: 5 configs → 1 unified configuration
+- **Test Structure**: Implemented Jest best practices (__fixtures__, __mocks__, __support__)
+- **Data Factories**: Created flexible test data generation (AuctionFactory, UserFactory, BidFactory)
+- **Unified Mocks**: Consistent mocking strategy for Redis and Nellis API
+- **Import Path Updates**: All tests updated to new structure
+- **Documentation**: Comprehensive test documentation created
+
+### Phase 4b: BDD Implementation 🔄 IN PROGRESS
 - **139 Remaining Scenarios**: Business logic, edge cases, integration
-- **Proven Testing Patterns**: Apply Phase 3 learnings
-- **Chrome Extension Validation**: Comprehensive compatibility testing
-- **Performance Benchmarking**: Establish production baselines
+- **Priority Order**:
+  1. Core Business Logic (50 scenarios) - HIGH
+  2. Performance & Reliability (36 scenarios) - MEDIUM
+  3. Edge Cases (33 scenarios) - MEDIUM
+  4. Integration (20 scenarios) - LOW
+- **Approach**: Happy path first, using new test organization
 
-### Ready for Phase 4 ✅
-- ✅ **Stable Foundation**: All Phase 3 enhancements working
-- ✅ **Testing Infrastructure**: Comprehensive patterns established
-- ✅ **Feature Flag System**: Production-ready configuration
-- ✅ **Monitoring**: Metrics and observability in place
+### Ready for Phase 4b ✅
+- ✅ **Test Organization**: Clean, maintainable structure
+- ✅ **Testing Patterns**: Factories and unified mocks ready
+- ✅ **All Tests Passing**: 103 tests in 15 suites
+- ✅ **Documentation**: Gherkin best practices established
 - ✅ **Chrome Extension**: 100% compatibility maintained
 
-Last Updated: 2025-01-29 (Phase 3 Completion)
+Last Updated: 2025-01-29 (Phase 4a Completion)
 
 ---
 

@@ -26,14 +26,20 @@ All project documentation is organized in the [`docs/`](./docs/) directory. Star
 
 ## Quick Start
 
-### Using Docker Compose (Recommended)
+### Using Docker (Recommended)
 
-1. Copy the environment file:
+We provide a simplified deployment approach with a single Dockerfile and minimal configuration:
+
+1. Copy the appropriate environment file:
    ```bash
-   cp .env.example .env
+   # For development
+   cp .env.development .env
+   
+   # For production
+   cp .env.production .env
    ```
 
-2. Edit `.env` and set your auth token:
+2. Edit `.env` and set your auth token (production only):
    ```
    AUTH_TOKEN=your-secure-token-here
    ```
@@ -43,17 +49,31 @@ All project documentation is organized in the [`docs/`](./docs/) directory. Star
    - Generate a secure token using: `openssl rand -hex 32`
    - For migration from older versions, see [MIGRATION_AUTH_TOKEN.md](./docs/MIGRATION_AUTH_TOKEN.md)
 
-3. Build and start the service:
+3. Start the service using the deployment script:
    ```bash
-   docker-compose up -d
+   # Development mode (default)
+   ./deploy.sh dev
+   
+   # Production mode
+   ./deploy.sh prod
+   ```
+
+   Or use Docker Compose directly:
+   ```bash
+   # Development
+   docker-compose up
+   
+   # Production
+   docker-compose --env-file .env.production up -d
    ```
 
 4. Check service health:
    ```bash
    curl http://localhost:3000/health
+   # Or use: ./deploy.sh status
    ```
 
-### Manual Setup
+### Manual Setup (Without Docker)
 
 1. Install dependencies:
    ```bash
@@ -63,12 +83,13 @@ All project documentation is organized in the [`docs/`](./docs/) directory. Star
 2. Set environment variables:
    ```bash
    cp .env.example .env
-   # Edit .env file
+   # Edit .env file with your configuration
    ```
 
 3. Start the service:
    ```bash
-   npm start
+   npm start        # Production mode
+   npm run dev      # Development mode with hot-reload
    ```
 
 ## API Endpoints
@@ -181,6 +202,44 @@ All 13 identified security vulnerabilities have been fixed:
 - `ALLOWED_EXTENSION_IDS` - Comma-separated list of authorized Chrome extensions
 
 See [Security Documentation](./docs/phase-0/SECURITY_VULNERABILITIES.md) for details.
+
+## Deployment
+
+### Deployment Commands
+
+The `deploy.sh` script provides simple commands for common operations:
+
+```bash
+# Development (default) - runs in foreground with hot-reload
+./deploy.sh dev
+
+# Production - runs in background
+./deploy.sh prod
+
+# View logs
+./deploy.sh logs
+
+# Stop all services
+./deploy.sh stop
+
+# Check service status
+./deploy.sh status
+
+# Backup Redis data
+./deploy.sh backup
+
+# Clean up (removes containers and volumes)
+./deploy.sh clean
+```
+
+### Docker Configuration
+
+The project uses a simplified Docker setup:
+- **Single Dockerfile** with multi-stage builds for dev/prod
+- **Environment-based configuration** via `.env` files
+- **No hidden overrides** - all configuration is explicit
+
+For detailed deployment instructions, see [Deployment Guide](./docs/DEPLOYMENT_GUIDE.md).
 
 ## Monitoring
 
