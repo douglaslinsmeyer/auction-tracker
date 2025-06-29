@@ -123,7 +123,7 @@ Feature: Auction Monitoring - Complete Behaviors
     Given any bid attempt is made
     When bid succeeds or fails
     Then bid details should be saved to storage
-    Including amount, strategy, success status, and timestamp
+    And it should include amount, strategy, success status, and timestamp
 
   # Event Broadcasting
   Scenario: Broadcast auction state after updates
@@ -136,7 +136,7 @@ Feature: Auction Monitoring - Complete Behaviors
     Given auction "12345" is being monitored
     When auction ends
     Then "auctionEnded" event should be emitted
-    With auctionId, finalPrice, and won status
+    And it should include auctionId, finalPrice, and won status
 
   # Error Handling
   Scenario: Handle API errors during update

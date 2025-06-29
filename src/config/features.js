@@ -38,10 +38,24 @@ const FEATURE_FLAGS = {
     phase: 4
   },
   
+  // Phase 4.5 - SSE Integration
+  USE_SSE: {
+    name: 'USE_SSE',
+    description: 'Enable Server-Sent Events for real-time auction updates',
+    defaultValue: false,
+    phase: 4.5
+  },
+  
   // Phase 5 - Advanced Features
   USE_SMART_BIDDING: {
     name: 'USE_SMART_BIDDING',
     description: 'Enable ML-based bidding strategies',
+    defaultValue: false,
+    phase: 5
+  },
+  USE_MINIMAL_POLLING: {
+    name: 'USE_MINIMAL_POLLING',
+    description: 'Use minimal polling strategy to reduce API calls',
     defaultValue: false,
     phase: 5
   }

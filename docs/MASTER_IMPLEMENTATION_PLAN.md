@@ -301,66 +301,177 @@ Feature: Progressive Enhancement with Feature Flags
 - **Security Built-in**: Request signing and authentication in tests
 - **Observability**: Metrics and logging validation included
 
-### Phase 5: Integration, Validation & Self-Hosted Deployment (Week 5)
-**Focus**: Simple, reliable self-hosted deployment
+### Phase 4.5: SSE Integration for Real-Time Updates (Week 5)
+**Focus**: Implement Server-Sent Events (SSE) to replace polling with Nellis's native real-time mechanism
 
-#### Chrome Extension Testing & Distribution:
-1. **Manual Testing Guide**
-   - Create comprehensive testing checklist
-   - Document manual installation process
-   - Test with all feature flags combinations
-   - Validate WebSocket reconnection
-   - Document known issues and workarounds
+#### Objectives:
+1. Implement SSE client to connect to Nellis's SSE endpoints
+2. Create hybrid update mechanism (SSE + polling fallback)
+3. Update WebSocket layer to relay SSE events
+4. Ensure backward compatibility and graceful degradation
+5. Reduce server load by 90% and improve real-time responsiveness
 
-2. **Private Distribution Setup**
-   - Package extension for manual installation
-   - Create installation guide with screenshots
-   - Document update process for team members
-   - Set up shared folder/repository for .crx files
-   - Version tracking spreadsheet
+#### Phase 4.5a: Core SSE Implementation (Days 1-2)
+1. **SSE Client Service**
+   - EventSource connection management
+   - Handle Nellis SSE events (bids, auction closed)
+   - Automatic reconnection with exponential backoff
+   - Connection pooling for multiple auctions
 
-3. **Integration Testing**
-   - Single backend instance with Docker Compose
-   - Verify Redis persistence across restarts
-   - Test graceful shutdown and startup
-   - Validate all bidding strategies
-   - Document recovery procedures
+2. **Event Handling**
+   ```javascript
+   // SSE event types from Nellis
+   - 'ch_product_bids:{productId}' - Bid updates
+   - 'ch_product_closed:{productId}' - Auction closed
+   - 'ping' - Keepalive messages
+   - 'connected {sessionId}' - Connection established
+   ```
 
-#### Performance Validation (Right-Sized):
-- **Realistic Load Testing**:
-  - 100 concurrent auctions maximum
-  - 5-10 WebSocket connections
-  - Memory usage under 256MB
-  - CPU usage acceptable on modest hardware
-  
-- **Reliability Testing**:
-  - 24-hour continuous run test
-  - Simulate network interruptions
-  - Redis backup and restore
-  - Container restart scenarios
+3. **Integration with AuctionMonitor**
+   - Extract product IDs from auction URLs
+   - Use SSE for real-time updates when available
+   - Maintain minimal polling as fallback (30s intervals)
+   - Feature flag for progressive rollout
 
-#### Docker Compose Production Setup:
-```yaml
-# docker-compose.prod.yml
-version: '3.8'
-services:
-  backend:
-    image: nellis-backend:latest
-    restart: unless-stopped
-    environment:
-      - NODE_ENV=production
-      - REDIS_URL=redis://redis:6379
-    ports:
-      - "3000:3000"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    volumes:
-      - ./logs:/app/logs
-    depends_on:
-      - redis
+#### Phase 4.5b: Testing & Validation (Days 3-4)
+1. **BDD Scenarios for SSE**
+   ```gherkin
+   @sse @real-time
+   Feature: Server-Sent Events Integration
+     
+     Scenario: SSE provides real-time bid updates
+       Given SSE is enabled via feature flag
+       When I monitor auction with product ID "12345"
+       Then the system should establish an SSE connection
+       And bid updates should arrive within 1 second
+       And polling should be reduced to fallback intervals
+     
+     Scenario: Graceful fallback on SSE failure
+       Given SSE connection fails after 3 attempts
+       When monitoring an auction
+       Then the system should fall back to polling
+       And maintain update frequency via traditional polling
+   ```
+
+2. **Performance Validation**
+   - Measure latency: SSE vs polling
+   - Monitor connection stability
+   - Test with 100 concurrent SSE connections
+   - Validate memory usage remains under 256MB
+
+#### Phase 4.5c: Monitoring & Rollout (Day 5)
+1. **SSE Metrics**
+   ```javascript
+   - sse_connections_active - Current SSE connections
+   - sse_events_received_total - Total events by type
+   - sse_connection_errors_total - Connection failures
+   - sse_latency_seconds - Event delivery latency
+   - sse_fallback_triggers_total - Fallback activations
+   ```
+
+2. **Progressive Rollout Plan**
+   - Week 1: Enable for 10% of auctions
+   - Week 2: Expand to 50% if metrics are good
+   - Week 3: Full rollout with monitoring
+   - Keep feature flag for instant rollback
+
+#### Success Criteria:
+- **Performance**: 90% reduction in API calls
+- **Latency**: < 1 second bid update delay
+- **Reliability**: Automatic fallback on SSE failure
+- **Compatibility**: Zero breaking changes
+- **Observability**: Full SSE connection visibility
+
+### Phase 5: Chrome Extension E2E Testing & Deployment Validation (Week 6)
+**Focus**: Comprehensive end-to-end testing of the Chrome extension with SSE-enabled backend
+
+Note: With SSE implemented in Phase 4.5 and minimal polling serving as fallback, this phase focuses on:
+- Validating the complete system with SSE + fallback polling
+- Chrome extension integration testing
+- Production deployment readiness
+- Performance validation with real-world usage
+
+#### Phase 5a: Chrome Extension E2E Test Suite (Days 1-2)
+
+1. **Extension Installation & Setup Tests**
+   ```gherkin
+   @extension @setup
+   Feature: Chrome Extension Installation
+     
+     Scenario: First-time installation and configuration
+       Given the extension is installed
+       When I click the extension icon
+       Then I should see the setup prompt
+       And I can enter the backend URL and auth token
+       And the connection status shows "Connected"
+   ```
+
+2. **Authentication Flow Testing**
+   - Cookie synchronization with nellisauction.com
+   - Token validation with backend
+   - Session persistence across browser restarts
+   - Multi-tab authentication consistency
+
+3. **Real-Time Update Verification**
+   - SSE events properly displayed in extension
+   - Fallback to polling when SSE unavailable
+   - Update latency measurement (< 1 second with SSE)
+   - WebSocket reconnection handling
+
+#### Phase 5b: Bidding Strategy E2E Tests (Days 2-3)
+
+1. **Manual Bidding Tests**
+   - Place bid through extension UI
+   - Verify bid appears on Nellis within 2 seconds
+   - Handle bid rejection scenarios
+   - Test with multiple concurrent auctions
+
+2. **Automated Strategy Tests**
+   - **Aggressive**: Verify auto-bid when outbid
+   - **Last Second**: Confirm snipe bid timing
+   - Strategy switching during active auction
+   - Max bid enforcement
+
+3. **Edge Case Testing**
+   - Network interruption recovery
+   - Backend restart resilience
+   - SSE to polling fallback transition
+   - Multiple device synchronization
+
+#### Phase 5c: Performance & Deployment Validation (Days 4-5)
+
+1. **Load Testing with SSE**
+   - 100 concurrent auctions (50 SSE, 50 polling)
+   - Memory usage under 256MB
+   - CPU usage reasonable (< 50% single core)
+   - Redis connection stability
+
+2. **Production Deployment Checklist**
+   ```yaml
+   deployment_validation:
+     - Docker Compose health checks passing
+     - Redis data persistence verified
+     - Environment variables properly set
+     - SSL certificates (if applicable)
+     - Backup procedures documented
+     - Monitoring dashboards configured
+     - Alert rules active
+   ```
+
+3. **User Acceptance Testing**
+   - Real auction monitoring for 24 hours
+   - All three bidding strategies tested
+   - Force update functionality verified
+   - Extension popup responsiveness
+
+#### Success Metrics:
+- **SSE Coverage**: 80%+ of auctions use SSE
+- **Update Latency**: < 1s with SSE, < 2s with polling
+- **System Uptime**: 99.9% over test period
+- **Memory Usage**: Stable under 256MB
+- **User Experience**: Smooth, responsive interface
+
+Note: Minimal polling implementation details have been moved to `MINIMAL_POLLING_STRATEGY.md` as it now serves as a fallback mechanism for SSE.
   
   redis:
     image: redis:7-alpine
@@ -373,13 +484,13 @@ volumes:
   redis-data:
 ```
 
-### Phase 6: Simple Monitoring & Operational Excellence (Week 6)
+### Phase 6: Simple Monitoring & Operational Excellence (Week 7)
 **Focus**: Lightweight monitoring and solid operational practices for self-hosted deployment
 
 #### Lightweight Monitoring Stack:
-1. **Basic Metrics with Prometheus**:
+1. **Enhanced Metrics with SSE and Polling Efficiency**:
    ```javascript
-   // Essential metrics only
+   // Essential metrics including SSE and fallback polling
    const prometheus = require('prom-client');
    
    // Core business metrics
@@ -396,7 +507,46 @@ volumes:
      systemHealth: new prometheus.Gauge({
        name: 'system_health_status',
        help: 'Overall system health (1=healthy, 0=unhealthy)'
-     })
+     }),
+     
+     // SSE metrics (Phase 4.5)
+     sseMetrics: {
+       activeConnections: new prometheus.Gauge({
+         name: 'sse_connections_active',
+         help: 'Current active SSE connections'
+       }),
+       eventsReceived: new prometheus.Counter({
+         name: 'sse_events_received_total',
+         help: 'Total SSE events received',
+         labelNames: ['event_type']
+       }),
+       connectionErrors: new prometheus.Counter({
+         name: 'sse_connection_errors_total',
+         help: 'SSE connection failures'
+       }),
+       eventLatency: new prometheus.Histogram({
+         name: 'sse_event_latency_seconds',
+         help: 'SSE event delivery latency',
+         buckets: [0.1, 0.5, 1, 2, 5]
+       })
+     },
+     
+     // Polling efficiency metrics (fallback)
+     pollingMetrics: {
+       totalPolls: new prometheus.Counter({
+         name: 'auction_polls_total',
+         help: 'Total number of auction polls'
+       }),
+       fallbackActivations: new prometheus.Counter({
+         name: 'sse_fallback_activations_total',
+         help: 'Times polling was used due to SSE failure'
+       }),
+       updateSource: new prometheus.Counter({
+         name: 'auction_updates_by_source',
+         help: 'Updates received by source',
+         labelNames: ['source'] // 'sse' or 'polling'
+       })
+     }
    };
    ```
 
@@ -435,6 +585,8 @@ volumes:
    - Backend service down
    - Redis connection lost
    - High memory usage (>200MB)
+   - SSE connection failure rate > 10%
+   - More than 50% auctions falling back to polling
    - Too many auction failures
 
 #### Operational Documentation:
@@ -508,7 +660,12 @@ const features = {
   USE_POLLING_QUEUE: false,      // Toggle queue-based polling
   USE_CIRCUIT_BREAKER: false,    // Toggle API failure protection
   
-  // Phase 4-6 (Planned)
+  // Phase 4.5 (SSE Integration)
+  ENABLE_SSE: false,             // Toggle Server-Sent Events
+  SSE_FALLBACK_INTERVAL: 30000,  // Fallback polling interval when SSE is active
+  
+  // Phase 5-6 (Planned)
+  USE_MINIMAL_POLLING: false,    // Toggle intelligent polling intervals
   ENABLE_PERFORMANCE_METRICS: false,
   ENABLE_DISTRIBUTED_TRACING: false,
   USE_SMART_BIDDING: false
@@ -538,7 +695,8 @@ redis-cli SET feature:polling_queue false
 ### Phase Success Criteria (Updated)
 - **Phase 3**: Performance improved ✅ (queue optimization delivered measurable gains)
 - **Phase 4**: 90%+ test coverage, <1% flakiness
-- **Phase 5**: Chrome extension fully functional
+- **Phase 4.5**: SSE integration with < 1s latency, 90% API reduction
+- **Phase 5**: Minimal polling + SSE achieving 98% total API reduction
 - **Phase 6**: Production checklist 100% complete
 
 ### Overall Success Metrics (Current Status)
@@ -597,23 +755,23 @@ redis-cli SET feature:polling_queue false
 
 ## Next Steps
 
-### Immediate (This Week)
-1. Set up feature flag system
-2. Create PollingQueueWrapper scaffold
-3. Write first BDD tests for polling
-4. Set up performance benchmarking
+### Immediate (Current Focus - Phase 4)
+1. Complete BDD test implementation
+2. Reorganize test infrastructure
+3. Set up CI/CD with GitHub Actions
+4. Prepare for SSE integration
 
-### Short Term (Phases 3-4)
-1. Implement all wrappers
-2. Complete BDD test suite
-3. Performance optimization
-4. Chrome extension validation
+### Short Term (Phases 4.5-5)
+1. Implement SSE client service
+2. Integrate SSE with existing monitoring
+3. Deploy minimal polling strategy
+4. Validate hybrid SSE + polling approach
 
-### Long Term (Phases 5-6)
-1. Production monitoring
-2. Documentation completion
-3. Team training
-4. Handover preparation
+### Long Term (Phase 6)
+1. Production monitoring setup
+2. Complete operational documentation
+3. Performance validation at scale
+4. Final handover preparation
 
 ## Conclusion
 

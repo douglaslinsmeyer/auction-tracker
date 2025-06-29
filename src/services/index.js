@@ -8,6 +8,7 @@ const auctionMonitor = require('./auctionMonitor');
 const nellisApi = require('./nellisApi');
 const storage = require('./storage');
 const wsHandler = require('./websocket');
+const sseClient = require('./sseClient');
 
 // Import classes (new)
 const {
@@ -24,6 +25,7 @@ module.exports = {
   nellisApi,
   storage,
   wsHandler,
+  sseClient,
   
   // Class constructors (new API)
   AuctionMonitorClass,

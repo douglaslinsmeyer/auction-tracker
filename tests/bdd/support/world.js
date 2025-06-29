@@ -6,12 +6,14 @@
 const { setWorldConstructor, setDefaultTimeout } = require('@cucumber/cucumber');
 const axios = require('axios');
 const WebSocket = require('ws');
-const { app, server: existingServer } = require('../../src/index');
+const sinon = require('sinon');
+const { expect } = require('chai');
+const { app, server: existingServer } = require('../../../src/index');
 const { Server: WebSocketServer } = require('ws');
-const storage = require('../../src/services/storage');
-const auctionMonitor = require('../../src/services/auctionMonitor');
-const nellisApi = require('../../src/services/nellisApi');
-const wsHandler = require('../../src/services/websocket');
+const storage = require('../../../src/services/storage');
+const auctionMonitor = require('../../../src/services/auctionMonitor');
+const nellisApi = require('../../../src/services/nellisApi');
+const wsHandler = require('../../../src/services/websocket');
 
 // Set default timeout for all steps
 setDefaultTimeout(30 * 1000); // 30 seconds
@@ -42,8 +44,7 @@ class CustomWorld {
    */
   async startServer() {
     return new Promise(async (resolve) => {
-      // Initialize storage first
-      await storage.initialize();
+      // Storage is already initialized in BeforeAll hook
       
       // Initialize nellisApi to recover cookies
       await nellisApi.initialize();

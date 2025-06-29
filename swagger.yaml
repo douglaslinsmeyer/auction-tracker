@@ -7,9 +7,14 @@ info:
     ## Features
     - Monitor multiple auctions simultaneously
     - Automated bidding with configurable strategies
-    - Real-time auction status updates
+    - Real-time auction updates via Server-Sent Events (SSE) from Nellis
+    - WebSocket API for Chrome extension communication
     - Authentication management
     - Bid history tracking
+    - Intelligent fallback polling when SSE unavailable
+    
+    ## Real-Time Updates
+    The service uses Server-Sent Events (SSE) to receive real-time updates from Nellis auctions, providing sub-second latency for bid updates. When SSE is unavailable, the system falls back to intelligent polling.
     
     ## Authentication
     The API uses session cookies from nellisauction.com for authentication. Use the `/auth` endpoint to set authentication credentials.
@@ -432,6 +437,55 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BidErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /auctions/{id}/refresh:
+    post:
+      tags:
+        - auctions
+      summary: Force refresh auction data
+      description: |
+        Force an immediate update of auction data. This bypasses the normal update schedule and queries the auction status immediately.
+        
+        **Rate Limited**: Maximum 1 request per 5 seconds per auction to prevent abuse.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Auction ID to refresh
+          schema:
+            type: string
+            example: "57947099"
+      responses:
+        '200':
+          description: Successfully refreshed auction data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Auction'
+        '404':
+          description: Auction not being monitored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many requests - rate limit exceeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Too many refresh requests. Please wait 5 seconds."
         '500':
           $ref: '#/components/responses/InternalServerError'
 

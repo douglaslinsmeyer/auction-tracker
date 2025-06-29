@@ -16,13 +16,15 @@ All project documentation is organized in the [`docs/`](./docs/) directory. Star
 ## Features
 
 - 24/7 auction monitoring (works when browser is closed)
-- Real-time WebSocket updates
+- **Server-Sent Events (SSE)** integration for real-time Nellis updates (Phase 4.5)
+- Real-time WebSocket updates to Chrome extension
 - REST API for extension communication
 - Automated bidding based on configured strategies
 - Docker containerization for easy deployment
 - **Rate limiting protection** against API abuse and DDoS attacks
 - **Automatic memory cleanup** for ended auctions to prevent memory leaks
 - **Request signing** (optional) for enhanced API security with HMAC-SHA256
+- **Intelligent fallback polling** when SSE is unavailable
 
 ## Quick Start
 
@@ -106,9 +108,9 @@ We provide a simplified deployment approach with a single Dockerfile and minimal
 - `POST /api/auctions/:id/bid` - Place a bid
 - `POST /api/auth` - Set authentication credentials
 
-### WebSocket API
+### WebSocket API (Extension Communication)
 
-Connect to `ws://localhost:3000` and authenticate:
+The WebSocket API is used for real-time communication between the Chrome extension and the backend service. Connect to `ws://localhost:3000` and authenticate:
 
 ```javascript
 // Connect

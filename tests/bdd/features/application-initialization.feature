@@ -77,7 +77,7 @@ Feature: Application Initialization - Complete Behaviors
   Scenario: Initialize WebSocket with broadcast handler
     When auctionMonitor initializes
     Then custom broadcast handler should be provided
-    That calls wsHandler.broadcastAuctionState
+    And it should call wsHandler.broadcastAuctionState
 
   # Port Configuration
   Scenario: Use environment port or default
@@ -139,7 +139,7 @@ Feature: Application Initialization - Complete Behaviors
   Scenario: Handle new WebSocket connections
     When WebSocket client connects
     Then wsHandler.handleConnection should be called
-    With WebSocket instance and server reference
+    And it should receive WebSocket instance and server reference
 
   # API Route Mounting
   Scenario: Mount API routes

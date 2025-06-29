@@ -5,16 +5,20 @@ const WebSocket = require('ws');
 const storage = require('./storage');
 const SafeMath = require('../utils/safeMath');
 const logger = require('../utils/logger');
+const features = require('../config/features');
 
 class AuctionMonitor extends EventEmitter {
   constructor() {
     super();
+    // Increase max listeners to handle SSE event listeners in tests
+    this.setMaxListeners(20);
     this.monitoredAuctions = new Map();
     this.pollingIntervals = new Map();
     this.wss = null;
     this.storageInitialized = false;
     this.broadcastHandler = null;
     this.cleanupInterval = null;
+    this.sseClient = null; // Will be initialized later
   }
 
   async initialize(wss, broadcastHandler = null) {
@@ -25,6 +29,9 @@ class AuctionMonitor extends EventEmitter {
     await storage.initialize();
     this.storageInitialized = true;
     
+    // Initialize SSE client if available
+    await this.initializeSSEClient();
+    
     // Recover persisted auctions
     await this.recoverPersistedState();
     
@@ -32,6 +39,47 @@ class AuctionMonitor extends EventEmitter {
     this.startCleanupTimer();
     
     console.log('Auction monitor initialized with persistence');
+  }
+  
+  async initializeSSEClient() {
+    try {
+      // Import SSE client lazily to avoid circular dependencies
+      const sseClient = require('./sseClient');
+      this.sseClient = sseClient;
+      
+      // Set the event emitter to this auction monitor
+      this.sseClient.eventEmitter = this;
+      
+      await this.sseClient.initialize();
+      
+      // Set up event listeners for SSE events
+      this.setupSSEEventListeners();
+      
+      logger.info('SSE client initialized and connected to auction monitor');
+    } catch (error) {
+      logger.error('Failed to initialize SSE client:', error);
+      this.sseClient = null;
+    }
+  }
+  
+  setupSSEEventListeners() {
+    if (!this.sseClient) return;
+    
+    // The SSE client will emit events on this auction monitor
+    // Listen for SSE auction updates
+    this.on('auction:update', (updateData) => {
+      this.handleSSEAuctionUpdate(updateData);
+    });
+    
+    // Listen for SSE auction closed events
+    this.on('auction:closed', (closeData) => {
+      this.handleSSEAuctionClosed(closeData);
+    });
+    
+    // Listen for SSE fallback events
+    this.on('sse:fallback', (fallbackData) => {
+      this.handleSSEFallback(fallbackData);
+    });
   }
   
   setBroadcastHandler(handler) {
@@ -50,7 +98,7 @@ class AuctionMonitor extends EventEmitter {
           // Don't start polling for ended auctions
           if (auction.status !== 'ended') {
             this.monitoredAuctions.set(auction.id, auction);
-            this.startPolling(auction.id);
+            await this.startMonitoring(auction.id, auction);
             console.log(`Recovered auction ${auction.id}: ${auction.title}`);
           }
         }
@@ -76,7 +124,7 @@ class AuctionMonitor extends EventEmitter {
       imageUrl: metadata.imageUrl || null,
       config: {
         maxBid: config.maxBid || globalSettings.general.defaultMaxBid || 100,
-        bidIncrement: config.bidIncrement || 1,
+        incrementAmount: config.incrementAmount || 1,
         strategy: config.strategy || globalSettings.general.defaultStrategy || 'increment',
         autoBid: config.autoBid !== undefined ? config.autoBid : globalSettings.general.autoBidDefault,
         // Notification settings removed
@@ -91,7 +139,8 @@ class AuctionMonitor extends EventEmitter {
     // Persist to storage
     await storage.saveAuction(auctionId, auction);
     
-    this.startPolling(auctionId);
+    // Start monitoring (SSE or polling)
+    await this.startMonitoring(auctionId, auction);
     
     console.log(`Started monitoring auction ${auctionId}`);
     return true;
@@ -187,16 +236,17 @@ class AuctionMonitor extends EventEmitter {
 
     // Get global settings for bidding logic
     const globalSettings = await storage.getSettings();
+    const biddingSettings = globalSettings.bidding || {};
 
     // For sniping strategy, use configured snipe timing
-    if (auction.config.strategy === 'sniping' && auctionData.timeRemaining > globalSettings.bidding.snipeTiming) {
+    if (auction.config.strategy === 'sniping' && auctionData.timeRemaining > (biddingSettings.snipeTiming || 30)) {
       return;
     }
 
     // Calculate next bid with buffer using safe math
     const currentBid = SafeMath.validateBidAmount(auctionData.currentBid || 0);
-    const increment = auction.config.bidIncrement || globalSettings.bidding.defaultIncrement || 5;
-    const buffer = globalSettings.bidding.bidBuffer || 0;
+    const increment = auction.config.incrementAmount || biddingSettings.defaultIncrement || 5;
+    const buffer = biddingSettings.bidBuffer || 0;
     
     const minimumBid = auctionData.nextBid 
       ? SafeMath.validateBidAmount(auctionData.nextBid)
@@ -344,6 +394,159 @@ class AuctionMonitor extends EventEmitter {
     const currentInterval = this.pollingIntervals.get(auctionId);
     if (currentInterval) {
       this.startPolling(auctionId, newInterval);
+    }
+  }
+
+  /**
+   * Start monitoring an auction using SSE if available, otherwise fallback to polling
+   */
+  async startMonitoring(auctionId, auction) {
+    const url = auction.url;
+    let sseConnected = false;
+    
+    // Try SSE first if enabled and URL is available
+    if (this.sseClient && url) {
+      const productId = this.extractProductId(url);
+      if (productId) {
+        try {
+          sseConnected = await this.sseClient.connectToAuction(productId, auctionId);
+          if (sseConnected) {
+            logger.info('SSE connection established for auction', { auctionId, productId });
+            
+            // Start minimal fallback polling (30s intervals)
+            this.startPolling(auctionId, 30000);
+            
+            // Update auction metadata
+            auction.useSSE = true;
+            auction.sseProductId = productId;
+            auction.fallbackPolling = true;
+            await storage.saveAuction(auctionId, auction);
+            
+            return;
+          }
+        } catch (error) {
+          logger.warn('SSE connection failed, falling back to polling', { auctionId, error: error.message });
+        }
+      }
+    }
+    
+    // Fallback to regular polling
+    logger.info('Using polling for auction monitoring', { auctionId, reason: sseConnected ? 'sse_failed' : 'sse_unavailable' });
+    this.startPolling(auctionId);
+    
+    // Update auction metadata
+    auction.useSSE = false;
+    auction.fallbackPolling = false;
+    await storage.saveAuction(auctionId, auction);
+  }
+  
+  /**
+   * Extract product ID from Nellis auction URL
+   */
+  extractProductId(url) {
+    if (!url) return null;
+    
+    // Match patterns like:
+    // https://www.nellisauction.com/p/product-name/12345
+    const match = url.match(/\/p\/[^\/]+\/(\d+)(?:\?|$)/);
+    return match ? match[1] : null;
+  }
+  
+  /**
+   * Handle SSE auction update events
+   */
+  async handleSSEAuctionUpdate(updateData) {
+    const { auctionId, productId, data, source } = updateData;
+    
+    logger.debug('Processing SSE auction update', { auctionId, productId, source });
+    
+    const auction = this.monitoredAuctions.get(auctionId);
+    if (!auction) {
+      logger.warn('Received SSE update for unknown auction', { auctionId });
+      return;
+    }
+    
+    // Update auction data
+    auction.data = {
+      ...(auction.data || {}),
+      ...data,
+      lastSSEUpdate: new Date().toISOString()
+    };
+    auction.lastUpdate = Date.now();
+    
+    // Check if we need to place a bid
+    if (auction.config?.autoBid && auction.data) {
+      this.executeAutoBid(auctionId, auction.data);
+    }
+    
+    // Broadcast update to clients
+    this.broadcastAuctionState(auctionId);
+    
+    // Emit event for other listeners
+    this.emit('auctionUpdate', { auctionId, auction, source: 'sse' });
+  }
+  
+  /**
+   * Handle SSE auction closed events
+   */
+  async handleSSEAuctionClosed(closeData) {
+    const { auctionId, productId, data } = closeData;
+    
+    logger.info('Processing SSE auction closed event', { auctionId, productId });
+    
+    const auction = this.monitoredAuctions.get(auctionId);
+    if (!auction) {
+      logger.warn('Received SSE close event for unknown auction', { auctionId });
+      return;
+    }
+    
+    // Update auction status
+    auction.status = 'ended';
+    auction.data = { ...auction.data, ...data };
+    auction.lastUpdate = Date.now();
+    
+    // Stop all monitoring for this auction
+    this.stopPolling(auctionId);
+    if (this.sseClient) {
+      this.sseClient.disconnect(productId);
+    }
+    
+    // Persist final state
+    await storage.saveAuction(auctionId, auction);
+    
+    // Broadcast final update
+    this.broadcastAuctionState(auctionId);
+    
+    // Emit event
+    this.emit('auctionEnded', { auctionId, auction, source: 'sse' });
+    
+    logger.info('Auction monitoring ended via SSE', { auctionId });
+  }
+  
+  /**
+   * Handle SSE fallback events
+   */
+  async handleSSEFallback(fallbackData) {
+    const { productId, auctionId } = fallbackData;
+    
+    logger.warn('SSE fallback triggered, switching to polling', { productId, auctionId });
+    
+    // Switch to regular polling
+    this.stopPolling(auctionId); // Stop minimal polling
+    this.startPolling(auctionId); // Start regular polling
+    
+    // Update auction metadata
+    const auction = this.monitoredAuctions.get(auctionId);
+    if (auction) {
+      auction.useSSE = false;
+      auction.fallbackPolling = true;
+      auction.sseFailureTime = new Date().toISOString();
+      await storage.saveAuction(auctionId, auction);
+    }
+    
+    // Update metrics if available
+    if (global.metrics?.pollingMetrics) {
+      global.metrics.pollingMetrics.fallbackActivations.inc();
     }
   }
 

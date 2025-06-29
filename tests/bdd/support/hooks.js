@@ -4,25 +4,36 @@
  */
 
 const { Before, After, BeforeAll, AfterAll } = require('@cucumber/cucumber');
-const testRedis = require('../../__support__/testRedis');
+const RedisMock = require('../../__mocks__/ioredis');
 const storage = require('../../../src/services/storage');
 const auctionMonitor = require('../../../src/services/auctionMonitor');
 
 // Global setup before all tests
 BeforeAll(async function() {
-  // Initialize test Redis
-  await testRedis.initialize();
+  // Set default auth token for tests if not provided
+  if (!process.env.AUTH_TOKEN) {
+    process.env.AUTH_TOKEN = 'test-auth-token';
+  }
   
-  // Override storage Redis client with test instance
-  storage.redis = testRedis.getClient();
+  // Create a mock Redis instance
+  const mockRedis = new RedisMock();
+  
+  // Override storage Redis client with mock instance
+  storage.redis = mockRedis;
   storage.connected = true;
   storage.initialized = true;
+  
+  // Override storage.initialize to prevent real Redis connection
+  storage.initialize = async function() {
+    // Already initialized with mock Redis
+    return;
+  };
 });
 
 // Setup before each scenario
 Before(async function() {
   // Clear Redis data
-  await testRedis.flushAll();
+  await storage.redis.flushall();
   
   // Clear auction monitor state
   auctionMonitor.monitoredAuctions.clear();
@@ -47,7 +58,9 @@ After(async function() {
 // Global cleanup after all tests
 AfterAll(async function() {
   // Close Redis connection
-  await testRedis.close();
+  if (storage.redis && storage.redis.quit) {
+    await storage.redis.quit();
+  }
 });
 
 // Tagged hooks for specific scenarios

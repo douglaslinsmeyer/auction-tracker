@@ -13,15 +13,15 @@ The Nellis Auction Backend has evolved through three successful phases into a **
 
 ## Component Architecture
 
-### Service Layer (Enhanced in Phase 3)
-The system uses a modular service architecture with dependency injection support and performance/resilience layers:
+### Service Layer (Enhanced in Phase 3, SSE in Phase 4.5)
+The system uses a modular service architecture with dependency injection support, performance/resilience layers, and SSE integration:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                        API Layer                            │
 │  ┌─────────────────┐              ┌────────────────────┐   │
 │  │   REST API      │              │   WebSocket API    │   │
-│  │  (Express.js)   │              │      (ws)          │   │
+│  │  (Express.js)   │              │  (ws - to clients) │   │
 │  └────────┬────────┘              └─────────┬──────────┘   │
 └───────────┼──────────────────────────────────┼──────────────┘
             │                                  │
@@ -37,15 +37,19 @@ The system uses a modular service architecture with dependency injection support
 │  │  ┌──────────────┐ ┌──────────┐ ┌───────────────┐  │    │
 │  │  │AuctionMonitor│ │NellisApi │ │Storage Service│  │    │
 │  │  └──────────────┘ └──────────┘ └───────────────┘  │    │
+│  │  ┌──────────────┐ ┌──────────────────────────────┐ │    │
+│  │  │  SSE Client  │ │   PollingQueueWrapper       │ │    │
+│  │  │  (Phase 4.5) │ │    (Fallback polling)       │ │    │
+│  │  └──────────────┘ └──────────────────────────────┘ │    │
 │  └────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
             │                                  │
 ┌───────────▼──────────────────────────────────▼──────────────┐
 │                    External Systems                         │
-│  ┌─────────────────┐              ┌────────────────────┐   │
-│  │     Redis       │              │ nellisauction.com │   │
-│  │  (Persistence)  │              │      (API)         │   │
-│  └─────────────────┘              └────────────────────┘   │
+│  ┌─────────────────┐    ┌─────────────┐    ┌───────────┐   │
+│  │     Redis       │    │ Nellis SSE  │    │  Nellis   │   │
+│  │  (Persistence)  │    │  Endpoint   │    │   API     │   │
+│  └─────────────────┘    └─────────────┘    └───────────┘   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -59,7 +63,15 @@ All major services implement interfaces for clean contracts:
 
 ### Service Implementations
 
-#### AuctionMonitor (Now with Performance Layer)
+#### SSEClient (NEW - Phase 4.5)
+**Primary Real-Time Updates**:
+- Connects to Nellis SSE endpoints for each monitored auction
+- Handles events: `ch_product_bids`, `ch_product_closed`
+- Automatic reconnection with exponential backoff
+- Emits events for WebSocket relay to clients
+- Feature flag controlled rollout
+
+#### AuctionMonitor (Enhanced with SSE Support)
 **Core Functionality** (Unchanged):
 - Manages auction lifecycles
 - Implements bidding strategies
@@ -67,11 +79,17 @@ All major services implement interfaces for clean contracts:
 - Maintains auction state
 
 **Phase 3 Enhancements**:
-- ✅ **PollingQueueWrapper**: Centralized polling with priority queue
+- ✅ **PollingQueueWrapper**: Now serves as fallback when SSE unavailable
   - Rate limiting: Max 10 API requests/second
   - Priority-based processing (ending auctions first)
   - Memory efficient (1 worker vs N timers)
   - Comprehensive metrics collection
+
+**Phase 4.5 Enhancements**:
+- ✅ **SSE Integration**: Primary update mechanism
+  - Automatic SSE connection for monitored auctions
+  - Fallback to polling on SSE failure
+  - Hybrid mode during transition
 
 #### NellisApi (Now with Resilience Layer)
 **Core Functionality** (Unchanged):
@@ -94,15 +112,16 @@ All major services implement interfaces for clean contracts:
 - Handles state recovery
 - **New**: Stores feature flag configuration
 
-#### WebSocketHandler (Unchanged - Still Reliable)
-- Manages client connections
-- Broadcasts auction updates
+#### WebSocketHandler (Enhanced for SSE Relay)
+- Manages client connections (Chrome extensions)
+- Broadcasts auction updates from both SSE and polling sources
 - Handles authentication
 - Implements rate limiting
+- **Phase 4.5**: Relays SSE events to connected clients
 
 ## Data Flow
 
-### Auction Monitoring Flow
+### Auction Monitoring Flow (SSE-Enabled)
 ```
 Chrome Extension
     │
@@ -116,18 +135,26 @@ Chrome Extension
     │         │
     │         ├──► Storage.saveAuction()
     │         │
-    │         └──► Start Polling Timer
+    │         └──► If SSE enabled & product ID found:
+    │                   ├──► SSEClient.connectToAuction()
+    │                   │         │
+    │                   │         ▼
+    │                   │    Nellis SSE Endpoint
+    │                   │         │
+    │                   │         ▼
+    │                   │    Real-time Events
     │                   │
-    │                   ▼
-    └─── WebSocket ◄── Broadcast Updates
+    │                   └──► Start Fallback Polling (30s)
+    │
+    └─── WebSocket ◄── Broadcast Updates (from SSE or polling)
 ```
 
-### Bidding Flow
+### Bidding Flow (SSE or Polling Triggered)
 ```
-Polling Timer Triggers
+SSE Event or Polling Timer
     │
     ▼
-NellisApi.getAuctionData()
+Update received (instant via SSE or periodic via polling)
     │
     ▼
 AuctionMonitor evaluates strategy
