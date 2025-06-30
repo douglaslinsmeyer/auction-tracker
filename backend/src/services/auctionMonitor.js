@@ -291,6 +291,16 @@ class AuctionMonitor extends EventEmitter {
       return;
     }
 
+    // Check if the required nextBid exceeds our maxBid - if so, don't bid at all
+    if (!SafeMath.isWithinBudget(nextBid, auction.config.maxBid)) {
+      logger.warn( `Auto-bid skipped for auction ${auctionId}: Next bid $${nextBid} exceeds max bid $${auction.config.maxBid}`);
+      auction.maxBidReached = true;
+      
+      // Track max bid reached in Prometheus
+      prometheusMetrics.metrics.business.maxBidReached.inc({ strategy: auction.config.strategy });
+      return;
+    }
+
     // Check if we already attempted this bid amount recently (within last 10 seconds)
     if (auction.lastBidAmount === nextBid && auction.lastBidTime && 
         (Date.now() - auction.lastBidTime) < 10000) {
@@ -298,7 +308,8 @@ class AuctionMonitor extends EventEmitter {
       return;
     }
 
-    if (SafeMath.isWithinBudget(nextBid, auction.config.maxBid)) {
+    // At this point, we know nextBid is within budget
+    if (true) {
       auction.maxBidReached = false;
       try {
         logger.logBidActivity('auto_bid_executing', auctionId, nextBid, { strategy: auction.config.strategy });
@@ -380,12 +391,6 @@ class AuctionMonitor extends EventEmitter {
         
         // Error notification removed
       }
-    } else {
-      logger.warn( `Auto-bid skipped for auction ${auctionId}: Next bid $${nextBid} exceeds max bid $${auction.config.maxBid}`);
-      auction.maxBidReached = true;
-      
-      // Track max bid reached in Prometheus
-      prometheusMetrics.metrics.business.maxBidReached.inc({ strategy: auction.config.strategy });
     }
   }
 

@@ -1,6 +1,6 @@
 module.exports = {
   displayName: 'BDD Tests',
-  testMatch: ['<rootDir>/tests/step-definitions/**/*.steps.js'],
+  testMatch: ['<rootDir>/tests/bdd/step-definitions/**/*.steps.js'],
   testEnvironment: 'node',
   coverageDirectory: 'coverage/bdd',
   collectCoverageFrom: [

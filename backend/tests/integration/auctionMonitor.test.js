@@ -61,6 +61,11 @@ describe('Auction Monitor Integration Tests', () => {
   });
 
   beforeEach(async () => {
+    // Stop all polling intervals first
+    auctionMonitor.monitoredAuctions.forEach((auction, auctionId) => {
+      auctionMonitor.stopPolling(auctionId);
+    });
+    
     jest.clearAllMocks();
     auctionMonitor.monitoredAuctions.clear();
     auctionMonitor.pollingIntervals.clear();
@@ -227,8 +232,42 @@ describe('Auction Monitor Integration Tests', () => {
 
   describe('Auto-Bidding Logic', () => {
     beforeEach(async () => {
-      await auctionMonitor.initialize(mockWss);
+      // Get a fresh instance to avoid pollution
+      jest.resetModules();
+      
+      // Re-setup mocks for fresh instance
+      storage = require('../../src/services/storage');
+      nellisApi = require('../../src/services/nellisApi');
+      storage.initialize = jest.fn().mockResolvedValue();
+      storage.saveAuction = jest.fn().mockResolvedValue(true);
+      storage.removeAuction = jest.fn().mockResolvedValue(true);
+      storage.getAllAuctions = jest.fn().mockResolvedValue([]);
+      storage.saveBidHistory = jest.fn().mockResolvedValue(true);
+      storage.isHealthy = jest.fn().mockResolvedValue(true);
+      storage.getSettings = jest.fn().mockResolvedValue({
+        general: {
+          defaultMaxBid: 100,
+          defaultStrategy: 'auto',
+          autoBidDefault: true
+        },
+        bidding: {
+          snipeTiming: 30,
+          bidBuffer: 0,
+          retryAttempts: 3
+        }
+      });
+      storage.connected = true;
+      
+      nellisApi.getAuctionData = jest.fn().mockResolvedValue(mockAuctionData);
       nellisApi.placeBid = jest.fn();
+      
+      // Get fresh auction monitor instance
+      auctionMonitor = require('../../src/services/auctionMonitor');
+      
+      jest.clearAllMocks();
+      jest.clearAllTimers();
+      
+      await auctionMonitor.initialize(mockWss);
     });
 
     it('should not auto-bid when autoBid is false', async () => {
@@ -270,6 +309,7 @@ describe('Auction Monitor Integration Tests', () => {
       // Clear any polling-triggered calls
       jest.clearAllMocks();
       
+      // Use a high nextBid that definitely exceeds maxBid (30)
       const auctionData = { ...mockAuctionData, isWinning: false, nextBid: 35 };
       await auctionMonitor.executeAutoBid(mockAuction.id, auctionData);
       
@@ -289,8 +329,8 @@ describe('Auction Monitor Integration Tests', () => {
       // Clear any polling-triggered calls
       jest.clearAllMocks();
       
-      // More than 30 seconds left
-      const auctionData = { ...mockAuctionData, timeRemaining: 60, nextBid: 35 };
+      // More than 30 seconds left (should not bid in sniping mode)
+      const auctionData = { ...mockAuctionData, isWinning: false, timeRemaining: 60, nextBid: 35 };
       await auctionMonitor.executeAutoBid(mockAuction.id, auctionData);
       
       expect(nellisApi.placeBid).not.toHaveBeenCalled();
