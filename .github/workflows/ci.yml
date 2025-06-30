@@ -142,18 +142,33 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y redis-tools
 
-      - name: Wait for Redis
+      - name: Wait for Redis with Connection Test
         run: |
-          for i in {1..10}; do
+          echo "Testing Redis readiness with multiple operations..."
+          for i in {1..15}; do
             if redis-cli -h localhost -p 6379 ping | grep PONG; then
-              echo "Redis is ready"
+              # Test actual Redis operations that tests will use
+              redis-cli -h localhost -p 6379 set test_key "test_value"
+              redis-cli -h localhost -p 6379 get test_key
+              redis-cli -h localhost -p 6379 del test_key
+              redis-cli -h localhost -p 6379 flushall
+              echo "Redis is fully ready for operations"
               exit 0
             fi
-            echo "Waiting for Redis... attempt $i/10"
-            sleep 2
+            echo "Waiting for Redis... attempt $i/15"
+            sleep 3
           done
-          echo "Redis failed to start after 20 seconds"
+          echo "Redis failed to start after 45 seconds"
           exit 1
+
+      - name: Monitor Redis Health
+        run: |
+          echo "Redis info:"
+          redis-cli -h localhost -p 6379 info server
+          echo "Redis memory usage:"
+          redis-cli -h localhost -p 6379 info memory
+          echo "Redis connections:"
+          redis-cli -h localhost -p 6379 info clients
 
       - name: Run Integration Tests
         working-directory: ./backend
@@ -163,7 +178,12 @@ jobs:
           AUTH_TOKEN: test-token
           REDIS_HOST: localhost
           REDIS_PORT: 6379
+          REDIS_URL: redis://localhost:6379
+          USE_REAL_REDIS: true
           TEST_TIMEOUT: 30000
+          CI: true
+          REDIS_CONNECTION_TIMEOUT: 10000
+          REDIS_COMMAND_TIMEOUT: 5000
 
       - name: Upload Integration Test Coverage
         uses: actions/upload-artifact@v4
@@ -218,18 +238,33 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y redis-tools
 
-      - name: Wait for Redis
+      - name: Wait for Redis with Connection Test
         run: |
-          for i in {1..10}; do
+          echo "Testing Redis readiness with multiple operations..."
+          for i in {1..15}; do
             if redis-cli -h localhost -p 6379 ping | grep PONG; then
-              echo "Redis is ready"
+              # Test actual Redis operations that tests will use
+              redis-cli -h localhost -p 6379 set test_key "test_value"
+              redis-cli -h localhost -p 6379 get test_key
+              redis-cli -h localhost -p 6379 del test_key
+              redis-cli -h localhost -p 6379 flushall
+              echo "Redis is fully ready for operations"
               exit 0
             fi
-            echo "Waiting for Redis... attempt $i/10"
-            sleep 2
+            echo "Waiting for Redis... attempt $i/15"
+            sleep 3
           done
-          echo "Redis failed to start after 20 seconds"
+          echo "Redis failed to start after 45 seconds"
           exit 1
+
+      - name: Monitor Redis Health
+        run: |
+          echo "Redis info:"
+          redis-cli -h localhost -p 6379 info server
+          echo "Redis memory usage:"
+          redis-cli -h localhost -p 6379 info memory
+          echo "Redis connections:"
+          redis-cli -h localhost -p 6379 info clients
 
       - name: Run BDD Tests
         working-directory: ./backend
@@ -245,6 +280,11 @@ jobs:
           AUTH_TOKEN: test-token
           REDIS_HOST: localhost
           REDIS_PORT: 6379
+          REDIS_URL: redis://localhost:6379
+          USE_REAL_REDIS: true
+          CI: true
+          REDIS_CONNECTION_TIMEOUT: 10000
+          REDIS_COMMAND_TIMEOUT: 5000
 
       - name: Upload BDD Test Results
         uses: actions/upload-artifact@v4
@@ -333,17 +373,23 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y redis-tools
 
-      - name: Wait for Redis
+      - name: Wait for Redis with Connection Test
         run: |
-          for i in {1..10}; do
+          echo "Testing Redis readiness with multiple operations..."
+          for i in {1..15}; do
             if redis-cli -h localhost -p 6379 ping | grep PONG; then
-              echo "Redis is ready"
+              # Test actual Redis operations that tests will use
+              redis-cli -h localhost -p 6379 set test_key "test_value"
+              redis-cli -h localhost -p 6379 get test_key
+              redis-cli -h localhost -p 6379 del test_key
+              redis-cli -h localhost -p 6379 flushall
+              echo "Redis is fully ready for operations"
               exit 0
             fi
-            echo "Waiting for Redis... attempt $i/10"
-            sleep 2
+            echo "Waiting for Redis... attempt $i/15"
+            sleep 3
           done
-          echo "Redis failed to start after 20 seconds"
+          echo "Redis failed to start after 45 seconds"
           exit 1
 
       - name: Start Backend Service

@@ -28,7 +28,13 @@ npm test                       # All tests
 npm run test:watch            # Watch mode
 npm run test:unit             # Unit tests only
 npm run test:integration      # Integration tests only
+npm run test:e2e              # End-to-end tests
+npm run test:bdd              # BDD/Cucumber tests
 npm run test:coverage         # With coverage report
+
+# Development test scripts (comprehensive)
+npm run test:all              # Run all test suites via bash script
+./scripts/run-all-tests.sh    # Direct bash script execution
 
 # Run a single test file
 npm test -- tests/unit/auctionMonitor.test.js
@@ -248,6 +254,9 @@ docker-compose logs -f dashboard # View dashboard logs
 
 ### Testing Practices
 - Any time we create new functionality or modify existing functionality we need to update our tests and run them, if they fail, we must fix them until they pass
+- Use the comprehensive test script for development: `./scripts/run-all-tests.sh` or `npm run test:all`
+- For faster development cycles, use `./scripts/run-all-tests.sh --no-e2e --no-bdd` to skip slower tests
+- Always run full test suite before committing: `./scripts/run-all-tests.sh --coverage`
 
 ### Project Phase Review
 - At the end of each phase, capture a detailed review of the work performed and lessons learned, then update existing project documentation with necessary updates and revisions but DO NOT CREATE NEW VERSIONS OF EXISTING PROJECT DOCUMENTATION.

@@ -10,8 +10,10 @@
     "test:unit": "jest --selectProjects=unit",
     "test:integration": "jest --selectProjects=integration",
     "test:e2e": "jest --config=jest.config.puppeteer.js",
+    "test:bdd": "jest --config=jest.config.bdd.js",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "test:all": "../scripts/run-all-tests.sh"
   },
   "dependencies": {
     "axios": "^1.6.0",
