@@ -1,8 +1,8 @@
 // Default settings
 const DEFAULT_SETTINGS = {
-  backendUrl: 'http://localhost:3000',
-  autoRefresh: true,
-  refreshInterval: 5,
+  backendUrl: CONFIG.BACKEND.DEFAULT_URL,
+  autoRefresh: CONFIG.EXTENSION.AUTO_REFRESH,
+  refreshInterval: CONFIG.EXTENSION.REFRESH_INTERVAL,
   notificationsEnabled: true,
   theme: 'system'
 };

@@ -65,7 +65,9 @@
       "Bash(git merge:*)",
       "Bash(npx jest:*)",
       "Bash(chmod:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)"
     ],
     "deny": []
   }

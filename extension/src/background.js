@@ -1,6 +1,7 @@
 console.log('Nellis Auction Helper: Background service worker started');
 
-// Import backend client
+// Import backend client and config
+importScripts('./config.js');
 importScripts('./backend-client.js');
 
 let monitoredAuctions = new Map();
@@ -19,10 +20,10 @@ chrome.runtime.onInstalled.addListener(() => {
       won: true
     },
     backend: {
-      url: 'http://localhost:3002',
-      token: 'dev-token'
+      url: CONFIG.BACKEND.DEFAULT_URL,
+      token: CONFIG.BACKEND.DEFAULT_TOKEN
     },
-    backendUrl: 'http://localhost:3002'
+    backendUrl: CONFIG.BACKEND.DEFAULT_URL
   });
   
   console.log('Extension installed with default settings');

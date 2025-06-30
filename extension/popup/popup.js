@@ -54,7 +54,7 @@ function attachEventListeners() {
     try {
       // Get the backend URL from storage
       const result = await chrome.storage.local.get(['backendUrl']);
-      const backendUrl = result.backendUrl || 'http://localhost:3002';
+      const backendUrl = result.backendUrl || CONFIG.BACKEND.DEFAULT_URL;
       
       // Open the backend URL in a new tab
       chrome.tabs.create({ url: backendUrl });

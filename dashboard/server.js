@@ -32,7 +32,12 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'src', 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`Dashboard server running on http://localhost:${PORT}`);
-  console.log(`Backend URL: ${process.env.BACKEND_URL || 'http://localhost:3000'}`);
+const server = app.listen(PORT, () => {
+  if (process.env.NODE_ENV !== 'test') {
+    console.log(`Dashboard server running on http://localhost:${PORT}`);
+    console.log(`Backend URL: ${process.env.BACKEND_URL || 'http://localhost:3000'}`);
+  }
 });
+
+// Export for testing
+module.exports = { app, server };

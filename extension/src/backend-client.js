@@ -8,13 +8,13 @@ class BackendClient {
     this.authToken = null;
     this.ws = null;
     this.wsReconnectTimer = null;
-    this.wsReconnectDelay = 5000;
+    this.wsReconnectDelay = CONFIG.WEBSOCKET.RECONNECT_DELAY;
     this.isConnected = false;
     this.messageHandlers = new Map();
     this.pendingRequests = new Map();
     this.requestIdCounter = 0;
     this.pingInterval = null;
-    this.pingIntervalDelay = 25000; // Ping every 25 seconds to keep connection alive
+    this.pingIntervalDelay = CONFIG.WEBSOCKET.PING_INTERVAL;
   }
 
   async initialize() {
@@ -22,8 +22,8 @@ class BackendClient {
     const { backend, backendUrl } = await chrome.storage.local.get(['backend', 'backendUrl']);
     
     // Use backendUrl from settings, fallback to backend.url, then default
-    this.baseUrl = backendUrl || backend?.url || 'http://localhost:3002';
-    this.authToken = backend?.token || 'dev-token';
+    this.baseUrl = backendUrl || backend?.url || CONFIG.BACKEND.DEFAULT_URL;
+    this.authToken = backend?.token || CONFIG.BACKEND.DEFAULT_TOKEN;
     
     console.log('Initializing backend client:', {
       baseUrl: this.baseUrl,
@@ -298,7 +298,7 @@ class BackendClient {
         config
       });
     } else {
-      const response = await fetch(`${this.baseUrl}/api/auctions/${auctionId}/config`, {
+      const response = await fetch(`${this.baseUrl}${CONFIG.buildApiUrl(CONFIG.API.AUCTION_CONFIG, {id: auctionId})}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -325,7 +325,7 @@ class BackendClient {
         amount
       });
     } else {
-      const response = await fetch(`${this.baseUrl}/api/auctions/${auctionId}/bid`, {
+      const response = await fetch(`${this.baseUrl}${CONFIG.buildApiUrl(CONFIG.API.AUCTION_BID, {id: auctionId})}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -345,7 +345,7 @@ class BackendClient {
   }
 
   async getMonitoredAuctions() {
-    const response = await fetch(`${this.baseUrl}/api/auctions?token=${encodeURIComponent(this.authToken)}`);
+    const response = await fetch(`${this.baseUrl}${CONFIG.API.AUCTIONS}?token=${encodeURIComponent(this.authToken)}`);
     
     if (!response.ok) {
       throw new Error(`Failed to get auctions: ${response.statusText}`);
@@ -400,7 +400,7 @@ class BackendClient {
       console.log('Request body:', requestBody);
       
       // Send to backend
-      const response = await fetch(`${this.baseUrl}/api/auth`, {
+      const response = await fetch(`${this.baseUrl}${CONFIG.API.AUTH}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
