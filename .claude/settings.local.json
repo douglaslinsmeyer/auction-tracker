@@ -70,7 +70,8 @@
       "Bash(gh run view:*)",
       "Bash(gh run cancel:*)",
       "Bash(gh run watch:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(./scripts/run-all-tests.sh:*)"
     ],
     "deny": []
   }

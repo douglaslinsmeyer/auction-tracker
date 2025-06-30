@@ -23,6 +23,17 @@ process.env.ENABLE_TEST_LOGS = 'false'; // Ensure Winston logger is silent
 // Set default test timeout
 jest.setTimeout(30000);
 
+// Redis setup for CI environment
+if (process.env.CI && process.env.REDIS_HOST) {
+  const { waitForRedis } = require('../support/redisSetup');
+  
+  beforeAll(async () => {
+    console.log('CI environment detected, waiting for Redis...');
+    await waitForRedis();
+    console.log('Redis ready for tests');
+  }, 45000);
+}
+
 // Global test utilities
 global.testUtils = {
   /**

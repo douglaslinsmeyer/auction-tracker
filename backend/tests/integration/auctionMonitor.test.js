@@ -14,6 +14,13 @@ describe('Auction Monitor Integration Tests', () => {
   beforeAll(() => {
     // Use fake timers to control polling
     jest.useFakeTimers();
+    
+    // Force use of real Redis in CI environment for integration tests
+    if (process.env.CI && process.env.USE_REAL_REDIS === 'true') {
+      // Temporarily disable the ioredis mock for integration tests
+      jest.unmock('ioredis');
+    }
+    
     // Import mocked modules
     storage = require('../../src/services/storage');
     nellisApi = require('../../src/services/nellisApi');
@@ -53,12 +60,21 @@ describe('Auction Monitor Integration Tests', () => {
     };
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     auctionMonitor.monitoredAuctions.clear();
     auctionMonitor.pollingIntervals.clear();
     // Clear any timers to prevent polling during tests
     jest.clearAllTimers();
+    
+    // Add Redis cleanup for CI environment
+    if (process.env.CI && storage.redis) {
+      try {
+        await storage.redis.flushall();
+      } catch (error) {
+        console.warn('Redis cleanup failed:', error);
+      }
+    }
   });
 
   afterAll(() => {

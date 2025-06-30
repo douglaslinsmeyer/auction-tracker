@@ -392,6 +392,15 @@ jobs:
           echo "Redis failed to start after 45 seconds"
           exit 1
 
+      - name: Monitor Redis Health
+        run: |
+          echo "Redis info:"
+          redis-cli -h localhost -p 6379 info server
+          echo "Redis memory usage:"
+          redis-cli -h localhost -p 6379 info memory
+          echo "Redis connections:"
+          redis-cli -h localhost -p 6379 info clients
+
       - name: Start Backend Service
         working-directory: ./backend
         run: |
@@ -404,6 +413,11 @@ jobs:
           AUTH_TOKEN: test-token
           REDIS_HOST: localhost
           REDIS_PORT: 6379
+          REDIS_URL: redis://localhost:6379
+          USE_REAL_REDIS: true
+          CI: true
+          REDIS_CONNECTION_TIMEOUT: 10000
+          REDIS_COMMAND_TIMEOUT: 5000
           PORT: 3000
 
       - name: Start Dashboard Service
