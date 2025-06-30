@@ -82,38 +82,51 @@ function redactObject(obj) {
   }
 }
 
-// Create logger instance
+// Create logger instance with test environment suppression
 const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
+  // Use silent property to completely suppress in test mode
+  silent: process.env.NODE_ENV === 'test' && process.env.ENABLE_TEST_LOGS !== 'true',
+  
+  // Set appropriate log levels per environment
+  level: process.env.LOG_LEVEL || (
+    process.env.NODE_ENV === 'test' ? 'error' : 
+    process.env.NODE_ENV === 'production' ? 'info' : 'debug'
+  ),
+  
   format: winston.format.combine(
     winston.format.timestamp({
       format: 'YYYY-MM-DD HH:mm:ss'
     }),
-    winston.format.errors ? winston.format.errors({ stack: true }) : winston.format.printf(info => info.message),
+    winston.format.errors({ stack: true }),
     redactFormat
   ),
+  
   transports: [
-    // Console transport
+    // Console transport with test suppression
     new winston.transports.Console({
+      silent: process.env.NODE_ENV === 'test' && process.env.ENABLE_TEST_LOGS !== 'true',
       format: winston.format.combine(
-        winston.format.colorize ? winston.format.colorize() : winston.format.printf(info => info.message),
+        winston.format.colorize(),
         redactFormat
       )
     }),
-    // File transport for errors
-    new winston.transports.File({
-      filename: path.join(process.cwd(), 'logs', 'error.log'),
-      level: 'error',
-      maxsize: 5242880, // 5MB
-      maxFiles: 5
-    }),
-    // File transport for all logs
-    new winston.transports.File({
-      filename: path.join(process.cwd(), 'logs', 'combined.log'),
-      maxsize: 5242880, // 5MB
-      maxFiles: 5
-    })
+    
+    // File transports (conditional for tests)
+    ...(process.env.NODE_ENV !== 'test' || process.env.LOG_FILES_IN_TEST === 'true' ? [
+      new winston.transports.File({
+        filename: path.join(process.cwd(), 'logs', 'error.log'),
+        level: 'error',
+        maxsize: 5242880, // 5MB
+        maxFiles: 5
+      }),
+      new winston.transports.File({
+        filename: path.join(process.cwd(), 'logs', 'combined.log'),
+        maxsize: 5242880, // 5MB
+        maxFiles: 5
+      })
+    ] : [])
   ],
+  
   // Don't exit on handled exceptions
   exitOnError: false
 });
@@ -154,8 +167,8 @@ logger.logSecurityEvent = (event, severity, metadata = {}) => {
   });
 };
 
-// Override console methods in production
-if (process.env.NODE_ENV === 'production') {
+// Override console methods in test AND production environments
+if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'test') {
   console.log = (...args) => logger.info(args.join(' '));
   console.error = (...args) => logger.error(args.join(' '));
   console.warn = (...args) => logger.warn(args.join(' '));

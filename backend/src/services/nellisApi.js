@@ -2,12 +2,7 @@ const axios = require('axios');
 const storage = require('./storage');
 const logger = require('../utils/logger');
 
-// Helper to avoid logging during tests
-const testLog = (level, ...args) => {
-  if (process.env.NODE_ENV !== 'test') {
-    console[level](...args);
-  }
-};
+// Use the project's Winston logger directly
 
 class NellisApi {
   constructor() {
@@ -34,7 +29,7 @@ class NellisApi {
       }
       this.initialized = true;
     } catch (error) {
-      testLog("error", 'Error initializing NellisApi:', error);
+      logger.error( 'Error initializing NellisApi:', error);
     }
   }
 
@@ -79,11 +74,11 @@ class NellisApi {
       throw new Error('Invalid response structure');
     } catch (error) {
       if (error.response && error.response.status === 400) {
-        testLog("error", `400 Bad Request for auction ${auctionId}:`, error.response.data);
-        testLog("error", 'Request URL:', url);
-        testLog("error", 'Request headers:', this.headers);
+        logger.error( `400 Bad Request for auction ${auctionId}:`, error.response.data);
+        logger.error( 'Request URL:', url);
+        logger.error( 'Request headers:', this.headers);
       } else {
-        testLog("error", `Error fetching auction data for ${auctionId}:`, error.message);
+        logger.error( `Error fetching auction data for ${auctionId}:`, error.message);
       }
       throw error;
     }
@@ -103,7 +98,7 @@ class NellisApi {
     try {
       // This would implement the login flow
       // For now, we'll assume cookies are provided through configuration
-      testLog("info", 'Authentication not yet implemented - using provided cookies');
+      logger.info( 'Authentication not yet implemented - using provided cookies');
       this.cookies = credentials.cookies || '';
       
       // Save cookies to storage
@@ -114,7 +109,7 @@ class NellisApi {
       
       return true;
     } catch (error) {
-      testLog("error", 'Authentication error:', error);
+      logger.error( 'Authentication error:', error);
       throw error;
     }
   }
@@ -172,7 +167,7 @@ class NellisApi {
           amount: bidAmount
         };
       } else {
-        testLog("error", `Bid placement failed with status ${response.status}`);
+        logger.error( `Bid placement failed with status ${response.status}`);
         return {
           success: false,
           error: `Bid failed with status ${response.status}`,
@@ -180,7 +175,7 @@ class NellisApi {
         };
       }
     } catch (error) {
-      testLog("error", `Error placing bid on auction ${auctionId}:`, error);
+      logger.error( `Error placing bid on auction ${auctionId}:`, error);
       
       // Extract meaningful error message
       let errorMessage = error.message;
@@ -224,7 +219,7 @@ class NellisApi {
         const maxRetries = globalSettings.bidding.retryAttempts || 3;
         
         if (retryCount < maxRetries - 1) {
-          testLog("log", `Retrying bid (attempt ${retryCount + 2} of ${maxRetries})...`);
+          logger.info( `Retrying bid (attempt ${retryCount + 2} of ${maxRetries})...`);
           await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Exponential backoff
           return this.placeBid(auctionId, amount, retryCount + 1);
         }
@@ -243,12 +238,12 @@ class NellisApi {
         if (result.status === 'fulfilled') {
           return result.value;
         } else {
-          testLog("error", `Failed to fetch auction ${auctionIds[index]}:`, result.reason);
+          logger.error( `Failed to fetch auction ${auctionIds[index]}:`, result.reason);
           return null;
         }
       }).filter(Boolean);
     } catch (error) {
-      testLog("error", 'Error fetching multiple auctions:', error);
+      logger.error( 'Error fetching multiple auctions:', error);
       throw error;
     }
   }
@@ -257,12 +252,12 @@ class NellisApi {
     try {
       // This would implement auction search
       // Using the Algolia search endpoint discovered in the analysis
-      testLog("info", `Searching auctions with query: ${query}`);
+      logger.info( `Searching auctions with query: ${query}`);
       
       // Placeholder
       return [];
     } catch (error) {
-      testLog("error", 'Error searching auctions:', error);
+      logger.error( 'Error searching auctions:', error);
       throw error;
     }
   }

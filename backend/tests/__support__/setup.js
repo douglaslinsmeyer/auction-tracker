@@ -18,6 +18,7 @@ process.env.NODE_ENV = 'test';
 process.env.AUTH_TOKEN = 'test-auth-token';
 process.env.ENCRYPTION_SECRET = 'test-encryption-secret-32-characters!';
 process.env.LOG_LEVEL = 'error'; // Reduce log noise in tests
+process.env.ENABLE_TEST_LOGS = 'false'; // Ensure Winston logger is silent
 
 // Set default test timeout
 jest.setTimeout(30000);
@@ -83,8 +84,12 @@ global.testUtils = {
 
 // Setup is handled by Cucumber hooks in hooks.js
 
+// Import logger to ensure proper configuration
+const logger = require('../../src/utils/logger');
+
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
-  console.error('Unhandled promise rejection in test:', err);
+  // Use logger instead of console.error, but only log errors in test mode
+  logger.error('Unhandled promise rejection in test:', err);
   process.exit(1);
 });

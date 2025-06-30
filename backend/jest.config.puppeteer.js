@@ -2,5 +2,6 @@ module.exports = {
   preset: 'jest-puppeteer',
   testMatch: ['**/tests/e2e/**/*.test.js'],
   testTimeout: 60000,
-  setupFilesAfterEnv: ['./tests/setup.puppeteer.js']
+  setupFilesAfterEnv: ['./tests/setup.puppeteer.js'],
+  silent: true // Suppress console output during tests
 };

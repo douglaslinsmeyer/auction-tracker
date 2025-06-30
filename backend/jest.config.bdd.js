@@ -16,9 +16,10 @@ module.exports = {
       statements: 80
     }
   },
-  setupFilesAfterEnv: ['<rootDir>/tests/support/setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/tests/__support__/setup.js'],
   testTimeout: 30000,
   verbose: true,
+  silent: true, // Suppress console output during tests
   // Transform options for jest-cucumber
   transform: {
     '^.+\\.js$': 'babel-jest',

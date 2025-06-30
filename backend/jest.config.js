@@ -7,6 +7,7 @@ module.exports = {
   clearMocks: true,
   resetMocks: true,
   restoreMocks: true,
+  silent: true, // Suppress console output during tests
   
   // Use __mocks__ convention (Jest standard)
   moduleNameMapper: {

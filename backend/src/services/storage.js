@@ -1,6 +1,7 @@
 const Redis = require('ioredis');
 const EventEmitter = require('events');
 const cryptoUtil = require('../utils/crypto');
+const logger = require('../utils/logger');
 
 class StorageService extends EventEmitter {
   constructor() {
@@ -18,12 +19,12 @@ class StorageService extends EventEmitter {
   async initialize() {
     try {
       const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-      console.log('Connecting to Redis:', redisUrl);
+      logger.info('Connecting to Redis:', redisUrl);
       
       this.redis = new Redis(redisUrl, {
         retryStrategy: (times) => {
           const delay = Math.min(times * 50, 2000);
-          console.log(`Redis connection retry ${times}, delay ${delay}ms`);
+          logger.debug(`Redis connection retry ${times}, delay ${delay}ms`);
           return delay;
         },
         maxRetriesPerRequest: 3,
@@ -32,39 +33,29 @@ class StorageService extends EventEmitter {
       });
 
       this.redis.on('connect', () => {
-        if (process.env.NODE_ENV !== 'test') {
-          console.log('Redis connected');
-        }
+        logger.info('Redis connected');
         this.connected = true;
         this.emit('connected');
       });
 
       this.redis.on('error', (err) => {
-        if (process.env.NODE_ENV !== 'test') {
-          console.error('Redis error:', err);
-        }
+        logger.error('Redis error:', err);
         this.connected = false;
         this.emit('error', err);
       });
 
       this.redis.on('close', () => {
-        if (process.env.NODE_ENV !== 'test') {
-          console.log('Redis connection closed');
-        }
+        logger.info('Redis connection closed');
         this.connected = false;
         this.emit('disconnected');
       });
 
       // Test connection
       await this.redis.ping();
-      if (process.env.NODE_ENV !== 'test') {
-        console.log('Redis connection successful');
-      }
+      logger.info('Redis connection successful');
       
     } catch (error) {
-      if (process.env.NODE_ENV !== 'test') {
-        console.error('Failed to connect to Redis, using in-memory fallback:', error);
-      }
+      logger.warn('Failed to connect to Redis, using in-memory fallback:', error);
       this.connected = false;
     }
   }
@@ -85,7 +76,7 @@ class StorageService extends EventEmitter {
         await this.redis.expire(key, this.config.auctionDataTTL);
         return true;
       } catch (error) {
-        console.error('Redis save error:', error);
+        logger.error('Redis save error:', error);
       }
     }
     
@@ -102,7 +93,7 @@ class StorageService extends EventEmitter {
         const data = await this.redis.get(key);
         return data ? JSON.parse(data) : null;
       } catch (error) {
-        console.error('Redis get error:', error);
+        logger.error('Redis get error:', error);
       }
     }
     
@@ -126,7 +117,7 @@ class StorageService extends EventEmitter {
           .filter(([err, data]) => !err && data)
           .map(([, data]) => JSON.parse(data));
       } catch (error) {
-        console.error('Redis getAllAuctions error:', error);
+        logger.error('Redis getAllAuctions error:', error);
       }
     }
     
@@ -148,7 +139,7 @@ class StorageService extends EventEmitter {
       try {
         await this.redis.del(key);
       } catch (error) {
-        console.error('Redis delete error:', error);
+        logger.error('Redis delete error:', error);
       }
     }
     
@@ -171,7 +162,7 @@ class StorageService extends EventEmitter {
           await this.redis.expire(key, this.config.cookieTTL);
           return true;
         } catch (error) {
-          console.error('Redis save cookies error:', error);
+          logger.error('Redis save cookies error:', error);
         }
       }
       
@@ -179,7 +170,7 @@ class StorageService extends EventEmitter {
       this.memoryFallback.set(key, encryptedCookies);
       return true;
     } catch (error) {
-      console.error('Failed to encrypt cookies:', error.message);
+      logger.error('Failed to encrypt cookies:', error.message);
       return false;
     }
   }
@@ -192,7 +183,7 @@ class StorageService extends EventEmitter {
       try {
         encryptedCookies = await this.redis.get(key);
       } catch (error) {
-        console.error('Redis get cookies error:', error);
+        logger.error('Redis get cookies error:', error);
       }
     }
     
@@ -206,7 +197,7 @@ class StorageService extends EventEmitter {
       try {
         return cryptoUtil.decrypt(encryptedCookies);
       } catch (error) {
-        console.error('Failed to decrypt cookies:', error.message);
+        logger.error('Failed to decrypt cookies:', error.message);
         // If decryption fails, cookies may be from old unencrypted version
         // Return null to force re-authentication
         return null;
@@ -230,7 +221,7 @@ class StorageService extends EventEmitter {
         await this.redis.expire(key, 86400 * 7); // 7 days
         return true;
       } catch (error) {
-        console.error('Redis save bid history error:', error);
+        logger.error('Redis save bid history error:', error);
       }
     }
     
@@ -245,7 +236,7 @@ class StorageService extends EventEmitter {
         const entries = await this.redis.zrevrange(key, 0, limit - 1);
         return entries.map(entry => JSON.parse(entry));
       } catch (error) {
-        console.error('Redis get bid history error:', error);
+        logger.error('Redis get bid history error:', error);
       }
     }
     
@@ -262,7 +253,7 @@ class StorageService extends EventEmitter {
         await this.redis.set(key, data);
         return true;
       } catch (error) {
-        console.error('Redis save system state error:', error);
+        logger.error('Redis save system state error:', error);
       }
     }
     
@@ -278,7 +269,7 @@ class StorageService extends EventEmitter {
         const data = await this.redis.get(key);
         return data ? JSON.parse(data) : null;
       } catch (error) {
-        console.error('Redis get system state error:', error);
+        logger.error('Redis get system state error:', error);
       }
     }
     
@@ -294,7 +285,7 @@ class StorageService extends EventEmitter {
         const data = await this.redis.get(key);
         return data ? JSON.parse(data) : this.getDefaultSettings();
       } catch (error) {
-        console.error('Redis get settings error:', error);
+        logger.error('Redis get settings error:', error);
       }
     }
     
@@ -310,7 +301,7 @@ class StorageService extends EventEmitter {
         await this.redis.set(key, data);
         return true;
       } catch (error) {
-        console.error('Redis save settings error:', error);
+        logger.error('Redis save settings error:', error);
       }
     }
     
