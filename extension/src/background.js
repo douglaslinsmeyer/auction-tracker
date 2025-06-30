@@ -195,7 +195,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return true;
       
     case 'testBackendConnection':
-      testBackendConnection(request.url)
+      testBackendConnection(request.url, request.token)
         .then(result => sendResponse(result))
         .catch(error => sendResponse({ success: false, error: error.message }));
       return true;
@@ -320,12 +320,13 @@ function updateBadge() {
 }
 
 // Test backend connection
-async function testBackendConnection(url) {
+async function testBackendConnection(url, token) {
   try {
-    const response = await fetch(`${url}/api/health`, {
+    const response = await fetch(`${url}${CONFIG.API.STATUS}`, {
       method: 'GET',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': token || CONFIG.BACKEND.DEFAULT_TOKEN
       }
     });
     

@@ -301,11 +301,11 @@ class BackendClient {
       const response = await fetch(`${this.baseUrl}${CONFIG.buildApiUrl(CONFIG.API.AUCTION_CONFIG, {id: auctionId})}`, {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': this.authToken
         },
         body: JSON.stringify({ 
-          config,
-          token: this.authToken 
+          config
         })
       });
       
@@ -328,11 +328,11 @@ class BackendClient {
       const response = await fetch(`${this.baseUrl}${CONFIG.buildApiUrl(CONFIG.API.AUCTION_BID, {id: auctionId})}`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': this.authToken
         },
         body: JSON.stringify({ 
-          amount,
-          token: this.authToken 
+          amount
         })
       });
       
@@ -345,7 +345,11 @@ class BackendClient {
   }
 
   async getMonitoredAuctions() {
-    const response = await fetch(`${this.baseUrl}${CONFIG.API.AUCTIONS}?token=${encodeURIComponent(this.authToken)}`);
+    const response = await fetch(`${this.baseUrl}${CONFIG.API.AUCTIONS}`, {
+      headers: {
+        'Authorization': this.authToken
+      }
+    });
     
     if (!response.ok) {
       throw new Error(`Failed to get auctions: ${response.statusText}`);
@@ -393,8 +397,7 @@ class BackendClient {
       });
       
       const requestBody = { 
-        cookies: cookieString,
-        token: this.authToken 
+        cookies: cookieString
       };
       
       console.log('Request body:', requestBody);
@@ -403,7 +406,8 @@ class BackendClient {
       const response = await fetch(`${this.baseUrl}${CONFIG.API.AUTH}`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': this.authToken
         },
         body: JSON.stringify(requestBody)
       });

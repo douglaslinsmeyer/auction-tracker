@@ -1,23 +1,37 @@
 // Default settings
 const DEFAULT_SETTINGS = {
   backendUrl: CONFIG.BACKEND.DEFAULT_URL,
+  authToken: CONFIG.BACKEND.DEFAULT_TOKEN,
   autoRefresh: CONFIG.EXTENSION.AUTO_REFRESH,
   refreshInterval: CONFIG.EXTENSION.REFRESH_INTERVAL,
   notificationsEnabled: true,
-  theme: 'system'
+  notifyOutbid: true,
+  notifyWon: true,
+  notifyEnding: true,
+  theme: 'system',
+  defaultMaxBid: 0,
+  bidIncrement: 1,
+  defaultStrategy: 'sniping'
 };
 
 // Elements
 const elements = {
   backendUrl: document.getElementById('backend-url'),
+  authToken: document.getElementById('auth-token'),
   testConnection: document.getElementById('test-connection'),
   connectionStatus: document.getElementById('connection-status'),
   autoRefresh: document.getElementById('auto-refresh'),
   refreshInterval: document.getElementById('refresh-interval'),
   notificationsEnabled: document.getElementById('notifications-enabled'),
+  notifyOutbid: document.getElementById('notify-outbid'),
+  notifyWon: document.getElementById('notify-won'),
+  notifyEnding: document.getElementById('notify-ending'),
   themeSystem: document.getElementById('theme-system'),
   themeLight: document.getElementById('theme-light'),
   themeDark: document.getElementById('theme-dark'),
+  defaultMaxBid: document.getElementById('default-max-bid'),
+  bidIncrement: document.getElementById('bid-increment'),
+  defaultStrategy: document.getElementById('default-strategy'),
   saveSettings: document.getElementById('save-settings'),
   resetSettings: document.getElementById('reset-settings'),
   saveStatus: document.getElementById('save-status')
@@ -43,6 +57,19 @@ elements.autoRefresh.addEventListener('change', (e) => {
   elements.refreshInterval.disabled = !e.target.checked;
 });
 
+// Master notifications toggle
+elements.notificationsEnabled.addEventListener('change', (e) => {
+  const enabled = e.target.checked;
+  elements.notifyOutbid.disabled = !enabled;
+  elements.notifyWon.disabled = !enabled;
+  elements.notifyEnding.disabled = !enabled;
+  if (!enabled) {
+    elements.notifyOutbid.checked = false;
+    elements.notifyWon.checked = false;
+    elements.notifyEnding.checked = false;
+  }
+});
+
 // Load settings from storage
 async function loadSettings() {
   try {
@@ -51,10 +78,20 @@ async function loadSettings() {
     
     // Apply settings to form
     elements.backendUrl.value = settings.backendUrl;
+    elements.authToken.value = settings.authToken || '';
     elements.autoRefresh.checked = settings.autoRefresh;
     elements.refreshInterval.value = settings.refreshInterval;
     elements.refreshInterval.disabled = !settings.autoRefresh;
     elements.notificationsEnabled.checked = settings.notificationsEnabled;
+    elements.notifyOutbid.checked = settings.notifyOutbid;
+    elements.notifyWon.checked = settings.notifyWon;
+    elements.notifyEnding.checked = settings.notifyEnding;
+    elements.notifyOutbid.disabled = !settings.notificationsEnabled;
+    elements.notifyWon.disabled = !settings.notificationsEnabled;
+    elements.notifyEnding.disabled = !settings.notificationsEnabled;
+    elements.defaultMaxBid.value = settings.defaultMaxBid;
+    elements.bidIncrement.value = settings.bidIncrement;
+    elements.defaultStrategy.value = settings.defaultStrategy;
     
     // Set theme radio
     const themeRadio = document.querySelector(`input[name="theme"][value="${settings.theme}"]`);
@@ -74,11 +111,31 @@ async function saveSettings() {
   try {
     const settings = {
       backendUrl: elements.backendUrl.value || DEFAULT_SETTINGS.backendUrl,
+      authToken: elements.authToken.value || DEFAULT_SETTINGS.authToken,
       autoRefresh: elements.autoRefresh.checked,
       refreshInterval: parseInt(elements.refreshInterval.value) || DEFAULT_SETTINGS.refreshInterval,
       notificationsEnabled: elements.notificationsEnabled.checked,
-      theme: document.querySelector('input[name="theme"]:checked').value
+      notifyOutbid: elements.notifyOutbid.checked,
+      notifyWon: elements.notifyWon.checked,
+      notifyEnding: elements.notifyEnding.checked,
+      theme: document.querySelector('input[name="theme"]:checked').value,
+      defaultMaxBid: parseFloat(elements.defaultMaxBid.value) || 0,
+      bidIncrement: parseFloat(elements.bidIncrement.value) || 1,
+      defaultStrategy: elements.defaultStrategy.value
     };
+    
+    // Also update the backend settings object for compatibility
+    await chrome.storage.local.set({
+      backend: {
+        url: settings.backendUrl,
+        token: settings.authToken
+      },
+      bidSettings: {
+        defaultMaxBid: settings.defaultMaxBid,
+        incrementAmount: settings.bidIncrement,
+        strategy: settings.defaultStrategy
+      }
+    });
     
     // Validate backend URL
     try {
@@ -122,6 +179,7 @@ async function resetSettings() {
 // Test backend connection
 async function testConnection() {
   const url = elements.backendUrl.value || DEFAULT_SETTINGS.backendUrl;
+  const token = elements.authToken.value || DEFAULT_SETTINGS.authToken;
   
   // Validate URL
   try {
@@ -140,7 +198,8 @@ async function testConnection() {
     // Test connection by sending a message to background script
     const response = await chrome.runtime.sendMessage({
       action: 'testBackendConnection',
-      url: url
+      url: url,
+      token: token
     });
     
     if (response && response.success) {

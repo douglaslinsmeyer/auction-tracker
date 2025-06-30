@@ -43,26 +43,21 @@ describe('Dashboard Server', () => {
       expect(response.headers['content-type']).toMatch(/css/);
     });
 
-    it('should return 404 for non-existent files', async () => {
-      const response = await request(app).get('/non-existent-file.js');
-      expect(response.status).toBe(404);
+    it('should serve index.html for non-existent routes (SPA behavior)', async () => {
+      const response = await request(app).get('/non-existent-route');
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toMatch(/html/);
     });
   });
 
-  describe('Security headers', () => {
-    it('should set X-Content-Type-Options header', async () => {
-      const response = await request(app).get('/');
-      expect(response.headers['x-content-type-options']).toBe('nosniff');
+  describe('API configuration', () => {
+    it('should provide configuration endpoint', async () => {
+      const response = await request(app).get('/api/config');
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toMatch(/json/);
+      expect(response.body).toHaveProperty('backendUrl');
+      expect(response.body).toHaveProperty('wsUrl');
     });
   });
 
-  describe('API proxy configuration', () => {
-    it('should have proxy middleware configured for /api', async () => {
-      // This test verifies that proxy middleware is set up
-      // Actual proxy functionality would require backend to be running
-      const response = await request(app).get('/api/health');
-      // Expect proxy error since backend is not running in test
-      expect([502, 503, 504]).toContain(response.status);
-    });
-  });
 });

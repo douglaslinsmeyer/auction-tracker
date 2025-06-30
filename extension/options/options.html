@@ -34,6 +34,37 @@
             <span class="status-text"></span>
           </div>
         </div>
+        
+        <div class="settings-group">
+          <label for="auth-token">Authentication Token</label>
+          <input type="password" id="auth-token" placeholder="Enter your auth token" />
+          <p class="help-text">Your backend authentication token (keep this secret)</p>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h2>Bidding Configuration</h2>
+        <div class="settings-group">
+          <label for="default-max-bid">Default Maximum Bid ($)</label>
+          <input type="number" id="default-max-bid" min="0" step="1" placeholder="0" />
+          <p class="help-text">Default maximum bid amount for new auctions</p>
+        </div>
+        
+        <div class="settings-group">
+          <label for="bid-increment">Bid Increment Amount ($)</label>
+          <input type="number" id="bid-increment" min="1" step="1" value="1" />
+          <p class="help-text">Amount to increment when placing bids</p>
+        </div>
+        
+        <div class="settings-group">
+          <label for="default-strategy">Default Bidding Strategy</label>
+          <select id="default-strategy">
+            <option value="manual">Manual - No automatic bidding</option>
+            <option value="sniping">Sniping - Bid in last 30 seconds</option>
+            <option value="aggressive">Aggressive - Auto-bid when outbid</option>
+          </select>
+          <p class="help-text">Default strategy for new auctions</p>
+        </div>
       </section>
 
       <section class="settings-section">
@@ -55,9 +86,33 @@
         <div class="settings-group">
           <label class="checkbox-label">
             <input type="checkbox" id="notifications-enabled" />
-            <span>Enable notifications</span>
+            <span>Enable all notifications</span>
           </label>
-          <p class="help-text">Show notifications for important auction events</p>
+          <p class="help-text">Master switch for all notifications</p>
+        </div>
+        
+        <div class="settings-group nested">
+          <label class="checkbox-label">
+            <input type="checkbox" id="notify-outbid" />
+            <span>Outbid notifications</span>
+          </label>
+          <p class="help-text">Notify when you've been outbid</p>
+        </div>
+        
+        <div class="settings-group nested">
+          <label class="checkbox-label">
+            <input type="checkbox" id="notify-won" />
+            <span>Won auction notifications</span>
+          </label>
+          <p class="help-text">Notify when you win an auction</p>
+        </div>
+        
+        <div class="settings-group nested">
+          <label class="checkbox-label">
+            <input type="checkbox" id="notify-ending" />
+            <span>Auction ending notifications</span>
+          </label>
+          <p class="help-text">Notify when auctions are about to end</p>
         </div>
       </section>
 

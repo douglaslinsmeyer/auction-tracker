@@ -679,7 +679,7 @@ function addDetailedMonitoringWithShadow(targetElement, auctionId, isMonitored =
   
   // Initialize autobid UI based on strategy
   const initializeAutoBidUI = () => {
-    const strategy = snipingPill.classList.contains('active') ? 'sniping' : 'increment';
+    const strategy = snipingPill.classList.contains('active') ? 'sniping' : 'aggressive';
     const isAutoStrategy = strategy === 'sniping';
     
     // For sniping strategy, auto-bid is enabled by default
@@ -715,7 +715,7 @@ function addDetailedMonitoringWithShadow(targetElement, auctionId, isMonitored =
     if (!monitoredAuctions.has(auctionId)) return;
     
     const maxBid = parseInt(maxBidInput.value) || 0;
-    const strategy = snipingPill.classList.contains('active') ? 'sniping' : 'increment';
+    const strategy = snipingPill.classList.contains('active') ? 'sniping' : 'aggressive';
     const autoBid = autoBidToggle.dataset.enabled === 'true';
     
     // Validate max bid before sending
@@ -792,7 +792,7 @@ function addDetailedMonitoringWithShadow(targetElement, auctionId, isMonitored =
         auctionId: auctionId,
         config: {
           maxBid: parseInt(maxBidInput.value) || 0,
-          strategy: 'increment',
+          strategy: 'aggressive',
           autoBid: autoBidToggle.checked
         }
       }, (response) => {
@@ -1556,7 +1556,7 @@ function updateAuctionDisplay(auctionId, data) {
             if (data.config.strategy === 'sniping') {
               snipingPill.classList.add('active');
               manualPill.classList.remove('active');
-            } else if (data.config.strategy === 'manual' || data.config.strategy === 'increment') {
+            } else if (data.config.strategy === 'manual' || data.config.strategy === 'aggressive') {
               manualPill.classList.add('active');
               snipingPill.classList.remove('active');
             }
