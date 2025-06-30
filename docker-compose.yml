@@ -12,6 +12,7 @@ services:
       - NODE_ENV=${NODE_ENV:-development}
       - PORT=3000
       - AUTH_TOKEN=${AUTH_TOKEN:-dev-token}
+      - ENCRYPTION_SECRET=${ENCRYPTION_SECRET:-dev-encryption-key-change-in-production}
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - REDIS_URL=redis://redis:6379
       - DEBUG=${DEBUG:-}

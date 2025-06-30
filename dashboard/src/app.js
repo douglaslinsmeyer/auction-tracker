@@ -158,6 +158,7 @@ class AuctionMonitorUI {
                 
             case 'auctionState':
                 // Replace entire auction state (single source of truth)
+                console.log('Received auctionState:', data);
                 if (data.auction) {
                     this.handleAuctionState(data.auction);
                 }
