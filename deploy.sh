@@ -34,7 +34,13 @@ case ${1:-dev} in
             ./scripts/setup-dev-env.sh
         fi
         
-        docker-compose up --build
+        # Check if monitoring flag is set
+        if [ "$2" == "--with-monitoring" ] || [ "$2" == "-m" ]; then
+            print_info "Starting with monitoring stack..."
+            docker-compose -f docker-compose.yml -f docker-compose.monitoring.yml up --build
+        else
+            docker-compose up --build
+        fi
         ;;
     
     prod|production)
@@ -52,7 +58,13 @@ case ${1:-dev} in
             exit 1
         fi
         
-        docker-compose --env-file .env.production up -d --build
+        # Check if monitoring flag is set
+        if [ "$2" == "--with-monitoring" ] || [ "$2" == "-m" ]; then
+            print_info "Starting with monitoring stack..."
+            docker-compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.monitoring.yml up -d --build
+        else
+            docker-compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+        fi
         print_info "Production deployment started in background"
         print_info "View logs with: ./deploy.sh logs"
         ;;
@@ -92,17 +104,53 @@ case ${1:-dev} in
         print_info "Backup saved to ./backups/"
         ;;
     
+    monitoring|monitor)
+        print_info "Managing monitoring stack..."
+        case ${2:-status} in
+            start)
+                print_info "Starting monitoring stack (requires main services)..."
+                # Start main services first if not running
+                docker-compose up -d redis
+                # Then start monitoring
+                docker-compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d prometheus grafana redis-exporter
+                print_info "Monitoring stack started:"
+                print_info "  - Prometheus: http://localhost:9090"
+                print_info "  - Grafana: http://localhost:3003 (admin/admin)"
+                ;;
+            stop)
+                print_info "Stopping monitoring stack..."
+                docker-compose -f docker-compose.yml -f docker-compose.monitoring.yml stop prometheus grafana redis-exporter
+                ;;
+            status)
+                print_info "Monitoring stack status:"
+                docker-compose -f docker-compose.yml -f docker-compose.monitoring.yml ps prometheus grafana redis-exporter
+                ;;
+            *)
+                print_error "Unknown monitoring command: $2"
+                echo "Usage: $0 monitoring {start|stop|status}"
+                exit 1
+                ;;
+        esac
+        ;;
+    
     *)
-        echo "Usage: $0 {dev|prod|stop|logs|clean|status|backup}"
+        echo "Usage: $0 {dev|prod|stop|logs|clean|status|backup|monitoring} [options]"
         echo ""
         echo "Commands:"
-        echo "  dev       - Start development environment (default)"
-        echo "  prod      - Start production environment"
-        echo "  stop      - Stop all services"
-        echo "  logs      - View logs (follow mode)"
-        echo "  clean     - Remove all containers and volumes"
-        echo "  status    - Show service status"
-        echo "  backup    - Backup Redis data"
+        echo "  dev [--with-monitoring|-m]  - Start development environment (default)"
+        echo "  prod [--with-monitoring|-m] - Start production environment"
+        echo "  stop                        - Stop all services"
+        echo "  logs                        - View logs (follow mode)"
+        echo "  clean                       - Remove all containers and volumes"
+        echo "  status                      - Show service status"
+        echo "  backup                      - Backup Redis data"
+        echo "  monitoring {start|stop|status} - Manage monitoring stack"
+        echo ""
+        echo "Examples:"
+        echo "  $0 dev                      - Start dev environment"
+        echo "  $0 dev --with-monitoring    - Start dev with monitoring"
+        echo "  $0 monitoring start         - Start just monitoring stack"
+        echo "  $0 monitoring status        - Check monitoring services"
         exit 1
         ;;
 esac
