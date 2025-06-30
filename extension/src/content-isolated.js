@@ -1524,12 +1524,26 @@ async function extractAuctionData(auctionId) {
 }
 
 async function fetchAuctionDataFromAPI(auctionId) {
+  // This API method only works on product detail pages
+  const isProductPage = window.location.pathname.match(/\/p\/[^\/]+\/\d+/);
+  const isAuctionPage = window.location.pathname.match(/\/auction\/\d+/);
+  
+  if (!isProductPage && !isAuctionPage) {
+    return null;
+  }
+  
   try {
     // Extract product ID from various formats
     const productId = auctionId.toString().replace(/[^0-9]/g, '');
     
-    // Use the _data parameter to get JSON
-    const url = `${window.location.origin}${window.location.pathname}?_data=routes/p.$title.$productId._index`;
+    // Build the appropriate URL based on page type
+    let url;
+    if (isProductPage) {
+      url = `${window.location.origin}${window.location.pathname}?_data=routes/p.$title.$productId._index`;
+    } else {
+      // For auction pages, try a different approach or skip API
+      return null;
+    }
     
     const response = await fetch(url, {
       method: 'GET',
@@ -1540,6 +1554,10 @@ async function fetchAuctionDataFromAPI(auctionId) {
     });
     
     if (!response.ok) {
+      // Don't throw for 403/404 as these are expected on some pages
+      if (response.status === 403 || response.status === 404) {
+        return null;
+      }
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     
@@ -1577,7 +1595,10 @@ async function fetchAuctionDataFromAPI(auctionId) {
     return null;
     
   } catch (error) {
-    console.error('NAH: Error fetching auction data:', error);
+    // Don't log 403 errors as they're expected on non-product pages
+    if (!error.message.includes('403')) {
+      console.error('NAH: Error fetching auction data:', error);
+    }
     return null;
   }
 }
