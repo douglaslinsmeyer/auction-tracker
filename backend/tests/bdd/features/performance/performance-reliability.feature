@@ -31,7 +31,7 @@ Feature: Performance and Reliability
     And I make 50 status check requests within 60 seconds
     Then all monitoring requests should succeed
     And all status check requests should succeed
-    Because they have different rate limit buckets
+    # Because they have different rate limit buckets
 
   # Circuit Breaker Scenarios
 
@@ -48,9 +48,10 @@ Feature: Performance and Reliability
     When 60 seconds have passed
     Then the circuit breaker should enter half-open state
     And allow 1 test request through
-    If the test request succeeds
-    Then the circuit breaker should close
-    Otherwise it should remain open
+    # If the test request succeeds
+    And the circuit breaker should close if the test succeeds
+    # Otherwise it should remain open
+    And the circuit breaker should remain open if the test fails
 
   Scenario: Circuit breaker recovery
     Given the circuit breaker has been open for 5 minutes

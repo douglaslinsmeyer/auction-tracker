@@ -68,16 +68,24 @@ class AuctionMonitorUI {
             this.startPingInterval();
             
             // Authenticate first
-            // Get token from localStorage or prompt user
+            // Get token from localStorage or use default
             let authToken = localStorage.getItem('authToken');
             if (!authToken) {
-                authToken = prompt('Please enter your authentication token:');
-                if (authToken) {
+                // In development, use default token
+                if (window.location.hostname === 'localhost') {
+                    authToken = 'dev-token';
                     localStorage.setItem('authToken', authToken);
+                    console.log('Using default development token');
                 } else {
-                    console.error('Authentication token is required');
-                    this.ws.close();
-                    return;
+                    authToken = prompt('Please enter your authentication token:');
+                    if (authToken) {
+                        localStorage.setItem('authToken', authToken);
+                    } else {
+                        console.error('Authentication token is required');
+                        this.authFailed = true;
+                        this.ws.close();
+                        return;
+                    }
                 }
             }
             
@@ -111,6 +119,12 @@ class AuctionMonitorUI {
     }
     
     attemptReconnect() {
+        // Don't reconnect if authentication failed
+        if (this.authFailed) {
+            console.log('Not reconnecting due to authentication failure');
+            return;
+        }
+        
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++;
             console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
@@ -159,7 +173,7 @@ class AuctionMonitorUI {
                 break;
                 
             case 'authenticated':
-                if (message.success) {
+                if (data.success) {
                     console.log('Authentication successful');
                     // Now request the monitored auctions
                     this.sendMessage({
@@ -169,8 +183,9 @@ class AuctionMonitorUI {
                     // Check auth status after WebSocket auth
                     this.checkAuthStatus();
                 } else {
-                    console.error('Authentication failed:', message.error);
-                    // Clear stored token and reconnect
+                    console.error('Authentication failed:', data.error);
+                    this.authFailed = true;
+                    // Clear stored token
                     localStorage.removeItem('authToken');
                     alert('Authentication failed. Please refresh the page and enter a valid token.');
                     this.ws.close();

@@ -23,7 +23,19 @@ class SettingsManager {
     
     async loadSettings() {
         try {
-            const response = await fetch('/api/settings');
+            // Get backend URL from config
+            const configResponse = await fetch('/api/config');
+            const config = await configResponse.json();
+            const backendUrl = config.backendUrl || 'http://localhost:3000';
+            
+            // Get auth token from localStorage
+            const authToken = localStorage.getItem('authToken') || 'dev-token';
+            
+            const response = await fetch(`${backendUrl}/api/settings`, {
+                headers: {
+                    'Authorization': authToken
+                }
+            });
             if (response.ok) {
                 const data = await response.json();
                 this.settings = data.settings || this.settings;
@@ -31,7 +43,8 @@ class SettingsManager {
             }
         } catch (error) {
             console.error('Failed to load settings:', error);
-            console.error('Failed to load settings');
+            // Use default settings
+            this.updateUI();
         }
     }
     
@@ -46,11 +59,20 @@ class SettingsManager {
             this.settings.bidding.bidBuffer = parseInt(document.getElementById('bid-buffer').value) || 0;
             this.settings.bidding.retryAttempts = parseInt(document.getElementById('retry-attempts').value) || 3;
             
+            // Get backend URL from config
+            const configResponse = await fetch('/api/config');
+            const config = await configResponse.json();
+            const backendUrl = config.backendUrl || 'http://localhost:3000';
+            
+            // Get auth token from localStorage
+            const authToken = localStorage.getItem('authToken') || 'dev-token';
+            
             // Save to server
-            const response = await fetch('/api/settings', {
+            const response = await fetch(`${backendUrl}/api/settings`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Authorization': authToken
                 },
                 body: JSON.stringify({ settings: this.settings })
             });

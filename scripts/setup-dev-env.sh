@@ -80,7 +80,7 @@ create_dashboard_env() {
 DASHBOARD_PORT=3001
 NODE_ENV=development
 
-# Backend Configuration
+# Backend Configuration (internal Docker network)
 BACKEND_URL=http://backend:3000
 BACKEND_WS_URL=ws://backend:3000
 

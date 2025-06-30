@@ -36,7 +36,8 @@ app.get('*', (req, res) => {
 const server = app.listen(PORT, () => {
   if (process.env.NODE_ENV !== 'test') {
     console.log(`Dashboard server running on http://localhost:${PORT}`);
-    console.log(`Backend URL: ${process.env.BACKEND_URL || 'http://localhost:3000'}`);
+    console.log(`Backend URL (Internal): ${process.env.BACKEND_URL || 'http://backend:3000'}`);
+    console.log(`Backend URL (External): ${process.env.EXTERNAL_BACKEND_URL || 'http://localhost:3000'}`);
   }
 });
 

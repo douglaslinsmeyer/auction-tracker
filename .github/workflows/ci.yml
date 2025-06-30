@@ -449,10 +449,10 @@ jobs:
 
       - name: Test Docker Compose Configuration
         run: |
-          # Test that docker-compose files are valid
-          docker-compose -f docker-compose.yml config
-          docker-compose -f docker-compose.yml -f docker-compose.prod.yml config
-          docker-compose -f docker-compose.yml -f docker-compose.monitoring.yml config
+          # Test that docker compose files are valid
+          docker compose -f docker-compose.yml config
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml config
+          docker compose -f docker-compose.yml -f docker-compose.monitoring.yml config
 
       - name: Test Docker Image Security
         run: |

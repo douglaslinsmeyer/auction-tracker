@@ -118,8 +118,8 @@ Feature: End-to-End Integration Flows
       | Storage | Save bid history |
       | WebSocket | Broadcast update |
     Then all steps should complete atomically
-    If any step fails
-    Then previous steps should be rolled back
+    # If any step fails
+    And previous steps should be rolled back if any fail
     And consistent state should be maintained
 
   # Data Consistency Scenarios
@@ -132,9 +132,10 @@ Feature: End-to-End Integration Flows
       | API Cache | Reduce load |
     When the auction price updates
     Then all layers should be updated
-    In the correct order to prevent inconsistency
+    # In the correct order to prevent inconsistency
+    And updates should occur in the correct order
     And read operations should always see latest data
-    Even during update propagation
+    # Even during update propagation
 
   Scenario: Handle split-brain scenarios
     Given two backend instances are running
@@ -166,8 +167,8 @@ Feature: End-to-End Integration Flows
     And 500 are watching auction "12345"
     When auction "12345" updates
     Then update should broadcast to exactly 500 users
-    Within 100 milliseconds
-    Without affecting other auction monitors
+    And broadcast should complete within 100 milliseconds
+    And other auction monitors should not be affected
     And system resources should scale linearly
 
   # End-to-End Performance Scenarios
@@ -201,7 +202,8 @@ Feature: End-to-End Integration Flows
     When the token expires
     Then refresh should happen automatically
     And the bid should complete with new token
-    Without user intervention
+    # Without user intervention
+    And no user intervention should be required
     And security should not be compromised
 
   Scenario: Audit trail completeness
@@ -213,6 +215,7 @@ Feature: End-to-End Integration Flows
       | Bid | $150 on auction 12345 |
       | Win | Auction 12345 |
     Then each action should be logged
-    With complete context and timestamp
+    # With complete context and timestamp
+    And logs should include complete context and timestamp
     And logs should be correlated by session
     And be queryable for compliance

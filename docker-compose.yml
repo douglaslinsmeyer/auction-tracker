@@ -38,8 +38,11 @@ services:
       - NODE_ENV=${NODE_ENV:-development}
       - PORT=3001
       - BACKEND_URL=http://backend:3000
+      - EXTERNAL_BACKEND_URL=http://localhost:3000
+      - EXTERNAL_WS_URL=ws://localhost:3000
     volumes:
       - ./dashboard/src:/app/src
+      - ./dashboard/server.js:/app/server.js
       - /app/node_modules
     restart: unless-stopped
     depends_on:
