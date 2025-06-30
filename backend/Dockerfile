@@ -37,8 +37,8 @@ COPY backend/ .
 # ===== Production Stage =====
 FROM node:18-alpine AS production
 
-# Add curl for healthcheck and logrotate for log management
-RUN apk add --no-cache curl logrotate
+# Add curl for healthcheck
+RUN apk add --no-cache curl
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
@@ -50,18 +50,9 @@ WORKDIR /app
 # Copy from build stage
 COPY --from=production-build --chown=nodejs:nodejs /app ./
 
-# Create log directory structure with proper permissions
-RUN mkdir -p /app/logs/backend/archive /app/logs/dashboard/archive && \
+# Create log directory with proper permissions
+RUN mkdir -p /app/logs && \
     chown -R nodejs:nodejs /app/logs
-
-# Copy log rotation configuration from project root
-COPY --chown=root:root logrotate.conf /etc/logrotate.d/nellis-auction
-COPY --chown=root:root scripts/setup-logrotate.sh /usr/local/bin/
-
-# Make setup script executable and setup cron for log rotation
-RUN chmod +x /usr/local/bin/setup-logrotate.sh && \
-    echo "0 3 * * * /usr/sbin/logrotate /etc/logrotate.d/nellis-auction" > /etc/cron.d/nellis-logrotate && \
-    chmod 0644 /etc/cron.d/nellis-logrotate
 
 # Switch to non-root user
 USER nodejs

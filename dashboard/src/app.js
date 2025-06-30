@@ -6,6 +6,7 @@ class AuctionMonitorUI {
         this.maxReconnectAttempts = 5;
         this.reconnectDelay = 1000;
         this.pingInterval = null;
+        this.authFailed = false;
         
         this.elements = {
             connectionStatus: document.getElementById('connection-status'),
