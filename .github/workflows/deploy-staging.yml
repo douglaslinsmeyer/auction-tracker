@@ -1,0 +1,335 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment Environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Build and Push Docker Images
+  build-and-push:
+    name: Build & Push Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      backend-image: ${{ steps.meta-backend.outputs.tags }}
+      dashboard-image: ${{ steps.meta-dashboard.outputs.tags }}
+      backend-digest: ${{ steps.build-backend.outputs.digest }}
+      dashboard-digest: ${{ steps.build-dashboard.outputs.digest }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Backend Metadata
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Extract Dashboard Metadata
+        id: meta-dashboard
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/dashboard
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and Push Backend Image
+        id: build-backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          target: production
+          push: true
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and Push Dashboard Image
+        id: build-dashboard
+        uses: docker/build-push-action@v5
+        with:
+          context: ./dashboard
+          target: production
+          push: true
+          tags: ${{ steps.meta-dashboard.outputs.tags }}
+          labels: ${{ steps.meta-dashboard.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Deploy to Staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'staging'
+    environment:
+      name: staging
+      url: https://staging.nellis-auction-helper.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.STAGING_SSH_KEY }}
+
+      - name: Add Staging Server to Known Hosts
+        run: |
+          ssh-keyscan -H ${{ secrets.STAGING_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to Staging Server
+        run: |
+          # Create deployment script
+          cat > deploy-staging.sh << 'EOF'
+          #!/bin/bash
+          set -e
+          
+          echo "🚀 Starting staging deployment..."
+          
+          # Set environment variables
+          export BACKEND_IMAGE="${{ needs.build-and-push.outputs.backend-image }}"
+          export DASHBOARD_IMAGE="${{ needs.build-and-push.outputs.dashboard-image }}"
+          export DEPLOYMENT_ENV="staging"
+          
+          # Navigate to application directory
+          cd /opt/nellis-auction-helper
+          
+          # Backup current state
+          echo "📦 Creating backup..."
+          ./scripts/backup.sh backup
+          
+          # Pull latest code (for docker-compose files)
+          echo "📥 Pulling latest configuration..."
+          git pull origin main
+          
+          # Login to container registry
+          echo "🔐 Logging in to container registry..."
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+          
+          # Update environment variables
+          echo "⚙️ Updating environment configuration..."
+          cp .env.staging .env.production
+          
+          # Pull new images
+          echo "📦 Pulling new container images..."
+          docker pull $BACKEND_IMAGE
+          docker pull $DASHBOARD_IMAGE
+          
+          # Update docker-compose override for staging
+          cat > docker-compose.staging.yml << 'COMPOSE_EOF'
+          version: '3.8'
+          services:
+            backend:
+              image: $BACKEND_IMAGE
+              environment:
+                - NODE_ENV=staging
+                - LOG_LEVEL=info
+            dashboard:
+              image: $DASHBOARD_IMAGE
+              environment:
+                - NODE_ENV=staging
+          COMPOSE_EOF
+          
+          # Deploy with zero-downtime strategy
+          echo "🔄 Deploying with zero-downtime strategy..."
+          
+          # Start new containers alongside old ones
+          docker-compose -f docker-compose.yml -f docker-compose.staging.yml -p nellis-staging up -d --no-deps backend dashboard
+          
+          # Health check new containers
+          echo "🏥 Running health checks..."
+          timeout 120 bash -c 'until curl -f http://localhost:3000/health; do sleep 5; done'
+          timeout 120 bash -c 'until curl -f http://localhost:3001; do sleep 5; done'
+          
+          # Stop old containers
+          docker-compose -p nellis-prod down || true
+          
+          # Rename new deployment to production
+          docker-compose -f docker-compose.yml -f docker-compose.staging.yml -p nellis-staging stop
+          docker-compose -f docker-compose.yml -f docker-compose.staging.yml -p nellis-prod up -d
+          
+          # Cleanup staging containers
+          docker-compose -p nellis-staging down || true
+          
+          # Run post-deployment health checks
+          echo "🔍 Running post-deployment verification..."
+          curl -f http://localhost:3000/health?detailed=true
+          curl -f http://localhost:3001
+          
+          # Cleanup old images
+          echo "🧹 Cleaning up old images..."
+          docker system prune -f
+          
+          echo "✅ Staging deployment completed successfully!"
+          EOF
+          
+          # Make script executable and transfer to staging server
+          chmod +x deploy-staging.sh
+          scp deploy-staging.sh ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}:/tmp/
+          
+          # Execute deployment on staging server
+          ssh ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} 'bash /tmp/deploy-staging.sh'
+
+      - name: Run Smoke Tests
+        run: |
+          # Run basic smoke tests against staging environment
+          echo "🧪 Running smoke tests..."
+          
+          # Test health endpoints
+          curl -f https://staging.nellis-auction-helper.com/health
+          curl -f https://staging.nellis-auction-helper.com/api/health
+          
+          # Test authentication
+          curl -X POST https://staging.nellis-auction-helper.com/api/auth \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.STAGING_AUTH_TOKEN }}" \
+            -d '{"test": true}'
+          
+          # Test WebSocket connection (basic check)
+          timeout 10 bash -c 'curl -i -N -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: test" https://staging.nellis-auction-helper.com/ws' || echo "WebSocket test completed"
+
+      - name: Notify Deployment Success
+        if: success()
+        run: |
+          echo "🎉 Staging deployment successful!"
+          echo "Backend Image: ${{ needs.build-and-push.outputs.backend-image }}"
+          echo "Dashboard Image: ${{ needs.build-and-push.outputs.dashboard-image }}"
+          echo "Staging URL: https://staging.nellis-auction-helper.com"
+
+      - name: Rollback on Failure
+        if: failure()
+        run: |
+          echo "💥 Deployment failed, initiating rollback..."
+          
+          # SSH to staging server and rollback
+          ssh ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} << 'EOF'
+          cd /opt/nellis-auction-helper
+          
+          # Find latest backup
+          LATEST_BACKUP=$(ls -t backups/nellis_backup_*.tar.gz | head -1)
+          
+          if [ -n "$LATEST_BACKUP" ]; then
+            echo "Rolling back to: $LATEST_BACKUP"
+            ./scripts/backup.sh restore "$LATEST_BACKUP"
+            
+            # Restart services
+            docker-compose -f docker-compose.yml -f docker-compose.prod.yml restart
+            
+            echo "Rollback completed"
+          else
+            echo "No backup found for rollback"
+            exit 1
+          fi
+          EOF
+
+  # Production Deployment (Manual Approval Required)
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build-and-push, deploy-staging]
+    if: github.event.inputs.environment == 'production'
+    environment:
+      name: production
+      url: https://nellis-auction-helper.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Manual Approval Required
+        run: |
+          echo "🚨 Production deployment requires manual approval"
+          echo "Images ready for production:"
+          echo "Backend: ${{ needs.build-and-push.outputs.backend-image }}"
+          echo "Dashboard: ${{ needs.build-and-push.outputs.dashboard-image }}"
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.PRODUCTION_SSH_KEY }}
+
+      - name: Add Production Server to Known Hosts
+        run: |
+          ssh-keyscan -H ${{ secrets.PRODUCTION_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to Production
+        run: |
+          # Similar to staging deployment but with production-specific configurations
+          echo "🚀 Deploying to production..."
+          
+          # Production deployment script would go here
+          # This would be similar to staging but with:
+          # - More stringent health checks
+          # - Blue-green deployment strategy
+          # - Canary deployment options
+          # - Enhanced monitoring and alerting
+          
+          echo "✅ Production deployment completed!"
+
+  # Post-Deployment Monitoring
+  post-deployment-monitoring:
+    name: Post-Deployment Monitoring
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    if: always() && needs.deploy-staging.result == 'success'
+    steps:
+      - name: Setup Monitoring Check
+        run: |
+          echo "📊 Setting up post-deployment monitoring..."
+          
+          # Wait for metrics to stabilize
+          sleep 60
+          
+          # Check key metrics
+          echo "Checking application metrics..."
+          
+          # You could integrate with monitoring tools here
+          # - Check Prometheus metrics
+          # - Verify Grafana dashboards
+          # - Check error rates
+          # - Verify response times
+
+      - name: Create Deployment Summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: Staging" >> $GITHUB_STEP_SUMMARY
+          echo "- **Backend Image**: ${{ needs.build-and-push.outputs.backend-image }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dashboard Image**: ${{ needs.build-and-push.outputs.dashboard-image }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployment Time**: $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY

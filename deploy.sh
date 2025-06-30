@@ -28,6 +28,12 @@ print_warning() {
 case ${1:-dev} in
     dev|development)
         print_info "Starting development environment..."
+        
+        # Setup development environment files
+        if [ -f scripts/setup-dev-env.sh ]; then
+            ./scripts/setup-dev-env.sh
+        fi
+        
         docker-compose up --build
         ;;
     

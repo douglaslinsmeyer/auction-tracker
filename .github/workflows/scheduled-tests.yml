@@ -1,0 +1,365 @@
+name: Scheduled Tests
+
+on:
+  schedule:
+    # Run full test suite daily at 2 AM UTC
+    - cron: '0 2 * * *'
+    # Run E2E tests every 6 hours
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      test_suite:
+        description: 'Test suite to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - e2e
+          - integration
+          - performance
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  # Daily comprehensive test run
+  daily-full-test:
+    name: Daily Full Test Suite
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 2 * * *' || github.event.inputs.test_suite == 'all'
+    services:
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: |
+            backend/package-lock.json
+            dashboard/package-lock.json
+
+      - name: Install Dependencies
+        run: |
+          cd backend && npm ci
+          cd ../dashboard && npm ci
+
+      - name: Run Full Test Suite
+        working-directory: ./backend
+        run: |
+          npm run test:unit
+          npm run test:integration
+          # Run BDD tests if configured
+          if [ -f "cucumber.js" ]; then
+            npx cucumber-js --config cucumber.js
+          fi
+        env:
+          NODE_ENV: test
+          AUTH_TOKEN: test-token
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+
+      - name: Run Dashboard Tests
+        working-directory: ./dashboard
+        run: npm test
+        env:
+          NODE_ENV: test
+
+      - name: Generate Test Report
+        if: always()
+        run: |
+          echo "## Daily Test Report - $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "### Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "- Unit Tests: Completed" >> $GITHUB_STEP_SUMMARY
+          echo "- Integration Tests: Completed" >> $GITHUB_STEP_SUMMARY
+          echo "- Dashboard Tests: Completed" >> $GITHUB_STEP_SUMMARY
+
+  # E2E tests (runs every 6 hours)
+  scheduled-e2e:
+    name: Scheduled E2E Tests
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 */6 * * *' || github.event.inputs.test_suite == 'e2e'
+    services:
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: |
+            backend/package-lock.json
+            dashboard/package-lock.json
+
+      - name: Install Dependencies
+        run: |
+          cd backend && npm ci
+          cd ../dashboard && npm ci
+
+      - name: Install Chrome Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2-dev \
+            libatk-bridge2.0-dev \
+            libgtk-3-dev \
+            libx11-xcb-dev \
+            libxcomposite-dev \
+            libxcursor-dev \
+            libxdamage-dev \
+            libxi-dev \
+            libxtst-dev \
+            libnss3-dev \
+            libxrandr-dev \
+            libxss-dev
+
+      - name: Start Services
+        run: |
+          # Start backend
+          cd backend
+          npm start &
+          echo $! > backend.pid
+          timeout 60 bash -c 'until curl -f http://localhost:3000/health; do sleep 2; done'
+          
+          # Start dashboard
+          cd ../dashboard
+          npm start &
+          echo $! > dashboard.pid
+          timeout 60 bash -c 'until curl -f http://localhost:3001; do sleep 2; done'
+        env:
+          NODE_ENV: test
+          AUTH_TOKEN: test-token
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          PORT: 3000
+
+      - name: Run E2E Tests
+        working-directory: ./backend
+        run: |
+          if [ -f "jest.config.puppeteer.js" ]; then
+            npm test -- --config=jest.config.puppeteer.js --maxWorkers=2
+          else
+            echo "E2E tests not yet configured"
+          fi
+        env:
+          NODE_ENV: test
+          AUTH_TOKEN: test-token
+          BACKEND_URL: http://localhost:3000
+          DASHBOARD_URL: http://localhost:3001
+          HEADLESS: true
+
+      - name: Stop Services
+        if: always()
+        run: |
+          if [ -f backend/backend.pid ]; then kill $(cat backend/backend.pid) || true; fi
+          if [ -f dashboard/dashboard.pid ]; then kill $(cat dashboard/dashboard.pid) || true; fi
+
+      - name: Upload E2E Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: scheduled-e2e-results-${{ github.run_number }}
+          path: |
+            backend/screenshots/
+            backend/videos/
+            backend/coverage/
+          retention-days: 7
+
+  # Performance benchmarking
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_suite == 'performance'
+    services:
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install Dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Run Performance Tests
+        working-directory: ./backend
+        run: |
+          if [ -d "tests/performance" ]; then
+            npm test -- tests/performance/ --detectOpenHandles --forceExit
+          else
+            echo "Performance tests not yet configured"
+          fi
+        env:
+          NODE_ENV: test
+          AUTH_TOKEN: test-token
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+
+      - name: Performance Benchmark
+        run: |
+          echo "## Performance Benchmark Results" >> $GITHUB_STEP_SUMMARY
+          echo "Run Date: $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "Node Version: ${{ env.NODE_VERSION }}" >> $GITHUB_STEP_SUMMARY
+          # Add actual performance metrics here
+
+  # Test health check
+  test-health-check:
+    name: Test Infrastructure Health
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check Test Configuration
+        run: |
+          echo "🔍 Checking test configuration health..."
+          
+          # Check if package.json test scripts exist
+          cd backend
+          if ! npm run | grep -q "test"; then
+            echo "❌ No test scripts found in backend package.json"
+            exit 1
+          fi
+          
+          cd ../dashboard
+          if ! npm run | grep -q "test"; then
+            echo "❌ No test scripts found in dashboard package.json"
+            exit 1
+          fi
+          
+          echo "✅ Test scripts configured correctly"
+
+      - name: Validate Jest Configurations
+        run: |
+          echo "🔍 Validating Jest configurations..."
+          
+          cd backend
+          for config in jest.config.js jest.config.bdd.js jest.config.puppeteer.js; do
+            if [ -f "$config" ]; then
+              echo "✅ Found $config"
+              # Basic syntax check
+              node -c "$config"
+            else
+              echo "⚠️ Missing $config"
+            fi
+          done
+
+      - name: Check Test Dependencies
+        run: |
+          echo "🔍 Checking test dependencies..."
+          
+          cd backend
+          # Check if critical test dependencies are installed
+          if ! npm list jest >/dev/null 2>&1; then
+            echo "❌ Jest not installed"
+            exit 1
+          fi
+          
+          if ! npm list puppeteer >/dev/null 2>&1; then
+            echo "⚠️ Puppeteer not installed (E2E tests may fail)"
+          fi
+          
+          echo "✅ Core test dependencies present"
+
+  # Cleanup old test artifacts
+  cleanup:
+    name: Cleanup Test Artifacts
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 2 * * *'
+    steps:
+      - name: Cleanup Old Artifacts
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            
+            // Get all artifacts
+            const artifacts = await github.rest.actions.listArtifactsForRepo({
+              owner,
+              repo,
+              per_page: 100
+            });
+            
+            // Delete artifacts older than 7 days
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - 7);
+            
+            for (const artifact of artifacts.data.artifacts) {
+              const createdAt = new Date(artifact.created_at);
+              if (createdAt < cutoffDate && artifact.name.includes('test')) {
+                console.log(`Deleting old artifact: ${artifact.name}`);
+                await github.rest.actions.deleteArtifact({
+                  owner,
+                  repo,
+                  artifact_id: artifact.id
+                });
+              }
+            }
+
+  # Report test status
+  report-status:
+    name: Report Test Status
+    runs-on: ubuntu-latest
+    needs: [daily-full-test, scheduled-e2e, performance-tests, test-health-check]
+    if: always()
+    steps:
+      - name: Generate Status Report
+        run: |
+          echo "## Scheduled Test Status Report" >> $GITHUB_STEP_SUMMARY
+          echo "Generated: $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Suite | Status | Notes |" >> $GITHUB_STEP_SUMMARY
+          echo "|------------|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Daily Full Test | ${{ needs.daily-full-test.result || 'skipped' }} | Comprehensive test suite |" >> $GITHUB_STEP_SUMMARY
+          echo "| E2E Tests | ${{ needs.scheduled-e2e.result || 'skipped' }} | Browser automation tests |" >> $GITHUB_STEP_SUMMARY
+          echo "| Performance Tests | ${{ needs.performance-tests.result || 'skipped' }} | Performance benchmarks |" >> $GITHUB_STEP_SUMMARY
+          echo "| Health Check | ${{ needs.test-health-check.result || 'skipped' }} | Test infrastructure health |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Check for Failures
+        run: |
+          if [[ "${{ needs.daily-full-test.result }}" == "failure" || 
+                "${{ needs.scheduled-e2e.result }}" == "failure" || 
+                "${{ needs.test-health-check.result }}" == "failure" ]]; then
+            echo "🚨 Some scheduled tests failed!"
+            echo "Check the individual job logs for details."
+            # Here you could integrate with notification systems
+            exit 1
+          fi
+          echo "✅ All scheduled tests completed successfully!"

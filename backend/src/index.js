@@ -153,7 +153,7 @@ app.use(prometheusMetrics.middleware.http);
 
 // Setup Swagger UI if available
 if (swaggerUi && YAML) {
-  const swaggerPath = path.join(__dirname, '..', '..', 'swagger.yaml');
+  const swaggerPath = path.join(__dirname, '..', 'swagger.yaml');
   if (fs.existsSync(swaggerPath)) {
     try {
       const swaggerDocument = YAML.load(swaggerPath);
