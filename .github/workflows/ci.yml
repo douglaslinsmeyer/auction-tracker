@@ -115,6 +115,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Enable memory overcommit for Redis
+        run: sudo sysctl -w vm.overcommit_memory=1
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -133,9 +136,6 @@ jobs:
       - name: Install Backend Dependencies
         working-directory: ./backend
         run: npm ci
-
-      - name: Enable memory overcommit for Redis
-        run: sudo sysctl -w vm.overcommit_memory=1
 
       - name: Install Redis CLI
         run: |
@@ -191,6 +191,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Enable memory overcommit for Redis
+        run: sudo sysctl -w vm.overcommit_memory=1
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -209,9 +212,6 @@ jobs:
       - name: Install Backend Dependencies
         working-directory: ./backend
         run: npm ci
-
-      - name: Enable memory overcommit for Redis
-        run: sudo sysctl -w vm.overcommit_memory=1
 
       - name: Install Redis CLI
         run: |
@@ -275,6 +275,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Enable memory overcommit for Redis
+        run: sudo sysctl -w vm.overcommit_memory=1
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -324,9 +327,6 @@ jobs:
             libnss3-dev \
             libxrandr-dev \
             libxss-dev
-
-      - name: Enable memory overcommit for Redis
-        run: sudo sysctl -w vm.overcommit_memory=1
 
       - name: Install Redis CLI
         run: |

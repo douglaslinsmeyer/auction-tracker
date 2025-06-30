@@ -248,7 +248,7 @@ describe('Auction Monitor Integration Tests', () => {
       await auctionMonitor.addAuction(mockAuction.id, {
         maxBid: 30,
         strategy: 'auto',
-        autoBid: false  // Disable auto-bidding to prevent polling bids
+        autoBid: true  // Enable auto-bidding to test max bid logic
       });
       
       // Clear any polling-triggered calls
@@ -267,7 +267,7 @@ describe('Auction Monitor Integration Tests', () => {
       await auctionMonitor.addAuction(mockAuction.id, {
         maxBid: 100,
         strategy: 'sniping',
-        autoBid: false  // Disable auto-bidding to prevent polling bids
+        autoBid: true  // Enable auto-bidding to test sniping logic
       });
       
       // Clear any polling-triggered calls
