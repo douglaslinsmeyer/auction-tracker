@@ -8,6 +8,13 @@ const logger = require('../utils/logger');
 const features = require('../config/features');
 const prometheusMetrics = require('../utils/prometheusMetrics');
 
+// Helper to avoid logging during tests
+const testLog = (level, ...args) => {
+  if (process.env.NODE_ENV !== 'test') {
+    console[level](...args);
+  }
+};
+
 class AuctionMonitor extends EventEmitter {
   constructor() {
     super();
@@ -39,7 +46,7 @@ class AuctionMonitor extends EventEmitter {
     // Start periodic cleanup of ended auctions
     this.startCleanupTimer();
     
-    console.log('Auction monitor initialized with persistence');
+    testLog("log", 'Auction monitor initialized with persistence');
   }
   
   async initializeSSEClient() {
@@ -89,29 +96,29 @@ class AuctionMonitor extends EventEmitter {
   
   async recoverPersistedState() {
     try {
-      console.log('Recovering persisted auction state...');
+      testLog("log", 'Recovering persisted auction state...');
       const auctions = await storage.getAllAuctions();
       
       if (auctions.length > 0) {
-        console.log(`Found ${auctions.length} persisted auctions`);
+        testLog("log", `Found ${auctions.length} persisted auctions`);
         
         for (const auction of auctions) {
           // Don't start polling for ended auctions
           if (auction.status !== 'ended') {
             this.monitoredAuctions.set(auction.id, auction);
             await this.startMonitoring(auction.id, auction);
-            console.log(`Recovered auction ${auction.id}: ${auction.title}`);
+            testLog("log", `Recovered auction ${auction.id}: ${auction.title}`);
           }
         }
       }
     } catch (error) {
-      console.error('Error recovering persisted state:', error);
+      testLog("error", 'Error recovering persisted state:', error);
     }
   }
 
   async addAuction(auctionId, config = {}, metadata = {}) {
     if (this.monitoredAuctions.has(auctionId)) {
-      console.warn(`Auction ${auctionId} is already being monitored`);
+      testLog("warn", `Auction ${auctionId} is already being monitored`);
       return false;
     }
 
@@ -148,7 +155,7 @@ class AuctionMonitor extends EventEmitter {
     prometheusMetrics.metrics.business.totalAuctions.inc();
     prometheusMetrics.metrics.business.activeAuctions.set(this.monitoredAuctions.size);
     
-    console.log(`Started monitoring auction ${auctionId}`);
+    testLog("log", `Started monitoring auction ${auctionId}`);
     return true;
   }
 
@@ -163,12 +170,12 @@ class AuctionMonitor extends EventEmitter {
     // Remove from storage
     await storage.removeAuction(auctionId);
     
-    console.log(`Stopped monitoring auction ${auctionId}`);
+    testLog("log", `Stopped monitoring auction ${auctionId}`);
     return true;
   }
 
   async updateAuction(auctionId) {
-    console.log(`Updating auction ${auctionId}`);
+    testLog("log", `Updating auction ${auctionId}`);
     const auction = this.monitoredAuctions.get(auctionId);
     if (!auction) return;
 
@@ -201,14 +208,13 @@ class AuctionMonitor extends EventEmitter {
       // Broadcast full auction state to WebSocket clients
       this.broadcastAuctionState(auctionId);
 
-      // Execute auto-bid based on strategy and autoBid flag
-      if (auction.config.strategy !== 'manual' && 
-          auction.config.autoBid === true) {
+      // Execute auto-bid based on autoBid flag
+      if (auction.config.autoBid === true) {
         this.executeAutoBid(auctionId, data);
       }
 
     } catch (error) {
-      console.error(`Error updating auction ${auctionId}:`, error);
+      testLog("error", `Error updating auction ${auctionId}:`, error);
       auction.status = 'error';
       await storage.saveAuction(auctionId, auction);
     }
@@ -218,7 +224,7 @@ class AuctionMonitor extends EventEmitter {
     const auction = this.monitoredAuctions.get(auctionId);
     if (!auction) return;
 
-    console.log(`Bid update for auction ${auctionId}: $${oldData.currentBid} -> $${newData.currentBid}`);
+    testLog("log", `Bid update for auction ${auctionId}: $${oldData.currentBid} -> $${newData.currentBid}`);
 
     // Check if we've been outbid
     if (newData.isWinning === false && oldData.isWinning === true) {
@@ -227,27 +233,25 @@ class AuctionMonitor extends EventEmitter {
   }
 
   async executeAutoBid(auctionId, auctionData) {
-    console.log(`Executing auto-bid for auction ${auctionId}`);
+    testLog("log", `Executing auto-bid for auction ${auctionId}`);
     const auction = this.monitoredAuctions.get(auctionId);
     if (!auction) return;
 
     // Check if auction has ended
     if (auctionData.isClosed || auctionData.timeRemaining <= 0) {
-      console.log(`Auto-bid skipped for auction ${auctionId}: Auction has ended`);
+      testLog("log", `Auto-bid skipped for auction ${auctionId}: Auction has ended`);
       return;
     }
 
     // Check if we're already winning
     if (auctionData.isWinning) {
-      console.log(`Auto-bid skipped for auction ${auctionId}: Already winning`);
+      testLog("log", `Auto-bid skipped for auction ${auctionId}: Already winning`);
       return;
     }
 
-    // Check strategy
-    // Auto strategy always allows auto-bidding when enabled
-    // Sniping strategy only auto-bids in the last seconds
+    // Check if auto-bidding is enabled
     if (!auction.config.autoBid) {
-      return; // No auto-bidding for manual strategy
+      return; // Auto-bidding is disabled
     }
 
     // Get global settings for bidding logic
@@ -275,7 +279,7 @@ class AuctionMonitor extends EventEmitter {
       : SafeMath.calculateNextBid(minimumBid, 0, buffer);
     
     // Debug logging for bid calculation
-    console.log(`Auto-bid calculation for auction ${auctionId}:`, {
+    testLog("log", `Auto-bid calculation for auction ${auctionId}:`, {
       currentBid,
       auctionDataNextBid: auctionData.nextBid,
       minimumBid,
@@ -288,14 +292,14 @@ class AuctionMonitor extends EventEmitter {
 
     // Validate nextBid is greater than currentBid
     if (nextBid <= currentBid) {
-      console.log(`Auto-bid skipped for auction ${auctionId}: Next bid ($${nextBid}) must be greater than current bid ($${currentBid})`);
+      testLog("log", `Auto-bid skipped for auction ${auctionId}: Next bid ($${nextBid}) must be greater than current bid ($${currentBid})`);
       return;
     }
 
     // Check if we already attempted this bid amount recently (within last 10 seconds)
     if (auction.lastBidAmount === nextBid && auction.lastBidTime && 
         (Date.now() - auction.lastBidTime) < 10000) {
-      console.log(`Auto-bid skipped for auction ${auctionId}: Recently attempted same bid amount ($${nextBid})`);
+      testLog("log", `Auto-bid skipped for auction ${auctionId}: Recently attempted same bid amount ($${nextBid})`);
       return;
     }
 
@@ -323,7 +327,7 @@ class AuctionMonitor extends EventEmitter {
           // Check if bid was accepted but we're still not winning
           if (result.data && result.data.message && 
               result.data.message.includes('another user has a higher maximum bid')) {
-            console.log(`Bid accepted but outbid on auction ${auctionId}. Current: $${result.data.data.currentAmount}, Next min: $${result.data.data.minimumNextBid}`);
+            testLog("log", `Bid accepted but outbid on auction ${auctionId}. Current: $${result.data.data.currentAmount}, Next min: $${result.data.data.minimumNextBid}`);
             
             // Update auction data with the new values
             if (result.data.data) {
@@ -345,7 +349,7 @@ class AuctionMonitor extends EventEmitter {
           
           this.emit('bidPlaced', { auctionId, amount: nextBid, result: result.data });
         } else {
-          console.error(`Auto-bid failed for auction ${auctionId}:`, result.error);
+          testLog("error", `Auto-bid failed for auction ${auctionId}:`, result.error);
           
           // Still track the bid attempt to prevent repeated failures
           auction.lastBidAmount = nextBid;
@@ -365,7 +369,7 @@ class AuctionMonitor extends EventEmitter {
           // Error notification removed
         }
       } catch (error) {
-        console.error(`Error placing auto-bid for auction ${auctionId}:`, error);
+        testLog("error", `Error placing auto-bid for auction ${auctionId}:`, error);
         
         // Still track the bid attempt to prevent repeated failures
         auction.lastBidAmount = nextBid;
@@ -382,7 +386,7 @@ class AuctionMonitor extends EventEmitter {
         // Error notification removed
       }
     } else {
-      console.warn(`Auto-bid skipped for auction ${auctionId}: Next bid $${nextBid} exceeds max bid $${auction.config.maxBid}`);
+      testLog("warn", `Auto-bid skipped for auction ${auctionId}: Next bid $${nextBid} exceeds max bid $${auction.config.maxBid}`);
       auction.maxBidReached = true;
       
       // Track max bid reached in Prometheus
@@ -391,7 +395,7 @@ class AuctionMonitor extends EventEmitter {
   }
 
   handleOutbid(auctionId, data) {
-    console.log(`User outbid on auction ${auctionId}`);
+    testLog("log", `User outbid on auction ${auctionId}`);
     this.emit('outbid', { auctionId, currentBid: data.currentBid });
     
     const auction = this.monitoredAuctions.get(auctionId);
@@ -401,7 +405,7 @@ class AuctionMonitor extends EventEmitter {
   }
 
   handleAuctionEnd(auctionId, data) {
-    console.log(`Auction ${auctionId} has ended`);
+    testLog("log", `Auction ${auctionId} has ended`);
     this.stopPolling(auctionId);
     
     const auction = this.monitoredAuctions.get(auctionId);
@@ -415,7 +419,7 @@ class AuctionMonitor extends EventEmitter {
     
     // Save the updated state
     storage.saveAuction(auctionId, auction).catch(err => {
-      console.error('Failed to save ended auction state:', err);
+      testLog("error", 'Failed to save ended auction state:', err);
     });
     
     // Update Prometheus metrics
@@ -439,7 +443,7 @@ class AuctionMonitor extends EventEmitter {
     // End notification removed
 
     // The cleanup timer will handle removal based on the endedAt timestamp
-    console.log(`Auction ${auctionId} marked as ended. Will be cleaned up after retention period.`);
+    testLog("log", `Auction ${auctionId} marked as ended. Will be cleaned up after retention period.`);
   }
 
   startPolling(auctionId, interval = 6000) {
@@ -707,7 +711,7 @@ class AuctionMonitor extends EventEmitter {
     }
     
     auction.config = { ...auction.config, ...config };
-    console.log(`Updated config for auction ${auctionId}:`, config);
+    testLog("log", `Updated config for auction ${auctionId}:`, config);
     
     // Persist the updated auction
     await storage.saveAuction(auctionId, auction);
@@ -730,7 +734,7 @@ class AuctionMonitor extends EventEmitter {
     // Also run cleanup immediately to clean any existing ended auctions
     this.cleanupEndedAuctions(AUCTION_RETENTION_MS);
     
-    console.log(`Auction cleanup timer started (runs every ${CLEANUP_INTERVAL / 1000} seconds)`);
+    testLog("log", `Auction cleanup timer started (runs every ${CLEANUP_INTERVAL / 1000} seconds)`);
   }
   
   cleanupEndedAuctions(retentionMs) {
@@ -742,7 +746,7 @@ class AuctionMonitor extends EventEmitter {
       if (auction.status === 'ended' || auction.status === 'closed') {
         const endedAt = auction.endedAt || auction.lastUpdated;
         if (endedAt && (now - endedAt) > retentionMs) {
-          console.log(`Cleaning up ended auction ${auctionId} (ended ${Math.round((now - endedAt) / 1000)} seconds ago)`);
+          testLog("log", `Cleaning up ended auction ${auctionId} (ended ${Math.round((now - endedAt) / 1000)} seconds ago)`);
           this.removeAuction(auctionId);
           cleanedCount++;
         }
@@ -750,14 +754,14 @@ class AuctionMonitor extends EventEmitter {
       
       // Also check for auctions with zero time remaining that might not have proper status
       if (auction.timeRemaining === 0 && auction.lastUpdated && (now - auction.lastUpdated) > retentionMs) {
-        console.log(`Cleaning up stale auction ${auctionId} with zero time remaining`);
+        testLog("log", `Cleaning up stale auction ${auctionId} with zero time remaining`);
         this.removeAuction(auctionId);
         cleanedCount++;
       }
     }
     
     if (cleanedCount > 0) {
-      console.log(`Cleaned up ${cleanedCount} ended auctions. Active auctions: ${this.monitoredAuctions.size}`);
+      testLog("log", `Cleaned up ${cleanedCount} ended auctions. Active auctions: ${this.monitoredAuctions.size}`);
     }
   }
 
@@ -774,7 +778,7 @@ class AuctionMonitor extends EventEmitter {
     });
     this.pollingIntervals.clear();
     this.monitoredAuctions.clear();
-    console.log('Auction monitor shut down');
+    testLog("log", 'Auction monitor shut down');
   }
 }
 

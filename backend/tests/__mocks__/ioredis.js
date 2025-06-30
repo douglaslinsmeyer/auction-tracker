@@ -7,11 +7,16 @@ class RedisMock extends EventEmitter {
     this.data = new Map();
     this.connected = false;
     
-    // Simulate async connection
-    process.nextTick(() => {
+    // Simulate async connection (but only in non-test environment to avoid logging after tests)
+    if (process.env.NODE_ENV !== 'test') {
+      process.nextTick(() => {
+        this.connected = true;
+        this.emit('connect');
+      });
+    } else {
+      // Immediate connection in tests to avoid async issues
       this.connected = true;
-      this.emit('connect');
-    });
+    }
   }
 
   async connect() {

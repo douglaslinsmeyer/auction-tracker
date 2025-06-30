@@ -28,7 +28,7 @@ describe('Auction Monitor Integration Tests', () => {
     storage.getSettings = jest.fn().mockResolvedValue({
       general: {
         defaultMaxBid: 100,
-        defaultStrategy: 'increment',
+        defaultStrategy: 'auto',
         autoBidDefault: true
       },
       bidding: {
@@ -215,10 +215,11 @@ describe('Auction Monitor Integration Tests', () => {
       nellisApi.placeBid = jest.fn();
     });
 
-    it('should not auto-bid with manual strategy', async () => {
+    it('should not auto-bid when autoBid is false', async () => {
       await auctionMonitor.addAuction(mockAuction.id, {
         ...mockAuction.config,
-        strategy: 'manual'
+        strategy: 'auto',
+        autoBid: false
       });
       
       const auctionData = { ...mockAuctionData, isWinning: false };
@@ -227,10 +228,10 @@ describe('Auction Monitor Integration Tests', () => {
       expect(nellisApi.placeBid).not.toHaveBeenCalled();
     });
 
-    it('should auto-bid with increment strategy', async () => {
+    it('should auto-bid with auto strategy', async () => {
       await auctionMonitor.addAuction(mockAuction.id, {
         maxBid: 100,
-        strategy: 'increment',
+        strategy: 'auto',
         bidIncrement: 5
       });
       
@@ -246,7 +247,7 @@ describe('Auction Monitor Integration Tests', () => {
     it('should not bid above max bid', async () => {
       await auctionMonitor.addAuction(mockAuction.id, {
         maxBid: 30,
-        strategy: 'increment',
+        strategy: 'auto',
         autoBid: false  // Disable auto-bidding to prevent polling bids
       });
       
@@ -288,7 +289,7 @@ describe('Auction Monitor Integration Tests', () => {
     it('should handle outbid response and retry', async () => {
       await auctionMonitor.addAuction(mockAuction.id, {
         maxBid: 100,
-        strategy: 'increment'
+        strategy: 'auto'
       });
       
       nellisApi.placeBid.mockResolvedValue(mockOutbidResponse);
@@ -306,7 +307,7 @@ describe('Auction Monitor Integration Tests', () => {
     it('should save failed bid attempts', async () => {
       await auctionMonitor.addAuction(mockAuction.id, {
         maxBid: 100,
-        strategy: 'increment'
+        strategy: 'auto'
       });
       
       const error = 'Bid rejected';
@@ -370,7 +371,7 @@ describe('Auction Monitor Integration Tests', () => {
       
       await auctionMonitor.addAuction(mockAuction.id, {
         maxBid: 100,
-        strategy: 'increment'
+        strategy: 'auto'
       });
       
       nellisApi.placeBid.mockResolvedValue({ 

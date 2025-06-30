@@ -7,7 +7,7 @@ module.exports = {
     config: {
       maxBid: 100,
       bidIncrement: 5,
-      strategy: 'increment',
+      strategy: 'auto',
       autoBid: true,
       notifyOnOutbid: true,
       notifyOnEnd: true

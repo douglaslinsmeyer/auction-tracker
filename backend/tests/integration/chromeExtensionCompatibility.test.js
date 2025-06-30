@@ -92,7 +92,7 @@ describe('Chrome Extension Compatibility', () => {
         {
           config: {
             maxBid: 100,
-            strategy: 'manual',
+            strategy: 'auto',
             autoBid: false
           }
         },
@@ -152,7 +152,7 @@ describe('Chrome Extension Compatibility', () => {
       // Add an auction with valid numeric ID
       const added = await auctionMonitor.addAuction('99999', {
         maxBid: 50,
-        strategy: 'manual'
+        strategy: 'auto'
       });
       
       expect(added).toBe(true);

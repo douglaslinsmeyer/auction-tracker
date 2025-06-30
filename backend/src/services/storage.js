@@ -32,29 +32,39 @@ class StorageService extends EventEmitter {
       });
 
       this.redis.on('connect', () => {
-        console.log('Redis connected');
+        if (process.env.NODE_ENV !== 'test') {
+          console.log('Redis connected');
+        }
         this.connected = true;
         this.emit('connected');
       });
 
       this.redis.on('error', (err) => {
-        console.error('Redis error:', err);
+        if (process.env.NODE_ENV !== 'test') {
+          console.error('Redis error:', err);
+        }
         this.connected = false;
         this.emit('error', err);
       });
 
       this.redis.on('close', () => {
-        console.log('Redis connection closed');
+        if (process.env.NODE_ENV !== 'test') {
+          console.log('Redis connection closed');
+        }
         this.connected = false;
         this.emit('disconnected');
       });
 
       // Test connection
       await this.redis.ping();
-      console.log('Redis connection successful');
+      if (process.env.NODE_ENV !== 'test') {
+        console.log('Redis connection successful');
+      }
       
     } catch (error) {
-      console.error('Failed to connect to Redis, using in-memory fallback:', error);
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Failed to connect to Redis, using in-memory fallback:', error);
+      }
       this.connected = false;
     }
   }
