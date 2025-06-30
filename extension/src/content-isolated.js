@@ -615,7 +615,12 @@ async function waitForAuctionPageElements(auctionId, options = {}) {
     const startTime = Date.now();
     
     // Set up MutationObserver for dynamic detection
+    let observerCallCount = 0;
     const observer = new MutationObserver(() => {
+      observerCallCount++;
+      // Throttle checks to avoid excessive processing
+      if (observerCallCount % 5 !== 0) return;
+      
       if (checkRequiredElements()) {
         observer.disconnect();
         clearTimeout(retryTimeout);
@@ -650,7 +655,8 @@ async function waitForAuctionPageElements(auctionId, options = {}) {
       const requiredElements = Object.values(checks).filter(Boolean).length;
       const isReady = requiredElements >= 3; // At least 3 out of 4 elements
       
-      if (!isReady && retryCount % 5 === 0) {
+      // Only log status occasionally to avoid spam
+      if (!isReady && retryCount > 0 && retryCount % 10 === 0) {
         console.log('NAH: Element check status:', checks);
       }
       
@@ -802,6 +808,8 @@ async function checkMonitoringStatus(auctionId) {
 function observeForDataUpdates(auctionId) {
   let dataCheckInterval;
   let lastDataFetch = Date.now();
+  let lastUpdateTime = 0;
+  const UPDATE_THROTTLE = 2000; // Only update every 2 seconds
   
   // Monitor fetch requests for data updates
   const originalFetch = window.fetch;
@@ -814,7 +822,13 @@ function observeForDataUpdates(auctionId) {
       return originalFetch.apply(this, args).then(response => {
         // Clone response to read it
         response.clone().json().then(data => {
-          console.log('NAH: Auction data fetched, updating display');
+          // Throttle updates to avoid spam
+          const now = Date.now();
+          if (now - lastUpdateTime < UPDATE_THROTTLE) {
+            return;
+          }
+          lastUpdateTime = now;
+          
           // Wait a bit for React to render
           setTimeout(() => {
             extractAuctionData(auctionId).then(auctionData => {
@@ -837,7 +851,7 @@ function observeForDataUpdates(auctionId) {
   // Periodic check for data staleness
   dataCheckInterval = setInterval(() => {
     if (Date.now() - lastDataFetch > 30000) { // 30 seconds
-      console.log('NAH: Refreshing auction data');
+      // Silently refresh auction data
       extractAuctionData(auctionId).then(auctionData => {
         if (auctionData) {
           updateAuctionDisplay(auctionId, auctionData);
@@ -1448,14 +1462,13 @@ async function extractAuctionData(auctionId) {
     // Try to fetch data from JSON endpoint first
     const response = await fetchAuctionDataFromAPI(auctionId);
     if (response) {
-      console.log('NAH: Successfully fetched data from API:', response);
       return {
         ...response,
         url: window.location.href
       };
     }
   } catch (error) {
-    console.log('NAH: API fetch failed, falling back to page scraping:', error);
+    // Silently fall back to page scraping
   }
   
   // Fallback to scraping if API fails
@@ -1467,13 +1480,10 @@ async function extractAuctionData(auctionId) {
     url: window.location.href
   };
   
-  console.log('NAH: Extracting auction data from page for:', auctionId);
-  
   // Get title from h1
   const titleElement = document.querySelector('h1');
   if (titleElement) {
     data.title = titleElement.textContent.trim();
-    console.log('NAH: Found title:', data.title);
   }
   
   // Find current price - look for "CURRENT PRICE" text and get next element
@@ -1481,18 +1491,15 @@ async function extractAuctionData(auctionId) {
   for (let i = 0; i < allElements.length; i++) {
     const elem = allElements[i];
     if (elem.textContent.trim() === 'CURRENT PRICE') {
-      console.log('NAH: Found CURRENT PRICE element');
       // Look for price in next sibling or parent's next child
       let priceElem = elem.nextElementSibling || 
                       (elem.parentElement && elem.parentElement.nextElementSibling);
       
       if (priceElem) {
         const priceText = priceElem.textContent.trim();
-        console.log('NAH: Found price text:', priceText);
         const price = parseFloat(priceText.replace(/[^0-9.]/g, ''));
         if (!isNaN(price)) {
           data.currentBid = price;
-          console.log('NAH: Extracted current bid:', price);
           break;
         }
       }
@@ -1503,20 +1510,16 @@ async function extractAuctionData(auctionId) {
   for (let i = 0; i < allElements.length; i++) {
     const elem = allElements[i];
     if (elem.textContent.trim() === 'Time Left') {
-      console.log('NAH: Found Time Left element');
       const nextElem = elem.nextElementSibling || 
                       (elem.parentElement && elem.parentElement.nextElementSibling);
       if (nextElem) {
         const timeText = nextElem.textContent.trim();
-        console.log('NAH: Found time text:', timeText);
         data.timeRemaining = parseTimeRemaining(timeText);
-        console.log('NAH: Parsed time remaining (seconds):', data.timeRemaining);
         break;
       }
     }
   }
   
-  console.log('NAH: Final auction data:', data);
   return data;
 }
 
@@ -1527,8 +1530,6 @@ async function fetchAuctionDataFromAPI(auctionId) {
     
     // Use the _data parameter to get JSON
     const url = `${window.location.origin}${window.location.pathname}?_data=routes/p.$title.$productId._index`;
-    
-    console.log('NAH: Fetching auction data from:', url);
     
     const response = await fetch(url, {
       method: 'GET',
@@ -1543,7 +1544,6 @@ async function fetchAuctionDataFromAPI(auctionId) {
     }
     
     const data = await response.json();
-    console.log('NAH: Received auction data:', data);
     
     // Parse the data structure
     if (data && data.product) {
@@ -1745,8 +1745,6 @@ function handleAuctionState(auction) {
 }
 
 function updateAuctionDisplay(auctionId, data) {
-  console.log('NAH: Updating auction display:', auctionId, data);
-  
   // Update displays in all shadow roots
   shadowRoots.forEach((shadowRoot, key) => {
     if (key.includes(auctionId)) {
