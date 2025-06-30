@@ -4,8 +4,8 @@ FROM node:18-alpine AS base
 # Set working directory
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy package files from backend directory
+COPY backend/package*.json ./
 
 # ===== Development Stage =====
 FROM base AS development
@@ -16,8 +16,8 @@ RUN npm install -g nodemon
 # Install all dependencies (including dev dependencies)
 RUN npm ci
 
-# Copy application files
-COPY . .
+# Copy application files from backend directory
+COPY backend/ .
 
 # Expose ports (3000 for app, 9229 for debugging)
 EXPOSE 3000 9229
@@ -31,8 +31,8 @@ FROM base AS production-build
 # Install only production dependencies
 RUN npm ci --only=production
 
-# Copy application code
-COPY . .
+# Copy application code from backend directory
+COPY backend/ .
 
 # ===== Production Stage =====
 FROM node:18-alpine AS production
@@ -54,12 +54,13 @@ COPY --from=production-build --chown=nodejs:nodejs /app ./
 RUN mkdir -p /app/logs/backend/archive /app/logs/dashboard/archive && \
     chown -R nodejs:nodejs /app/logs
 
-# Copy log rotation configuration
+# Copy log rotation configuration from project root
 COPY --chown=root:root logrotate.conf /etc/logrotate.d/nellis-auction
 COPY --chown=root:root scripts/setup-logrotate.sh /usr/local/bin/
 
-# Setup cron for log rotation (runs as root for logrotate)
-RUN echo "0 3 * * * /usr/sbin/logrotate /etc/logrotate.d/nellis-auction" > /etc/cron.d/nellis-logrotate && \
+# Make setup script executable and setup cron for log rotation
+RUN chmod +x /usr/local/bin/setup-logrotate.sh && \
+    echo "0 3 * * * /usr/sbin/logrotate /etc/logrotate.d/nellis-auction" > /etc/cron.d/nellis-logrotate && \
     chmod 0644 /etc/cron.d/nellis-logrotate
 
 # Switch to non-root user

@@ -856,7 +856,18 @@ class AuctionMonitorUI {
     
     async checkAuthStatus() {
         try {
-            const response = await fetch('/api/auth/status');
+            // Get backend URL from config
+            const configResponse = await fetch('/api/config');
+            const config = await configResponse.json();
+            const backendUrl = config.backendUrl || 'http://localhost:3000';
+            
+            // Check auth status from backend
+            const authToken = localStorage.getItem('authToken');
+            const response = await fetch(`${backendUrl}/api/auth/status`, {
+                headers: {
+                    'Authorization': authToken || 'dev-token'
+                }
+            });
             const data = await response.json();
             
             this.updateAuthStatus(data.authenticated, data.cookieCount);

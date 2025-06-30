@@ -21,9 +21,10 @@ app.use(express.static(path.join(__dirname, 'src')));
 
 // API endpoint for configuration (optional - can be used to pass backend URL to frontend)
 app.get('/api/config', (req, res) => {
+  // Use external URLs for browser access
   res.json({
-    backendUrl: process.env.BACKEND_URL || 'http://localhost:3000',
-    wsUrl: process.env.WS_URL || 'ws://localhost:3000'
+    backendUrl: process.env.EXTERNAL_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:3000',
+    wsUrl: process.env.EXTERNAL_WS_URL || process.env.WS_URL || 'ws://localhost:3000'
   });
 });
 
