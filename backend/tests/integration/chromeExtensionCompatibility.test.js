@@ -144,8 +144,8 @@ describe('Chrome Extension Compatibility', () => {
     it('should maintain state across imports', async () => {
       const auctionMonitor = require('../../src/services/auctionMonitor');
       
-      // Add an auction
-      const added = await auctionMonitor.addAuction('test-123', {
+      // Add an auction with valid numeric ID
+      const added = await auctionMonitor.addAuction('99999', {
         maxBid: 50,
         strategy: 'manual'
       });
@@ -156,12 +156,12 @@ describe('Chrome Extension Compatibility', () => {
       const auctionMonitor2 = require('../../src/services/auctionMonitor');
       const auctions = auctionMonitor2.getMonitoredAuctions();
       
-      const testAuction = auctions.find(a => a.id === 'test-123');
+      const testAuction = auctions.find(a => a.id === '99999');
       expect(testAuction).toBeDefined();
       expect(testAuction.config.maxBid).toBe(50);
       
       // Cleanup
-      await auctionMonitor.removeAuction('test-123');
+      await auctionMonitor.removeAuction('99999');
     });
   });
 });

@@ -89,21 +89,21 @@ describe('SSE Integration', () => {
       const startPollingSpy = jest.spyOn(auctionMonitor, 'startPolling');
       
       const auction = {
-        id: 'test123',
+        id: '88888',
         url: 'https://www.nellisauction.com/p/test/12345',
         title: 'Test Auction'
       };
       
-      await auctionMonitor.startMonitoring('test123', auction);
+      await auctionMonitor.startMonitoring('88888', auction);
       
-      expect(startPollingSpy).toHaveBeenCalledWith('test123');
+      expect(startPollingSpy).toHaveBeenCalledWith('88888');
       expect(auction.useSSE).toBe(false);
       expect(auction.fallbackPolling).toBe(false);
     });
     
     it('should handle SSE auction updates', async () => {
       const updateData = {
-        auctionId: 'test123',
+        auctionId: '88888',
         productId: '12345',
         data: {
           currentBid: 150,
@@ -115,8 +115,8 @@ describe('SSE Integration', () => {
       };
       
       // Add auction to monitor first
-      auctionMonitor.monitoredAuctions.set('test123', {
-        id: 'test123',
+      auctionMonitor.monitoredAuctions.set('88888', {
+        id: '88888',
         data: { currentBid: 100 }
       });
       
@@ -124,15 +124,15 @@ describe('SSE Integration', () => {
       
       await auctionMonitor.handleSSEAuctionUpdate(updateData);
       
-      const auction = auctionMonitor.monitoredAuctions.get('test123');
+      const auction = auctionMonitor.monitoredAuctions.get('88888');
       expect(auction.data.currentBid).toBe(150);
       expect(auction.data.updateSource).toBe('sse');
-      expect(broadcastSpy).toHaveBeenCalledWith('test123');
+      expect(broadcastSpy).toHaveBeenCalledWith('88888');
     });
     
     it('should handle SSE auction closed events', async () => {
       const closeData = {
-        auctionId: 'test123',
+        auctionId: '88888',
         productId: '12345',
         data: {
           status: 'closed',
@@ -142,8 +142,8 @@ describe('SSE Integration', () => {
       };
       
       // Add auction to monitor first
-      auctionMonitor.monitoredAuctions.set('test123', {
-        id: 'test123',
+      auctionMonitor.monitoredAuctions.set('88888', {
+        id: '88888',
         status: 'monitoring'
       });
       
@@ -152,22 +152,22 @@ describe('SSE Integration', () => {
       
       await auctionMonitor.handleSSEAuctionClosed(closeData);
       
-      const auction = auctionMonitor.monitoredAuctions.get('test123');
+      const auction = auctionMonitor.monitoredAuctions.get('88888');
       expect(auction.status).toBe('ended');
       expect(auction.data.finalBid).toBe(200);
-      expect(stopPollingSpy).toHaveBeenCalledWith('test123');
-      expect(broadcastSpy).toHaveBeenCalledWith('test123');
+      expect(stopPollingSpy).toHaveBeenCalledWith('88888');
+      expect(broadcastSpy).toHaveBeenCalledWith('88888');
     });
     
     it('should handle SSE fallback events', async () => {
       const fallbackData = {
         productId: '12345',
-        auctionId: 'test123'
+        auctionId: '88888'
       };
       
       // Add auction to monitor first
-      auctionMonitor.monitoredAuctions.set('test123', {
-        id: 'test123',
+      auctionMonitor.monitoredAuctions.set('88888', {
+        id: '88888',
         useSSE: true
       });
       
@@ -176,10 +176,10 @@ describe('SSE Integration', () => {
       
       await auctionMonitor.handleSSEFallback(fallbackData);
       
-      expect(stopPollingSpy).toHaveBeenCalledWith('test123');
-      expect(startPollingSpy).toHaveBeenCalledWith('test123');
+      expect(stopPollingSpy).toHaveBeenCalledWith('88888');
+      expect(startPollingSpy).toHaveBeenCalledWith('88888');
       
-      const auction = auctionMonitor.monitoredAuctions.get('test123');
+      const auction = auctionMonitor.monitoredAuctions.get('88888');
       expect(auction.useSSE).toBe(false);
       expect(auction.fallbackPolling).toBe(true);
     });
@@ -194,18 +194,18 @@ describe('SSE Integration', () => {
       const startPollingSpy = jest.spyOn(auctionMonitor, 'startPolling');
       
       const auction = {
-        id: 'test123',
+        id: '88888',
         url: 'https://www.nellisauction.com/p/test/12345',
         title: 'Test Auction'
       };
       
-      await auctionMonitor.startMonitoring('test123', auction);
+      await auctionMonitor.startMonitoring('88888', auction);
       
       // Should connect to SSE
-      expect(connectToAuctionSpy).toHaveBeenCalledWith('12345', 'test123');
+      expect(connectToAuctionSpy).toHaveBeenCalledWith('12345', '88888');
       
       // Should also start fallback polling with longer interval
-      expect(startPollingSpy).toHaveBeenCalledWith('test123', 30000);
+      expect(startPollingSpy).toHaveBeenCalledWith('88888', 30000);
       
       // Should mark as using SSE
       expect(auction.useSSE).toBe(true);

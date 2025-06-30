@@ -71,7 +71,13 @@ class NellisApi {
 
       throw new Error('Invalid response structure');
     } catch (error) {
-      console.error(`Error fetching auction data for ${auctionId}:`, error.message);
+      if (error.response && error.response.status === 400) {
+        console.error(`400 Bad Request for auction ${auctionId}:`, error.response.data);
+        console.error('Request URL:', url);
+        console.error('Request headers:', this.headers);
+      } else {
+        console.error(`Error fetching auction data for ${auctionId}:`, error.message);
+      }
       throw error;
     }
   }
