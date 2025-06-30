@@ -1,5 +1,5 @@
-// Import logger if using modules, otherwise use global
-const logger = (typeof require !== 'undefined') ? require('./logger') : window.Logger;
+// Use the global Logger from logger.js
+const logger = window.Logger;
 
 class AuctionMonitorUI {
     constructor() {
@@ -153,6 +153,11 @@ class AuctionMonitorUI {
     
     handleWebSocketMessage(data) {
         switch (data.type) {
+            case 'connected':
+                logger.info('Received connected message from backend:', data);
+                // Backend is ready, proceed with authentication
+                break;
+                
             case 'response':
                 if (data.data && data.data.auctions) {
                     this.updateAuctions(data.data.auctions);
@@ -194,6 +199,17 @@ class AuctionMonitorUI {
                     alert('Authentication failed. Please refresh the page and enter a valid token.');
                     this.ws.close();
                 }
+                break;
+                
+            case 'monitoredAuctions':
+                logger.info('Received monitored auctions:', data);
+                if (data.auctions) {
+                    this.updateAuctions(data.auctions);
+                }
+                break;
+                
+            default:
+                logger.info('Unhandled message type:', data.type, data);
                 break;
         }
     }

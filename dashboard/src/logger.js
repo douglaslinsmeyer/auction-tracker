@@ -57,7 +57,7 @@ const formatMessage = (level, ...args) => {
 /**
  * Dashboard Logger
  */
-const logger = {
+const Logger = {
   /**
    * Log error message
    * @param {...any} args - Arguments to log
@@ -127,7 +127,7 @@ const logger = {
 
 // Export for use in modules or make available globally
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = logger;
+  module.exports = Logger;
 } else {
-  window.Logger = logger;
+  window.Logger = Logger;
 }
