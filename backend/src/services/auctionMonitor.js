@@ -231,8 +231,16 @@ class AuctionMonitor extends EventEmitter {
     const auction = this.monitoredAuctions.get(auctionId);
     if (!auction) return;
 
-    if (auction.isWinning) {
-      return; // Already winning, no need to bid
+    // Check if auction has ended
+    if (auctionData.isClosed || auctionData.timeRemaining <= 0) {
+      console.log(`Auto-bid skipped for auction ${auctionId}: Auction has ended`);
+      return;
+    }
+
+    // Check if we're already winning
+    if (auctionData.isWinning) {
+      console.log(`Auto-bid skipped for auction ${auctionId}: Already winning`);
+      return;
     }
 
     // Check strategy
@@ -265,6 +273,31 @@ class AuctionMonitor extends EventEmitter {
     const nextBid = auctionData.nextBid 
       ? SafeMath.addMoney(minimumBid, buffer)
       : SafeMath.calculateNextBid(minimumBid, 0, buffer);
+    
+    // Debug logging for bid calculation
+    console.log(`Auto-bid calculation for auction ${auctionId}:`, {
+      currentBid,
+      auctionDataNextBid: auctionData.nextBid,
+      minimumBid,
+      increment,
+      buffer,
+      calculatedNextBid: nextBid,
+      maxBid: auction.config.maxBid,
+      isWinning: auctionData.isWinning
+    });
+
+    // Validate nextBid is greater than currentBid
+    if (nextBid <= currentBid) {
+      console.log(`Auto-bid skipped for auction ${auctionId}: Next bid ($${nextBid}) must be greater than current bid ($${currentBid})`);
+      return;
+    }
+
+    // Check if we already attempted this bid amount recently (within last 10 seconds)
+    if (auction.lastBidAmount === nextBid && auction.lastBidTime && 
+        (Date.now() - auction.lastBidTime) < 10000) {
+      console.log(`Auto-bid skipped for auction ${auctionId}: Recently attempted same bid amount ($${nextBid})`);
+      return;
+    }
 
     if (SafeMath.isWithinBudget(nextBid, auction.config.maxBid)) {
       auction.maxBidReached = false;
@@ -314,6 +347,10 @@ class AuctionMonitor extends EventEmitter {
         } else {
           console.error(`Auto-bid failed for auction ${auctionId}:`, result.error);
           
+          // Still track the bid attempt to prevent repeated failures
+          auction.lastBidAmount = nextBid;
+          auction.lastBidTime = Date.now();
+          
           // Save failed bid to history
           await storage.saveBidHistory(auctionId, {
             amount: nextBid,
@@ -329,6 +366,10 @@ class AuctionMonitor extends EventEmitter {
         }
       } catch (error) {
         console.error(`Error placing auto-bid for auction ${auctionId}:`, error);
+        
+        // Still track the bid attempt to prevent repeated failures
+        auction.lastBidAmount = nextBid;
+        auction.lastBidTime = Date.now();
         
         // Save error to bid history
         await storage.saveBidHistory(auctionId, {

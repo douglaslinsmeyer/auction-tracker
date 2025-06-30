@@ -104,6 +104,11 @@ describe('Chrome Extension Compatibility', () => {
         }
       );
       
+      // Debug logging
+      if (response.status === 400) {
+        console.error('400 error response:', response.data);
+      }
+      
       expect([200, 409]).toContain(response.status); // 200 for new, 409 for already monitoring
     });
   });

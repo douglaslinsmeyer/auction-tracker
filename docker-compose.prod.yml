@@ -7,6 +7,8 @@ version: '3.8'
 services:
   backend:
     build:
+      context: .
+      dockerfile: ./backend/Dockerfile
       target: production
       args:
         - NODE_ENV=production
@@ -54,6 +56,8 @@ services:
 
   dashboard:
     build:
+      context: ./dashboard
+      dockerfile: ./Dockerfile
       target: production
       args:
         - NODE_ENV=production
