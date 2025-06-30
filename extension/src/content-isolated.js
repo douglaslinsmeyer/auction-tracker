@@ -1,4 +1,19 @@
-console.log('Nellis Auction Helper: Content script loaded (isolated mode)');
+// Import logger
+importScripts = importScripts || (() => {});
+try {
+  if (typeof ExtensionLogger === 'undefined') {
+    const script = document.createElement('script');
+    script.src = chrome.runtime.getURL('src/logger.js');
+    document.head.appendChild(script);
+  }
+} catch (e) {}
+
+// Use setTimeout to ensure logger is loaded
+setTimeout(() => {
+  if (typeof ExtensionLogger !== 'undefined') {
+    ExtensionLogger.lifecycle('Content script loaded (isolated mode)');
+  }
+}, 100);
 
 // Unique namespace for our extension
 const NAH_NAMESPACE = 'nah-ext-2024';
@@ -23,8 +38,10 @@ function detectExtensionConflicts() {
   });
   
   if (conflicts.length > 0) {
-    console.log(`NAH: Detected potential conflicts with: ${conflicts.join(', ')}`);
-    console.log('NAH: Running in isolated mode with Shadow DOM');
+    if (typeof ExtensionLogger !== 'undefined') {
+      ExtensionLogger.warn(`NAH: Detected potential conflicts with: ${conflicts.join(', ')}`);
+      ExtensionLogger.info('NAH: Running in isolated mode with Shadow DOM');
+    }
   }
   
   return conflicts;

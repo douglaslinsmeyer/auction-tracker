@@ -1,8 +1,10 @@
-console.log('Nellis Auction Helper: Background service worker started');
-
+// Import logger first
+importScripts('./logger.js');
 // Import backend client and config
 importScripts('./config.js');
 importScripts('./backend-client.js');
+
+ExtensionLogger.lifecycle('Background service worker started');
 
 let monitoredAuctions = new Map();
 let backendClient = new BackendClient();
@@ -26,7 +28,7 @@ chrome.runtime.onInstalled.addListener(() => {
     backendUrl: CONFIG.BACKEND.DEFAULT_URL
   });
   
-  console.log('Extension installed with default settings');
+  ExtensionLogger.lifecycle('Extension installed with default settings');
 });
 
 // Always initialize backend on startup
@@ -44,7 +46,7 @@ chrome.storage.onChanged.addListener(async (changes, namespace) => {
 
 async function initializeBackend() {
   try {
-    console.log('Initializing backend connection...');
+    ExtensionLogger.info('Initializing backend connection...');
     await backendClient.initialize();
     
     // Set up event listeners
@@ -56,9 +58,10 @@ async function initializeBackend() {
     // Sync monitored auctions with backend
     await syncWithBackend();
     
-    console.log('Backend initialization complete. Status:', await backendClient.getBackendStatus());
+    const status = await backendClient.getBackendStatus();
+    ExtensionLogger.info('Backend initialization complete. Status:', status);
   } catch (error) {
-    console.error('Failed to initialize backend:', error);
+    ExtensionLogger.error('Failed to initialize backend:', error);
   }
 }
 
@@ -67,7 +70,7 @@ function handleAuctionState(data) {
   const auction = data.auction;
   if (!auction || !auction.id) return;
   
-  console.log('Received auction state update:', auction.id);
+  ExtensionLogger.info('Received auction state update:', auction.id);
   
   // Update local cache
   monitoredAuctions.set(auction.id, auction);
@@ -123,12 +126,12 @@ function handleBackendNotification(notification) {
 }
 
 function handleBackendConnected() {
-  console.log('Backend connected');
+  ExtensionLogger.lifecycle('Backend connected');
   chrome.runtime.sendMessage({ type: 'backendConnected' }).catch(() => {});
 }
 
 function handleBackendDisconnected() {
-  console.log('Backend disconnected');
+  ExtensionLogger.lifecycle('Backend disconnected');
   chrome.runtime.sendMessage({ type: 'backendDisconnected' }).catch(() => {});
 }
 
@@ -137,10 +140,10 @@ async function syncWithBackend() {
     // Sync cookies
     const cookieResult = await backendClient.syncCookies();
     if (!cookieResult.success) {
-      console.warn('Cookie sync failed:', cookieResult.error);
+      ExtensionLogger.warn('Cookie sync failed:', cookieResult.error);
     }
   } catch (error) {
-    console.error('Failed to sync with backend:', error);
+    ExtensionLogger.error('Failed to sync with backend:', error);
   }
 }
 
@@ -171,7 +174,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           sendResponse({ auctions });
         })
         .catch(error => {
-          console.error('Error getting auctions:', error);
+          ExtensionLogger.error('Error getting auctions:', error);
           sendResponse({ auctions: [] });
         });
       return true;
@@ -248,7 +251,7 @@ async function handleUpdateAuctionConfig(auctionId, config) {
       throw new Error('Backend not connected');
     }
     
-    console.log(`Updating config for auction ${auctionId}:`, config);
+    ExtensionLogger.info(`Updating config for auction ${auctionId}:`, config);
     await backendClient.updateConfig(auctionId, config);
     
     // Update local record if we have it
@@ -267,7 +270,7 @@ async function handleUpdateAuctionConfig(auctionId, config) {
       }).catch(() => {});
     }
   } catch (error) {
-    console.error('Error updating auction config:', error);
+    ExtensionLogger.error('Error updating auction config:', error);
     throw error;
   }
 }
@@ -286,7 +289,7 @@ async function clearAllMonitoring() {
     
     const promises = Array.from(allAuctionIds).map(id => 
       backendClient.stopMonitoring(id).catch(err => 
-        console.error(`Failed to stop monitoring ${id}:`, err)
+        ExtensionLogger.error(`Failed to stop monitoring ${id}:`, err)
       )
     );
     
@@ -303,7 +306,7 @@ async function clearAllMonitoring() {
       }).catch(() => {});
     }
   } catch (error) {
-    console.error('Error clearing all monitoring:', error);
+    ExtensionLogger.error('Error clearing all monitoring:', error);
     throw error;
   }
 }
@@ -369,7 +372,7 @@ async function handleSettingsUpdate(settings) {
 
 // Clean up when service worker suspends
 chrome.runtime.onSuspend.addListener(() => {
-  console.log('Service worker suspending...');
+  ExtensionLogger.lifecycle('Service worker suspending...');
   if (backendClient.isConnected) {
     backendClient.disconnect();
   }

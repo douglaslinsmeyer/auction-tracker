@@ -1,3 +1,6 @@
+// Import logger if using modules, otherwise use global
+const logger = (typeof require !== 'undefined') ? require('./logger') : window.Logger;
+
 class AuctionMonitorUI {
     constructor() {
         this.ws = null;
@@ -45,7 +48,7 @@ class AuctionMonitorUI {
                 wsUrl = config.wsUrl;
             }
         } catch (error) {
-            console.log('Could not fetch config, using defaults');
+            logger.info('Could not fetch config, using defaults');
         }
         
         // Fallback to environment-based URL
@@ -56,11 +59,11 @@ class AuctionMonitorUI {
             wsUrl = `${protocol}//${host}:${port}`;
         }
         
-        console.log('Connecting to WebSocket:', wsUrl);
+        logger.info('Connecting to WebSocket:', wsUrl);
         this.ws = new WebSocket(wsUrl);
         
         this.ws.onopen = () => {
-            console.log('WebSocket connected');
+            logger.info('WebSocket connected');
             this.reconnectAttempts = 0;
             this.updateConnectionStatus('connected');
             
@@ -75,13 +78,13 @@ class AuctionMonitorUI {
                 if (window.location.hostname === 'localhost') {
                     authToken = 'dev-token';
                     localStorage.setItem('authToken', authToken);
-                    console.log('Using default development token');
+                    logger.info('Using default development token');
                 } else {
                     authToken = prompt('Please enter your authentication token:');
                     if (authToken) {
                         localStorage.setItem('authToken', authToken);
                     } else {
-                        console.error('Authentication token is required');
+                        logger.error('Authentication token is required');
                         this.authFailed = true;
                         this.ws.close();
                         return;
@@ -101,19 +104,19 @@ class AuctionMonitorUI {
                 const data = JSON.parse(event.data);
                 this.handleWebSocketMessage(data);
             } catch (error) {
-                console.error('Failed to parse WebSocket message:', error);
+                logger.error('Failed to parse WebSocket message:', error);
             }
         };
         
         this.ws.onclose = () => {
-            console.log('WebSocket disconnected');
+            logger.info('WebSocket disconnected');
             this.updateConnectionStatus('disconnected');
             this.stopPingInterval();
             this.attemptReconnect();
         };
         
         this.ws.onerror = (error) => {
-            console.error('WebSocket error:', error);
+            logger.error('WebSocket error:', error);
             this.updateConnectionStatus('disconnected');
         };
     }
@@ -121,13 +124,13 @@ class AuctionMonitorUI {
     attemptReconnect() {
         // Don't reconnect if authentication failed
         if (this.authFailed) {
-            console.log('Not reconnecting due to authentication failure');
+            logger.info('Not reconnecting due to authentication failure');
             return;
         }
         
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++;
-            console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+            logger.info(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
             
             setTimeout(() => {
                 this.connectWebSocket();
@@ -158,7 +161,7 @@ class AuctionMonitorUI {
                 
             case 'auctionState':
                 // Replace entire auction state (single source of truth)
-                console.log('Received auctionState:', data);
+                logger.info('Received auctionState:', data);
                 if (data.auction) {
                     this.handleAuctionState(data.auction);
                 }
@@ -170,12 +173,12 @@ class AuctionMonitorUI {
                 
             case 'pong':
                 // Connection is alive
-                console.log('Received pong');
+                logger.info('Received pong');
                 break;
                 
             case 'authenticated':
                 if (data.success) {
-                    console.log('Authentication successful');
+                    logger.info('Authentication successful');
                     // Now request the monitored auctions
                     this.sendMessage({
                         type: 'getMonitoredAuctions',
@@ -184,7 +187,7 @@ class AuctionMonitorUI {
                     // Check auth status after WebSocket auth
                     this.checkAuthStatus();
                 } else {
-                    console.error('Authentication failed:', data.error);
+                    logger.error('Authentication failed:', data.error);
                     this.authFailed = true;
                     // Clear stored token
                     localStorage.removeItem('authToken');
@@ -238,7 +241,7 @@ class AuctionMonitorUI {
                 this.updateAuctions(data.auctions);
             }
         } catch (error) {
-            console.error('Failed to load auctions:', error);
+            logger.error('Failed to load auctions:', error);
         }
     }
     
@@ -253,7 +256,7 @@ class AuctionMonitorUI {
     }
     
     handleAuctionState(auction) {
-        console.log('Received auction state:', auction.id, 'Config:', auction.config);
+        logger.info('Received auction state:', auction.id, 'Config:', auction.config);
         
         const existingAuction = this.auctions.get(auction.id);
         
@@ -264,11 +267,11 @@ class AuctionMonitorUI {
         
         if (!existingAuction) {
             // New auction - need full render
-            console.log('New auction, performing full render');
+            logger.info('New auction, performing full render');
             this.render();
         } else {
             // Existing auction - patch the card
-            console.log('Existing auction, patching card');
+            logger.info('Existing auction, patching card');
             this.patchAuctionCard(auction);
         }
     }
@@ -284,7 +287,7 @@ class AuctionMonitorUI {
                 this.render();
             }
         } catch (error) {
-            console.error('Failed to clear auctions:', error);
+            logger.error('Failed to clear auctions:', error);
         }
     }
     
@@ -299,7 +302,7 @@ class AuctionMonitorUI {
                 this.render();
             }
         } catch (error) {
-            console.error('Failed to stop monitoring:', error);
+            logger.error('Failed to stop monitoring:', error);
         }
     }
     
@@ -319,7 +322,7 @@ class AuctionMonitorUI {
             requestId: this.generateRequestId()
         });
         
-        console.log(`Sending ${configType} update for auction ${auctionId} to ${value}`);
+        logger.info(`Sending ${configType} update for auction ${auctionId} to ${value}`);
     }
     
     toggleAutoBid(auctionId) {
@@ -331,7 +334,7 @@ class AuctionMonitorUI {
         // Update autoBid flag
         this.updateAuctionConfig(auctionId, 'autoBid', newAutoBidStatus);
         
-        console.log(`Toggling auto-bid for auction ${auctionId} to ${newAutoBidStatus}`);
+        logger.info(`Toggling auto-bid for auction ${auctionId} to ${newAutoBidStatus}`);
     }
     
     updateStrategy(auctionId, strategy) {
@@ -349,7 +352,7 @@ class AuctionMonitorUI {
             requestId: this.generateRequestId()
         });
         
-        console.log(`Updating strategy for auction ${auctionId} to ${strategy} with autoBid: true`);
+        logger.info(`Updating strategy for auction ${auctionId} to ${strategy} with autoBid: true`);
     }
     
     validateMaxBidInput(inputElement, auctionId) {
@@ -441,12 +444,12 @@ class AuctionMonitorUI {
         const card = document.querySelector(`[data-auction-id="${auction.id}"]`);
         if (!card) {
             // Card doesn't exist, create it
-            console.log('Card not found for auction:', auction.id, '- performing full render');
+            logger.info('Card not found for auction:', auction.id, '- performing full render');
             this.render();
             return;
         }
         
-        console.log('Patching card for auction:', auction.id, 'with config:', auction.config);
+        logger.info('Patching card for auction:', auction.id, 'with config:', auction.config);
         
         const data = auction.data || {};
         const timeRemaining = data.timeRemaining || 0;
@@ -868,7 +871,7 @@ class AuctionMonitorUI {
     
     showNotification(data) {
         // Could add toast notifications here
-        console.log('Notification:', data);
+        logger.info('Notification:', data);
     }
     
     async checkAuthStatus() {
@@ -889,7 +892,7 @@ class AuctionMonitorUI {
             
             this.updateAuthStatus(data.authenticated, data.cookieCount);
         } catch (error) {
-            console.error('Failed to check auth status:', error);
+            logger.error('Failed to check auth status:', error);
             this.updateAuthStatus(false, 0);
         }
     }
@@ -960,7 +963,7 @@ class AuctionMonitorUI {
                 content.classList.remove('hidden');
             }
         } catch (error) {
-            console.error('Failed to load bid history:', error);
+            logger.error('Failed to load bid history:', error);
             loading.classList.add('hidden');
             content.innerHTML = `
                 <div class="text-center py-4 text-red-600 dark:text-red-400">
