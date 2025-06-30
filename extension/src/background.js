@@ -12,7 +12,7 @@ chrome.runtime.onInstalled.addListener(() => {
     bidSettings: {
       defaultMaxBid: 0,
       incrementAmount: 1,
-      strategy: 'sniping'
+      strategy: CONFIG.EXTENSION.DEFAULT_STRATEGY
     },
     notifications: {
       enabled: true,
@@ -215,7 +215,7 @@ async function handleStartMonitoring(auctionId, auctionData, providedConfig) {
   const config = providedConfig || {
     maxBid: settings.bidSettings?.defaultMaxBid || 0,
     incrementAmount: settings.bidSettings?.incrementAmount || 1,
-    strategy: settings.bidSettings?.strategy || 'sniping'
+    strategy: settings.bidSettings?.strategy || CONFIG.EXTENSION.DEFAULT_STRATEGY
   };
   
   const metadata = {

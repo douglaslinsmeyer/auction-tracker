@@ -109,6 +109,7 @@ docker-compose logs -f dashboard # View dashboard logs
 - **Manual**: User-triggered bids only
 - **Aggressive**: Auto-bid up to max when outbid
 - **Last Second**: Snipe bid in final 30 seconds
+- **The only bidding strategies we're implementing are Auto (Incremental) and Sniping**
 
 ### API Documentation
 - Swagger UI available at `http://localhost:3000/api-docs`

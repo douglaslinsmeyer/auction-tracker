@@ -2,7 +2,7 @@ const Joi = require('joi');
 
 // Common patterns
 const auctionIdPattern = /^[a-zA-Z0-9_-]+$/;
-const strategyTypes = ['manual', 'aggressive', 'last-second', 'sniping'];
+const strategyTypes = ['auto', 'sniping'];
 
 // Auction configuration schema
 const auctionConfigSchema = Joi.object({

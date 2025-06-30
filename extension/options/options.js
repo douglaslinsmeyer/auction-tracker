@@ -11,7 +11,7 @@ const DEFAULT_SETTINGS = {
   theme: 'system',
   defaultMaxBid: 0,
   bidIncrement: 1,
-  defaultStrategy: 'sniping'
+  defaultStrategy: CONFIG.EXTENSION.DEFAULT_STRATEGY
 };
 
 // Elements

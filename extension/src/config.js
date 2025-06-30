@@ -13,7 +13,8 @@ const CONFIG = {
   EXTENSION: {
     AUTO_REFRESH: true,
     REFRESH_INTERVAL: 5, // seconds
-    SYNC_COOKIES: true
+    SYNC_COOKIES: true,
+    DEFAULT_STRATEGY: 'auto' // 'auto' or 'sniping'
   },
   
   // WebSocket Configuration

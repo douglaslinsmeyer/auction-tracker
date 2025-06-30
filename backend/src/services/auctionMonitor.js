@@ -127,7 +127,7 @@ class AuctionMonitor extends EventEmitter {
       config: {
         maxBid: config.maxBid || generalSettings.defaultMaxBid || 100,
         incrementAmount: config.incrementAmount || 1,
-        strategy: config.strategy || generalSettings.defaultStrategy || 'increment',
+        strategy: config.strategy || generalSettings.defaultStrategy || 'auto',
         autoBid: config.autoBid !== undefined ? config.autoBid : generalSettings.autoBidDefault !== undefined ? generalSettings.autoBidDefault : true,
         // Notification settings removed
       },
@@ -236,7 +236,9 @@ class AuctionMonitor extends EventEmitter {
     }
 
     // Check strategy
-    if (auction.config.strategy === 'manual') {
+    // Auto strategy always allows auto-bidding when enabled
+    // Sniping strategy only auto-bids in the last seconds
+    if (!auction.config.autoBid) {
       return; // No auto-bidding for manual strategy
     }
 
@@ -300,7 +302,7 @@ class AuctionMonitor extends EventEmitter {
             }
             
             // For incremental strategy, immediately try to bid again if we're still under max
-            if (auction.config.strategy === 'increment' && 
+            if (auction.config.strategy === 'auto' && 
                 result.data.data.minimumNextBid <= auction.config.maxBid) {
               setTimeout(() => {
                 this.executeAutoBid(auctionId, auctionData);
