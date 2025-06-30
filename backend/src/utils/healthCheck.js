@@ -1,10 +1,13 @@
 /**
  * Enhanced Health Check System
  * Provides comprehensive health status for production monitoring
+ * 
+ * Now includes independent health storage to survive Redis failures
  */
 
 const os = require('os');
 const logger = require('./logger');
+const healthStorage = require('../services/healthStorage');
 
 class HealthChecker {
   constructor() {
@@ -79,6 +82,15 @@ class HealthChecker {
     }
     
     results.status = overallStatus;
+    
+    // Store health check result in independent storage
+    try {
+      await healthStorage.addHealthCheck(results);
+    } catch (error) {
+      // Don't fail health check if storage fails
+      logger.debug('Failed to store health check result:', error);
+    }
+    
     return results;
   }
   

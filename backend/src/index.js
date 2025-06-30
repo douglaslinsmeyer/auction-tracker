@@ -28,6 +28,28 @@ const storage = require('./services/storage');
 const apiRoutes = require('./routes/api');
 const wsHandler = require('./services/websocket');
 
+// Global error handlers to prevent crashes
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception:', error);
+  // For Redis connection errors, don't crash even in development
+  if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+    logger.error('Storage connection error, continuing without storage');
+    return;
+  }
+  // Don't exit in production, just log
+  if (process.env.NODE_ENV === 'production') {
+    logger.error('Process would have crashed, but continuing in production mode');
+  } else {
+    // In development, still exit for other errors
+    process.exit(1);
+  }
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't exit, just log
+});
+
 
 // Create Express app
 const app = express();
@@ -336,6 +358,12 @@ async function startServer() {
     
     // Initialize storage first
     await storage.initialize();
+    
+    // Handle storage errors to prevent crashes
+    storage.on('error', (error) => {
+      logger.error('Storage service error:', error);
+      // Don't crash, just log the error
+    });
     
     // Initialize nellisApi to recover cookies
     await nellisApi.initialize();

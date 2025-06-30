@@ -29,3 +29,8 @@ backups/
 redis-data/
 grafana-data/
 prometheus-data/
+
+# Health monitoring data
+health-data.json
+health-data-*.json
+.health-cache/

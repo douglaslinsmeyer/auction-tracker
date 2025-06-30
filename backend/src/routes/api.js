@@ -283,14 +283,22 @@ router.post('/auth', validateBody('Auth'), async (req, res) => {
     
     if (!cookies) {
       console.log('Auth failed: No cookies in request body');
-      return res.status(400).json({ success: false, error: 'Cookies required' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Cookies required',
+        code: 'MISSING_COOKIES'
+      });
     }
     
     const success = await nellisApi.authenticate({ cookies });
     res.json({ success });
   } catch (error) {
     console.error('Error setting authentication:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error',
+      code: 'INTERNAL_ERROR'
+    });
   }
 });
 

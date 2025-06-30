@@ -47,6 +47,12 @@
                 </svg>
                 Auctions
             </a>
+            <a href="#health" id="nav-health" class="flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                </svg>
+                System Health
+            </a>
             <a href="#settings" id="nav-settings" class="flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
                 <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
@@ -193,6 +199,71 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Health Page -->
+            <div id="health-page" class="page hidden">
+                <div class="max-w-6xl mx-auto">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-2xl font-bold text-gray-900 dark:text-white">System Health</h2>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-sm text-gray-500 dark:text-gray-400">Auto-refresh:</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="auto-refresh-toggle" class="sr-only peer" checked>
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+                            </label>
+                            <span id="last-health-update" class="text-sm text-gray-500 dark:text-gray-400"></span>
+                        </div>
+                    </div>
+                    
+                    <!-- Overall System Status -->
+                    <div id="overall-health-card" class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-1">Overall System Status</h3>
+                                <p id="overall-health-message" class="text-sm text-gray-500 dark:text-gray-400"></p>
+                            </div>
+                            <div id="overall-health-indicator" class="flex items-center space-x-2">
+                                <span id="overall-health-dot" class="w-4 h-4 rounded-full"></span>
+                                <span id="overall-health-text" class="text-lg font-medium"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Component Health Table -->
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead class="bg-gray-50 dark:bg-gray-700">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Component</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Message</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Metrics</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Response Time</th>
+                                </tr>
+                            </thead>
+                            <tbody id="health-table-body" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                <!-- Health rows will be dynamically inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Auction Monitoring Stats -->
+                    <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                            <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Monitored Auctions</h4>
+                            <p id="monitored-auctions-count" class="text-2xl font-bold text-gray-900 dark:text-white">-</p>
+                        </div>
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                            <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Active Auctions</h4>
+                            <p id="active-auctions-count" class="text-2xl font-bold text-gray-900 dark:text-white">-</p>
+                        </div>
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                            <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">System Uptime</h4>
+                            <p id="system-uptime" class="text-2xl font-bold text-gray-900 dark:text-white">-</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 
@@ -271,6 +342,7 @@
 
     <script src="logger.js"></script>
     <script src="app.js"></script>
+    <script src="health.js"></script>
     <script>
         // Dark mode toggle
         const themeToggle = document.getElementById('theme-toggle');
@@ -351,6 +423,13 @@
             e.preventDefault();
             showPage('auctions');
             history.pushState({ page: 'auctions' }, '', '#auctions');
+            closeSidebarMenu();
+        });
+
+        document.getElementById('nav-health').addEventListener('click', (e) => {
+            e.preventDefault();
+            showPage('health');
+            history.pushState({ page: 'health' }, '', '#health');
             closeSidebarMenu();
         });
 

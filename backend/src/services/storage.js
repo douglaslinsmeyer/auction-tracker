@@ -9,6 +9,10 @@ class StorageService extends EventEmitter {
     this.redis = null;
     this.connected = false;
     this.memoryFallback = new Map();
+    this.reconnectTimer = null;
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = Infinity; // Keep trying forever
+    this.reconnectDelay = 5000; // 5 seconds between reconnect attempts
     this.config = {
       keyPrefix: 'nellis:',
       cookieTTL: 86400, // 24 hours in seconds
@@ -23,13 +27,15 @@ class StorageService extends EventEmitter {
       
       this.redis = new Redis(redisUrl, {
         retryStrategy: (times) => {
-          const delay = Math.min(times * 50, 2000);
+          // Use exponential backoff with max delay of 30 seconds
+          const delay = Math.min(times * 1000, 30000);
           logger.debug(`Redis connection retry ${times}, delay ${delay}ms`);
-          return delay;
+          return delay; // Keep retrying indefinitely
         },
         maxRetriesPerRequest: 3,
         enableReadyCheck: true,
         enableOfflineQueue: true,
+        lazyConnect: true, // Don't connect immediately
       });
 
       this.redis.on('connect', () => {
@@ -41,7 +47,10 @@ class StorageService extends EventEmitter {
       this.redis.on('error', (err) => {
         logger.error('Redis error:', err);
         this.connected = false;
-        this.emit('error', err);
+        // Only emit error if there are listeners to prevent uncaught exception
+        if (this.listenerCount('error') > 0) {
+          this.emit('error', err);
+        }
       });
 
       this.redis.on('close', () => {
@@ -50,6 +59,20 @@ class StorageService extends EventEmitter {
         this.emit('disconnected');
       });
 
+      this.redis.on('ready', () => {
+        logger.info('Redis ready and operational');
+        this.connected = true;
+        this.emit('ready');
+      });
+
+      this.redis.on('reconnecting', () => {
+        logger.info('Redis reconnecting...');
+        this.emit('reconnecting');
+      });
+
+      // Try to connect
+      await this.redis.connect();
+      
       // Test connection
       await this.redis.ping();
       logger.info('Redis connection successful');
@@ -326,8 +349,29 @@ class StorageService extends EventEmitter {
 
   // Cleanup
   async close() {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     if (this.redis) {
       await this.redis.quit();
+    }
+  }
+
+  // Manual reconnection method
+  async reconnect() {
+    if (this.connected) {
+      logger.info('Redis already connected');
+      return true;
+    }
+
+    try {
+      logger.info('Attempting manual Redis reconnection');
+      await this.redis.connect();
+      return true;
+    } catch (error) {
+      logger.error('Manual reconnection failed:', error);
+      return false;
     }
   }
 

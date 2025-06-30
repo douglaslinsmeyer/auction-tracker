@@ -2,8 +2,6 @@ const axios = require('axios');
 const storage = require('./storage');
 const logger = require('../utils/logger');
 
-// Use the project's Winston logger directly
-
 class NellisApi {
   constructor() {
     this.baseUrl = 'https://www.nellisauction.com';
@@ -258,6 +256,61 @@ class NellisApi {
       return [];
     } catch (error) {
       logger.error( 'Error searching auctions:', error);
+      throw error;
+    }
+  }
+
+  async validateCookies() {
+    try {
+      if (!this.cookies) {
+        return false;
+      }
+
+      // Try to make a simple authenticated request to validate cookies
+      const testUrl = `${this.baseUrl}/account`;
+      const response = await axios.get(testUrl, {
+        headers: {
+          ...this.headers,
+          'Cookie': this.cookies
+        },
+        maxRedirects: 0,
+        validateStatus: status => status < 400
+      });
+
+      // If we get a 200, cookies are valid
+      // If we get a 302 redirect to login, cookies are invalid
+      return response.status === 200;
+    } catch (error) {
+      logger.debug('Cookie validation failed:', error.message);
+      return false;
+    }
+  }
+
+  async authenticate(credentials) {
+    try {
+      if (!credentials || !credentials.cookies) {
+        throw new Error('Cookies are required for authentication');
+      }
+
+      // Set the cookies
+      this.setCookies(credentials.cookies);
+      
+      // Save cookies to storage
+      await storage.saveCookies(credentials.cookies);
+      
+      // Validate the cookies by making a test request
+      const isValid = await this.validateCookies();
+      
+      if (isValid) {
+        logger.logAuthActivity('authenticate', true);
+        return true;
+      } else {
+        logger.logAuthActivity('authenticate', false, 'Invalid cookies');
+        return false;
+      }
+    } catch (error) {
+      logger.error('Error authenticating:', error);
+      logger.logAuthActivity('authenticate', false, error.message);
       throw error;
     }
   }
