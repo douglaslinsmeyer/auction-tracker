@@ -10,16 +10,23 @@ const fs = require('fs').promises;
  * @returns {Promise<{browser: Browser, extensionId: string}>}
  */
 async function launchBrowserWithExtension(options = {}) {
-  const { headless = false, devtools = false } = options;
+  // Respect HEADLESS environment variable for CI/CD
+  const headlessEnv = process.env.HEADLESS === 'true';
+  const { headless = headlessEnv, devtools = false } = options;
+  
+  // Chrome extensions cannot be loaded in headless mode
+  if (headless) {
+    throw new Error('Chrome extensions cannot be loaded in headless mode. Set HEADLESS=false or skip extension tests in CI.');
+  }
   
   // Path to the extension directory
-  const extensionPath = path.join(__dirname, '../../../../nellis-auction-helper');
+  const extensionPath = path.join(__dirname, '../../../../extension');
   
   // Verify extension exists
   try {
     await fs.access(extensionPath);
   } catch (error) {
-    throw new Error(`Extension not found at ${extensionPath}. Make sure nellis-auction-helper is in the parent directory.`);
+    throw new Error(`Extension not found at ${extensionPath}. Make sure the extension directory exists.`);
   }
   
   // Launch browser with extension

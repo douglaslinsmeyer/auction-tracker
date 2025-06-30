@@ -3,7 +3,9 @@ const { configureAuthToken, connectToBackend, isWebSocketConnected } = require('
 const MockNellisServer = require('../mocks/nellisServer');
 const axios = require('axios');
 
-describe('Extension Authentication Flow', () => {
+const describeSkipIfHeadless = process.env.HEADLESS === 'true' ? describe.skip : describe;
+
+describeSkipIfHeadless('Extension Authentication Flow', () => {
   let browser;
   let extensionId;
   let mockNellis;

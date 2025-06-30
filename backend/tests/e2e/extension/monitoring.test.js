@@ -9,7 +9,10 @@ const {
 } = require('../helpers/extensionHelpers');
 const MockNellisServer = require('../mocks/nellisServer');
 
-describe('Auction Monitoring via Extension', () => {
+// Skip extension tests in headless mode (CI/CD)
+const describeSkipIfHeadless = process.env.HEADLESS === 'true' ? describe.skip : describe;
+
+describeSkipIfHeadless('Auction Monitoring via Extension', () => {
   let browser;
   let extensionId;
   let mockNellis;

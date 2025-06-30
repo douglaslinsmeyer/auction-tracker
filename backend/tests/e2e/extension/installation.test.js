@@ -1,7 +1,10 @@
 const { launchBrowserWithExtension, openExtensionPopup, waitForServiceWorker } = require('../helpers/extensionLoader');
 const { configureAuthToken, connectToBackend } = require('../helpers/extensionHelpers');
 
-describe('Chrome Extension Installation & Setup', () => {
+// Skip extension tests in headless mode (CI/CD)
+const describeSkipIfHeadless = process.env.HEADLESS === 'true' ? describe.skip : describe;
+
+describeSkipIfHeadless('Chrome Extension Installation & Setup', () => {
   let browser;
   let extensionId;
 
