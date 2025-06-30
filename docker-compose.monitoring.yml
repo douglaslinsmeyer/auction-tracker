@@ -21,7 +21,7 @@ services:
     ports:
       - "9090:9090"
     networks:
-      - nellis-network
+      - auction-network
     restart: unless-stopped
     labels:
       - "com.nellis.component=monitoring"
@@ -42,7 +42,7 @@ services:
     ports:
       - "3003:3000"  # Changed from 3001 to avoid conflict with dashboard
     networks:
-      - nellis-network
+      - auction-network
     restart: unless-stopped
     depends_on:
       - prometheus
@@ -59,7 +59,7 @@ services:
     ports:
       - "9121:9121"
     networks:
-      - nellis-network
+      - auction-network
     restart: unless-stopped
     depends_on:
       - redis
@@ -74,6 +74,4 @@ volumes:
     name: nellis-grafana-data
 
 networks:
-  nellis-network:
-    external: true
-    name: auction-helper_auction-network  # Match the main docker-compose network
+  auction-network:
