@@ -192,10 +192,13 @@ docker-compose logs -f dashboard # View dashboard logs
   - Auction monitoring metrics
 
 #### Logging
-- Structured logging with Winston
-- Log levels: error, warn, info, debug
-- Automatic request/response logging
-- Error tracking with stack traces
+- **Backend**: Structured logging with Winston logger (`backend/src/utils/logger.js`)
+- **Dashboard**: Client-side logger with test suppression (`dashboard/src/logger.js`)
+- **Extension**: Manifest V3 compliant logger with context awareness (`extension/src/logger.js`)
+- **Log levels**: error, warn, info, debug
+- **Test suppression**: Automatic silence during test execution to prevent CI/CD failures
+- **Security**: Automatic redaction of sensitive data (passwords, tokens, cookies)
+- **Automatic request/response logging and error tracking with stack traces**
 
 ### Resilience Patterns
 
@@ -251,3 +254,103 @@ docker-compose logs -f dashboard # View dashboard logs
 
 ### Deliverable Review
 - Before marking a phase deliverable complete, check with me that it is satisfactory.
+
+### Logging Guidelines
+**CRITICAL**: All developers must follow these logging practices to prevent CI/CD failures and maintain code quality.
+
+#### Never Use Console Methods Directly
+- **NEVER** use `console.log()`, `console.error()`, `console.warn()`, or `console.info()` in source code
+- **ALWAYS** use the appropriate logger for each component
+- Console methods cause "Cannot log after tests are done" errors that break CI/CD pipelines
+
+#### Component-Specific Logging
+
+**Backend (Node.js):**
+```javascript
+// Import the Winston logger
+const logger = require('../utils/logger');
+
+// Use structured logging methods
+logger.info('User authenticated successfully', { userId: user.id });
+logger.warn('Rate limit approaching', { requests: count, limit: maxRequests });
+logger.error('Database connection failed', { error: err.message, stack: err.stack });
+logger.debug('Processing auction data', { auctionId, bidCount });
+```
+
+**Dashboard (Browser):**
+```javascript
+// Logger is available globally as window.Logger
+Logger.info('Dashboard initialized');
+Logger.warn('WebSocket connection unstable');
+Logger.error('Failed to load auction data', error);
+Logger.debug('User interaction', { action: 'bid_placed', auctionId });
+
+// Or import in modules
+const logger = require('./logger');
+logger.info('Component loaded');
+```
+
+**Extension (Chrome Extension):**
+```javascript
+// ExtensionLogger is available globally after importing logger.js
+ExtensionLogger.lifecycle('Extension starting up');
+ExtensionLogger.info('Monitoring auction', { auctionId });
+ExtensionLogger.user('Button clicked', { action: 'start_monitoring' });
+ExtensionLogger.api('GET', '/api/auctions', response);
+ExtensionLogger.error('Background script error', error);
+```
+
+#### Test Environment Behavior
+- **All loggers automatically suppress output during tests** (NODE_ENV=test)
+- **Only ERROR level logs appear in test mode** for debugging critical issues
+- **Test environment is detected automatically** - no manual configuration needed
+- **Set ENABLE_TEST_LOGS=true** in environment to see logs during test development
+
+#### Log Level Guidelines
+- **ERROR**: Actual errors that require attention (exceptions, failed operations)
+- **WARN**: Potentially problematic situations (rate limits, fallbacks, deprecations)
+- **INFO**: General application flow (user actions, system events, connections)
+- **DEBUG**: Detailed diagnostic information (data processing, internal state changes)
+
+#### Security Considerations
+- **Sensitive data is automatically redacted** by the backend logger
+- **Never log passwords, tokens, API keys, or personal information**
+- **Use structured logging** with separate fields rather than string concatenation
+- **The logger will automatically redact common sensitive field names**
+
+#### Testing Your Logging
+```bash
+# Backend - run tests to verify no logging interference
+npm test
+
+# Check that intentional errors don't break CI
+npm run test:integration
+
+# Verify logging works in development
+NODE_ENV=development npm start
+```
+
+#### Migration from Console Statements
+When updating existing code:
+1. **Replace console.log()** → `logger.info()` or `Logger.info()`
+2. **Replace console.error()** → `logger.error()` or `Logger.error()`
+3. **Replace console.warn()** → `logger.warn()` or `Logger.warn()`
+4. **Replace console.debug()** → `logger.debug()` or `Logger.debug()`
+5. **Test that changes don't break CI/CD pipeline**
+
+#### Environment Configuration
+```bash
+# Backend .env settings
+LOG_LEVEL=info                    # Set minimum log level
+ENABLE_TEST_LOGS=false           # Suppress logs during tests (default)
+NODE_ENV=test                    # Automatically detected by logger
+
+# Dashboard test suppression (automatic)
+# - Detects ?test=true, ?e2e=true in URL
+# - Detects webdriver presence
+# - Configurable via localStorage.dashboard_log_level
+
+# Extension test suppression (automatic)  
+# - Detects test/dev in manifest.version_name
+# - Detects missing Chrome APIs (test environment)
+```
