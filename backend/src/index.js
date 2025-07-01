@@ -19,7 +19,7 @@ try {
   swaggerUi = require('swagger-ui-express');
   YAML = require('yamljs');
 } catch (error) {
-  console.log('Swagger dependencies not available, skipping Swagger UI setup');
+  logger.info('Swagger dependencies not available, skipping Swagger UI setup');
 }
 
 const auctionMonitor = require('./services/auctionMonitor');
@@ -190,12 +190,12 @@ if (swaggerUi && YAML) {
           defaultModelsExpandDepth: -1
         }
       }));
-      console.log('Swagger UI available at /api-docs');
+      logger.info('Swagger UI available at /api-docs');
     } catch (error) {
-      console.error('Error loading Swagger documentation:', error.message);
+      logger.error('Error loading Swagger documentation', { error: error.message });
     }
   } else {
-    console.log('swagger.yaml not found, skipping Swagger UI setup');
+    logger.info('swagger.yaml not found, skipping Swagger UI setup');
   }
 }
 

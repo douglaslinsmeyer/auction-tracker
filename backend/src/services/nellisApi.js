@@ -27,7 +27,7 @@ class NellisApi {
       }
       this.initialized = true;
     } catch (error) {
-      logger.error( 'Error initializing NellisApi:', error);
+      logger.error('Error initializing NellisApi', { error: error.message, stack: error.stack });
     }
   }
 
@@ -72,11 +72,11 @@ class NellisApi {
       throw new Error('Invalid response structure');
     } catch (error) {
       if (error.response && error.response.status === 400) {
-        logger.error( `400 Bad Request for auction ${auctionId}:`, error.response.data);
-        logger.error( 'Request URL:', url);
-        logger.error( 'Request headers:', this.headers);
+        logger.error(`400 Bad Request for auction ${auctionId}`, { responseData: error.response.data });
+        logger.debug('Request details', { url });
+        logger.debug('Request headers', { headers: this.headers });
       } else {
-        logger.error( `Error fetching auction data for ${auctionId}:`, error.message);
+        logger.error(`Error fetching auction data for ${auctionId}`, { error: error.message });
       }
       throw error;
     }
@@ -92,25 +92,8 @@ class NellisApi {
     return Math.max(0, Math.floor(diff / 1000)); // Return seconds
   }
 
-  async authenticate(credentials) {
-    try {
-      // This would implement the login flow
-      // For now, we'll assume cookies are provided through configuration
-      logger.info( 'Authentication not yet implemented - using provided cookies');
-      this.cookies = credentials.cookies || '';
-      
-      // Save cookies to storage
-      if (this.cookies) {
-        await storage.saveCookies(this.cookies);
-        logger.logAuthActivity('cookies_saved', true);
-      }
-      
-      return true;
-    } catch (error) {
-      logger.error( 'Authentication error:', error);
-      throw error;
-    }
-  }
+  // Removed duplicate authenticate method - see line 289 for actual implementation
+  // The authenticate method below (line 289) handles cookie validation properly
 
   // Alias for authenticate - sets cookies directly
   async setCookies(cookieString) {
@@ -165,7 +148,7 @@ class NellisApi {
           amount: bidAmount
         };
       } else {
-        logger.error( `Bid placement failed with status ${response.status}`);
+        logger.error(`Bid placement failed with status ${response.status}`);
         return {
           success: false,
           error: `Bid failed with status ${response.status}`,
@@ -173,7 +156,7 @@ class NellisApi {
         };
       }
     } catch (error) {
-      logger.error( `Error placing bid on auction ${auctionId}:`, error);
+      logger.error(`Error placing bid on auction ${auctionId}`, { error: error.message, stack: error.stack });
       
       // Extract meaningful error message
       let errorMessage = error.message;
@@ -217,7 +200,7 @@ class NellisApi {
         const maxRetries = globalSettings.bidding.retryAttempts || 3;
         
         if (retryCount < maxRetries - 1) {
-          logger.info( `Retrying bid (attempt ${retryCount + 2} of ${maxRetries})...`);
+          logger.info(`Retrying bid (attempt ${retryCount + 2} of ${maxRetries})...`);
           await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Exponential backoff
           return this.placeBid(auctionId, amount, retryCount + 1);
         }
@@ -236,12 +219,12 @@ class NellisApi {
         if (result.status === 'fulfilled') {
           return result.value;
         } else {
-          logger.error( `Failed to fetch auction ${auctionIds[index]}:`, result.reason);
+          logger.error(`Failed to fetch auction ${auctionIds[index]}`, { error: result.reason });
           return null;
         }
       }).filter(Boolean);
     } catch (error) {
-      logger.error( 'Error fetching multiple auctions:', error);
+      logger.error('Error fetching multiple auctions', { error: error.message });
       throw error;
     }
   }
@@ -250,12 +233,12 @@ class NellisApi {
     try {
       // This would implement auction search
       // Using the Algolia search endpoint discovered in the analysis
-      logger.info( `Searching auctions with query: ${query}`);
+      logger.info(`Searching auctions with query: ${query}`);
       
       // Placeholder
       return [];
     } catch (error) {
-      logger.error( 'Error searching auctions:', error);
+      logger.error('Error searching auctions', { error: error.message });
       throw error;
     }
   }
@@ -281,7 +264,7 @@ class NellisApi {
       // If we get a 302 redirect to login, cookies are invalid
       return response.status === 200;
     } catch (error) {
-      logger.debug('Cookie validation failed:', error.message);
+      logger.debug('Cookie validation failed', { error: error.message });
       return false;
     }
   }
@@ -293,7 +276,7 @@ class NellisApi {
       }
 
       // Set the cookies
-      this.setCookies(credentials.cookies);
+      await this.setCookies(credentials.cookies);
       
       // Save cookies to storage
       await storage.saveCookies(credentials.cookies);
@@ -309,7 +292,7 @@ class NellisApi {
         return false;
       }
     } catch (error) {
-      logger.error('Error authenticating:', error);
+      logger.error('Error authenticating', { error: error.message, stack: error.stack });
       logger.logAuthActivity('authenticate', false, error.message);
       throw error;
     }

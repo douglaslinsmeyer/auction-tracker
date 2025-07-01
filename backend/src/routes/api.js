@@ -6,6 +6,7 @@ const nellisApi = require('../services/nellisApi');
 const storage = require('../services/storage');
 const { validateBody, validateAuctionId } = require('../middleware/validation');
 const { asyncHandler, createError } = require('../middleware/errorHandler');
+const logger = require('../utils/logger');
 
 // Create a specific rate limiter for bid operations
 const bidLimiter = rateLimit({
@@ -19,7 +20,7 @@ const bidLimiter = rateLimit({
     return `${req.ip}:${req.params.id}`;
   },
   handler: (req, res) => {
-    console.warn(`Bid rate limit exceeded for IP ${req.ip} on auction ${req.params.id}`);
+    logger.warn(`Bid rate limit exceeded for IP ${req.ip} on auction ${req.params.id}`);
     res.status(429).json({
       success: false,
       error: 'Too many bid attempts on this auction. Please wait before trying again.',
@@ -118,7 +119,7 @@ router.post('/auctions/:id/monitor', validateAuctionId, validateBody('StartMonit
       res.status(409).json({ success: false, error: 'Auction already being monitored' });
     }
   } catch (error) {
-    console.error(`Error starting monitoring for auction ${req.params.id}:`, error.message);
+    logger.error(`Error starting monitoring for auction ${req.params.id}:`, error.message);
     next(error);
   }
 });
@@ -135,7 +136,7 @@ router.delete('/auctions/:id/monitor', validateAuctionId, (req, res) => {
       res.status(404).json({ success: false, error: 'Auction not being monitored' });
     }
   } catch (error) {
-    console.error(`Error stopping monitoring for auction ${req.params.id}:`, error);
+    logger.error(`Error stopping monitoring for auction ${req.params.id}:`, error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -152,7 +153,7 @@ router.post('/auctions/:id/stop', (req, res) => {
       res.status(404).json({ success: false, error: 'Auction not being monitored' });
     }
   } catch (error) {
-    console.error(`Error stopping monitoring for auction ${req.params.id}:`, error);
+    logger.error(`Error stopping monitoring for auction ${req.params.id}:`, error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -175,7 +176,7 @@ router.post('/auctions/clear', (req, res) => {
       cleared 
     });
   } catch (error) {
-    console.error('Error clearing all auctions:', error);
+    logger.error('Error clearing all auctions:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -210,7 +211,7 @@ router.put('/auctions/:id/config', validateAuctionId, validateBody('AuctionConfi
     
     res.json({ success: true, config: auction.config });
   } catch (error) {
-    console.error(`Error updating config for auction ${req.params.id}:`, error);
+    logger.error(`Error updating config for auction ${req.params.id}:`, error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -233,7 +234,7 @@ router.get('/auctions/:id/bids', async (req, res) => {
       count: bidHistory.length
     });
   } catch (error) {
-    console.error(`Error getting bid history for auction ${req.params.id}:`, error);
+    logger.error(`Error getting bid history for auction ${req.params.id}:`, error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -265,7 +266,7 @@ router.post('/auctions/:id/bid', validateAuctionId, bidLimiter, validateBody('Bi
     
     res.json(result);
   } catch (error) {
-    console.error(`Error placing bid on auction ${req.params.id}:`, error);
+    logger.error(`Error placing bid on auction ${req.params.id}:`, error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -273,7 +274,7 @@ router.post('/auctions/:id/bid', validateAuctionId, bidLimiter, validateBody('Bi
 // Set authentication credentials
 router.post('/auth', validateBody('Auth'), async (req, res) => {
   try {
-    console.log('Auth request received:', {
+    logger.info('Auth request received:', {
       body: req.body,
       headers: req.headers,
       contentType: req.get('content-type')
@@ -282,7 +283,7 @@ router.post('/auth', validateBody('Auth'), async (req, res) => {
     const { cookies } = req.body;
     
     if (!cookies) {
-      console.log('Auth failed: No cookies in request body');
+      logger.warn('Auth failed: No cookies in request body');
       return res.status(400).json({ 
         success: false, 
         error: 'Cookies required',
@@ -293,7 +294,7 @@ router.post('/auth', validateBody('Auth'), async (req, res) => {
     const success = await nellisApi.authenticate({ cookies });
     res.json({ success });
   } catch (error) {
-    console.error('Error setting authentication:', error);
+    logger.error('Error setting authentication:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error',
@@ -320,14 +321,14 @@ router.post('/auth/validate', async (req, res) => {
     let auctionData = null;
     try {
       auctionData = await nellisApi.getAuctionData(auctionId || '57938394');
-      console.log('Successfully fetched auction data:', {
+      logger.info('Successfully fetched auction data:', {
         id: auctionData.id,
         title: auctionData.title,
         currentBid: auctionData.currentBid,
         isWinning: auctionData.isWinning
       });
     } catch (error) {
-      console.error('Failed to fetch auction data:', error.message);
+      logger.error('Failed to fetch auction data:', error.message);
       return res.json({
         success: false,
         authenticated: false,
@@ -342,7 +343,7 @@ router.post('/auth/validate', async (req, res) => {
     // Test 3: Optionally test bid placement (dry run)
     let bidTestResult = null;
     if (testBidAmount && auctionData && !auctionData.isClosed) {
-      console.log('Testing bid placement (dry run)...');
+      logger.info('Testing bid placement (dry run)...');
       // For safety, we'll only test with a bid that's below current bid
       const safeBidAmount = Math.min(testBidAmount, auctionData.currentBid - 1);
       
@@ -378,7 +379,7 @@ router.post('/auth/validate', async (req, res) => {
       } : null
     });
   } catch (error) {
-    console.error('Error validating authentication:', error);
+    logger.error('Error validating authentication:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message,
@@ -430,7 +431,7 @@ router.get('/settings', async (req, res) => {
     const settings = await storage.getSettings();
     res.json({ success: true, settings });
   } catch (error) {
-    console.error('Error getting settings:', error);
+    logger.error('Error getting settings:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -467,7 +468,7 @@ router.get('/circuit-breaker', (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Error getting circuit breaker status:', error);
+    logger.error('Error getting circuit breaker status:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -540,7 +541,7 @@ router.post('/settings', validateBody('Settings'), async (req, res) => {
     
     res.json({ success: true, settings });
   } catch (error) {
-    console.error('Error saving settings:', error);
+    logger.error('Error saving settings:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

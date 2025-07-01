@@ -3,7 +3,7 @@
  * Prevents sensitive information like stack traces from being exposed
  */
 
-const logger = require('winston');
+const logger = require('../utils/logger');
 
 /**
  * Error handler middleware

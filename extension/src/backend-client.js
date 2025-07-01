@@ -25,7 +25,7 @@ class BackendClient {
     this.baseUrl = backendUrl || backend?.url || CONFIG.BACKEND.DEFAULT_URL;
     this.authToken = backend?.token || CONFIG.BACKEND.DEFAULT_TOKEN;
     
-    console.log('Initializing backend client:', {
+    ExtensionLogger.info('Initializing backend client:', {
       baseUrl: this.baseUrl,
       authToken: this.authToken
     });
@@ -41,21 +41,21 @@ class BackendClient {
 
     try {
       const wsUrl = this.baseUrl.replace(/^http/, 'ws');
-      console.log('Connecting to WebSocket:', wsUrl);
+      ExtensionLogger.info('Connecting to WebSocket:', wsUrl);
       
       this.ws = new WebSocket(wsUrl);
-      console.log('WebSocket object created, readyState:', this.ws.readyState);
+      ExtensionLogger.debug('WebSocket object created, readyState:', this.ws.readyState);
       
       // Add a connection timeout
       const connectionTimeout = setTimeout(() => {
-        console.error('WebSocket connection timeout after 10 seconds');
+        ExtensionLogger.error('WebSocket connection timeout after 10 seconds');
         if (this.ws && this.ws.readyState === WebSocket.CONNECTING) {
           this.ws.close();
         }
       }, 10000);
       
       this.ws.onopen = async () => {
-        console.log('Connected to backend WebSocket');
+        ExtensionLogger.info('Connected to backend WebSocket');
         clearTimeout(connectionTimeout);
         this.isConnected = true;
         clearTimeout(this.wsReconnectTimer);
@@ -75,12 +75,12 @@ class BackendClient {
           const message = JSON.parse(event.data);
           this.handleMessage(message);
         } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
+          ExtensionLogger.error('Error parsing WebSocket message:', error);
         }
       };
 
       this.ws.onclose = (event) => {
-        console.log('Disconnected from backend WebSocket:', {
+        ExtensionLogger.info('Disconnected from backend WebSocket:', {
           code: event.code,
           reason: event.reason,
           wasClean: event.wasClean
@@ -93,7 +93,7 @@ class BackendClient {
       };
 
       this.ws.onerror = (error) => {
-        console.error('WebSocket error:', {
+        ExtensionLogger.error('WebSocket error:', {
           type: error.type,
           target: error.target?.url,
           readyState: this.ws?.readyState,
@@ -104,7 +104,7 @@ class BackendClient {
         this.emit('error', error);
       };
     } catch (error) {
-      console.error('Failed to connect to backend:', error);
+      ExtensionLogger.error('Failed to connect to backend:', error);
       this.scheduleReconnect();
     }
   }
@@ -140,7 +140,7 @@ class BackendClient {
     
     this.pingInterval = setInterval(() => {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        console.log('Sending ping to keep connection alive');
+        ExtensionLogger.debug('Sending ping to keep connection alive');
         this.ws.send(JSON.stringify({ type: 'ping' }));
       }
     }, this.pingIntervalDelay);
@@ -161,11 +161,11 @@ class BackendClient {
   }
 
   handleMessage(message) {
-    console.log('Received WebSocket message:', message);
+    ExtensionLogger.debug('Received WebSocket message:', message);
     
     // Handle response to a request
     if (message.requestId && this.pendingRequests.has(message.requestId)) {
-      console.log('Handling response for requestId:', message.requestId);
+      ExtensionLogger.debug('Handling response for requestId:', message.requestId);
       const { resolve, reject } = this.pendingRequests.get(message.requestId);
       this.pendingRequests.delete(message.requestId);
       
@@ -178,17 +178,17 @@ class BackendClient {
     }
     
     if (message.requestId) {
-      console.warn('Received response for unknown requestId:', message.requestId);
+      ExtensionLogger.warn('Received response for unknown requestId:', message.requestId);
     }
 
     // Handle broadcast messages
     switch (message.type) {
       case 'authenticated':
-        console.log('Backend authentication:', message.success ? 'successful' : 'failed');
+        ExtensionLogger.info('Backend authentication:', message.success ? 'successful' : 'failed');
         break;
         
       case 'pong':
-        console.log('Received pong from server - connection alive');
+        ExtensionLogger.debug('Received pong from server - connection alive');
         break;
         
       case 'auctionUpdate':
@@ -219,13 +219,13 @@ class BackendClient {
       const requestId = `req_${++this.requestIdCounter}`;
       message.requestId = requestId;
       
-      console.log('Sending WebSocket message:', message);
+      ExtensionLogger.debug('Sending WebSocket message:', message);
       this.pendingRequests.set(requestId, { resolve, reject });
       
       // Set timeout for request
       setTimeout(() => {
         if (this.pendingRequests.has(requestId)) {
-          console.error('Request timeout for message:', message);
+          ExtensionLogger.error('Request timeout for message:', message);
           this.pendingRequests.delete(requestId);
           reject(new Error('Request timeout'));
         }
@@ -255,7 +255,7 @@ class BackendClient {
         try {
           handler(data);
         } catch (error) {
-          console.error(`Error in event handler for ${event}:`, error);
+          ExtensionLogger.error(`Error in event handler for ${event}:`, error);
         }
       });
     }
@@ -263,7 +263,7 @@ class BackendClient {
 
   // API Methods
   async startMonitoring(auctionId, config = {}, metadata = {}) {
-    console.log('Starting monitoring via WebSocket:', auctionId, config, metadata);
+    ExtensionLogger.info('Starting monitoring via WebSocket:', auctionId, config, metadata);
     
     if (!this.isConnected) {
       throw new Error('WebSocket not connected');
@@ -278,7 +278,7 @@ class BackendClient {
   }
 
   async stopMonitoring(auctionId) {
-    console.log('Stopping monitoring via WebSocket:', auctionId);
+    ExtensionLogger.info('Stopping monitoring via WebSocket:', auctionId);
     
     if (!this.isConnected) {
       throw new Error('WebSocket not connected');
@@ -381,7 +381,7 @@ class BackendClient {
     try {
       // Check if we have cookies permission
       if (!chrome.cookies) {
-        console.warn('Cookies API not available - skipping cookie sync');
+        ExtensionLogger.warn('Cookies API not available - skipping cookie sync');
         return { success: false, error: 'Cookies permission not granted' };
       }
       
@@ -389,7 +389,7 @@ class BackendClient {
       const cookies = await chrome.cookies.getAll({ domain: '.nellisauction.com' });
       const cookieString = cookies.map(c => `${c.name}=${c.value}`).join('; ');
       
-      console.log('Syncing cookies to backend:', {
+      ExtensionLogger.info('Syncing cookies to backend:', {
         baseUrl: this.baseUrl,
         cookiesFound: cookies.length,
         cookieString: cookieString ? 'Found cookies' : 'No cookies found',
@@ -400,7 +400,7 @@ class BackendClient {
         cookies: cookieString
       };
       
-      console.log('Request body:', requestBody);
+      ExtensionLogger.debug('Request body:', requestBody);
       
       // Send to backend
       const response = await fetch(`${this.baseUrl}${CONFIG.API.AUTH}`, {
@@ -414,13 +414,13 @@ class BackendClient {
       
       if (!response.ok) {
         const errorData = await response.text();
-        console.error('Cookie sync failed:', response.status, errorData);
+        ExtensionLogger.error('Cookie sync failed:', response.status, errorData);
         throw new Error(`Failed to sync cookies: ${response.statusText}`);
       }
       
       return response.json();
     } catch (error) {
-      console.error('Error syncing cookies:', error);
+      ExtensionLogger.error('Error syncing cookies:', error);
       return { success: false, error: error.message };
     }
   }
