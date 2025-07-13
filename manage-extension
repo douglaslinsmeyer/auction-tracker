@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+# Cross-platform Chrome extension manager wrapper
+# Uses the unified bash script that handles all platforms
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Execute the unified bash script
+exec "$SCRIPT_DIR/scripts/manage-extension.sh" "$@"

@@ -192,8 +192,8 @@ class AuctionMonitor extends EventEmitter {
         this.handleBidUpdate(auctionId, data, previousData);
       }
 
-      // Check for 30-second rule
-      if (data.timeRemaining <= 30 && data.timeRemaining > 0) {
+      // Check for increased polling as auction ends
+      if (data.timeRemaining <= 20 && data.timeRemaining > 0) {
         this.adjustPollingRate(auctionId, 2000); // Poll every 2 seconds
       }
 
@@ -254,7 +254,7 @@ class AuctionMonitor extends EventEmitter {
     const biddingSettings = globalSettings.bidding || {};
 
     // For sniping strategy, use configured snipe timing
-    if (auction.config.strategy === 'sniping' && auctionData.timeRemaining > (biddingSettings.snipeTiming || 30)) {
+    if (auction.config.strategy === 'sniping' && auctionData.timeRemaining > (biddingSettings.snipeTiming || 10)) {
       return;
     }
 

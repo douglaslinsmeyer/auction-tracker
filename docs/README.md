@@ -24,6 +24,7 @@ Welcome to the comprehensive documentation for the Nellis Auction Helper project
 | [PRODUCTION_READINESS_CHECKLIST.md](PRODUCTION_READINESS_CHECKLIST.md) | Complete deployment guide (self-hosted & enterprise) | Operators |
 | [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) | Step-by-step deployment procedures | Operators |
 | [MONITORING_SETUP.md](MONITORING_SETUP.md) | System monitoring and alerting configuration | Operators |
+| [HEALTH_MONITORING.md](HEALTH_MONITORING.md) | Health monitoring system with resilient storage | Operators/Developers |
 | [SSL_TLS_SETUP.md](SSL_TLS_SETUP.md) | Security configuration and certificate management | Operators |
 
 ### 🔧 Development & Reference
@@ -33,6 +34,7 @@ Welcome to the comprehensive documentation for the Nellis Auction Helper project
 | [QUICK_REFERENCE.md](QUICK_REFERENCE.md) | Commands and troubleshooting quick reference | All |
 | [api/README.md](api/README.md) | API specifications and endpoints | Developers |
 | [reference/SOURCE_CODE_REFERENCE.md](reference/SOURCE_CODE_REFERENCE.md) | Code navigation and structure guide | Developers |
+| [EXTENSION_MANAGER.md](EXTENSION_MANAGER.md) | Chrome extension installation and management | All |
 
 ### 🧪 Testing Documentation
 | Document | Description | Audience |
@@ -78,6 +80,7 @@ Welcome to the comprehensive documentation for the Nellis Auction Helper project
 1. [PRODUCTION_READINESS_CHECKLIST.md](PRODUCTION_READINESS_CHECKLIST.md) - Complete deployment guide
 2. [SSL_TLS_SETUP.md](SSL_TLS_SETUP.md) - Security configuration
 3. [MONITORING_SETUP.md](MONITORING_SETUP.md) - Monitoring and alerts
+4. [HEALTH_MONITORING.md](HEALTH_MONITORING.md) - System health monitoring
 
 #### Develop New Features
 1. [ARCHITECTURE.md](ARCHITECTURE.md) - Understand system design

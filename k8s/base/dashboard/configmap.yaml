@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-config
+  labels:
+    app: auction-tracker
+    component: dashboard
+data:
+  # Backend service URL for internal communication
+  BACKEND_URL: "http://backend:3000"
+  # These will be overridden in overlays for external access
+  EXTERNAL_BACKEND_URL: "http://backend:3000"
+  EXTERNAL_WS_URL: "ws://backend:3000"
+  # Dashboard-specific settings
+  ENABLE_ANALYTICS: "false"
+  SESSION_TIMEOUT: "3600"

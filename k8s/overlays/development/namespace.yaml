@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: auction-tracker-dev
+  labels:
+    app: auction-tracker
+    environment: development

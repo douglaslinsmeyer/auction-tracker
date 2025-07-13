@@ -10,6 +10,9 @@ class SettingsManager {
                 snipeTiming: 5,
                 bidBuffer: 0,
                 retryAttempts: 3
+            },
+            connection: {
+                backendUrl: localStorage.getItem('dashboard_backend_url') || 'http://localhost:3000'
             }
         };
         
@@ -23,10 +26,8 @@ class SettingsManager {
     
     async loadSettings() {
         try {
-            // Get backend URL from config
-            const configResponse = await fetch('/api/config');
-            const config = await configResponse.json();
-            const backendUrl = config.backendUrl || 'http://localhost:3000';
+            // Get backend URL from settings or localStorage
+            const backendUrl = this.settings.connection.backendUrl;
             
             // Get auth token from localStorage
             const authToken = localStorage.getItem('authToken') || 'dev-token';
@@ -38,7 +39,11 @@ class SettingsManager {
             });
             if (response.ok) {
                 const data = await response.json();
+                // Preserve connection settings from localStorage
+                const savedBackendUrl = this.settings.connection.backendUrl;
                 this.settings = data.settings || this.settings;
+                this.settings.connection = this.settings.connection || {};
+                this.settings.connection.backendUrl = savedBackendUrl;
                 this.updateUI();
             }
         } catch (error) {
@@ -59,10 +64,13 @@ class SettingsManager {
             this.settings.bidding.bidBuffer = parseInt(document.getElementById('bid-buffer').value) || 0;
             this.settings.bidding.retryAttempts = parseInt(document.getElementById('retry-attempts').value) || 3;
             
-            // Get backend URL from config
-            const configResponse = await fetch('/api/config');
-            const config = await configResponse.json();
-            const backendUrl = config.backendUrl || 'http://localhost:3000';
+            // Save connection settings
+            const newBackendUrl = document.getElementById('backend-url').value.trim() || 'http://localhost:3000';
+            this.settings.connection.backendUrl = newBackendUrl;
+            localStorage.setItem('dashboard_backend_url', newBackendUrl);
+            
+            // Get backend URL from settings
+            const backendUrl = this.settings.connection.backendUrl;
             
             // Get auth token from localStorage
             const authToken = localStorage.getItem('authToken') || 'dev-token';
@@ -97,6 +105,12 @@ class SettingsManager {
         document.getElementById('snipe-timing').value = this.settings.bidding.snipeTiming;
         document.getElementById('bid-buffer').value = this.settings.bidding.bidBuffer;
         document.getElementById('retry-attempts').value = this.settings.bidding.retryAttempts;
+        
+        // Update connection settings
+        const backendUrlInput = document.getElementById('backend-url');
+        if (backendUrlInput) {
+            backendUrlInput.value = this.settings.connection.backendUrl || '';
+        }
     }
     
     attachEventListeners() {
@@ -129,6 +143,10 @@ class SettingsManager {
     
     getSettings() {
         return this.settings;
+    }
+    
+    getBackendUrl() {
+        return this.settings.connection.backendUrl;
     }
 }
 

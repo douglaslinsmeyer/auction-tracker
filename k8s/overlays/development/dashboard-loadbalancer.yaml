@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard-lb
+  labels:
+    app: auction-tracker
+    component: dashboard
+spec:
+  type: LoadBalancer
+  selector:
+    app: auction-tracker
+    component: dashboard
+  ports:
+  - name: http
+    port: 3001
+    targetPort: http
+    protocol: TCP

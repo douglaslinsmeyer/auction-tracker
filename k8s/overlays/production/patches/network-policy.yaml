@@ -1,0 +1,65 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: auction-tracker-network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: auction-tracker
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow traffic from Gateway
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: gateway-system
+    ports:
+    - protocol: TCP
+      port: 3000
+    - protocol: TCP
+      port: 3001
+  # Allow internal communication
+  - from:
+    - podSelector:
+        matchLabels:
+          app: auction-tracker
+    ports:
+    - protocol: TCP
+      port: 3000
+    - protocol: TCP
+      port: 3001
+    - protocol: TCP
+      port: 6379
+  # Allow metrics scraping
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9100
+  egress:
+  # Allow DNS
+  - to:
+    - namespaceSelector: {}
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow internal communication
+  - to:
+    - podSelector:
+        matchLabels:
+          app: auction-tracker
+  # Allow external HTTPS (for Nellis API)
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80

@@ -19,8 +19,8 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - REDIS_URL=redis://redis:6379
       - DEBUG=${DEBUG:-}
-      - ALLOWED_EXTENSION_IDS=${ALLOWED_EXTENSION_IDS:-}
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
+      - ALLOWED_EXTENSION_IDS=${ALLOWED_EXTENSION_IDS:-nndieiblaeieakimlfknekcfmflgdpbl}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3001,http://localhost:8080}
     volumes:
       # Development volumes - disabled in production via env var
       - ${SRC_VOLUME:-./backend/src:/app/src}

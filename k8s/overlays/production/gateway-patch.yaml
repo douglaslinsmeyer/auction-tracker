@@ -1,0 +1,54 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: auction-tracker-routes
+spec:
+  hostnames:
+  - "auction-tracker.example.com"
+  - "api.auction-tracker.example.com"
+  - "www.auction-tracker.example.com"
+  rules:
+  # API routes with rate limiting
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /api
+    - headers:
+      - name: Host
+        value: api.auction-tracker.example.com
+    backendRefs:
+    - name: backend
+      port: 3000
+    filters:
+    - type: RequestHeaderModifier
+      requestHeaderModifier:
+        add:
+        - name: X-Forwarded-Proto
+          value: https
+  # WebSocket route
+  - matches:
+    - path:
+        type: Exact
+        value: /ws
+    - headers:
+      - name: Upgrade
+        value: websocket
+    backendRefs:
+    - name: backend
+      port: 3000
+  # Health check route (no rate limiting)
+  - matches:
+    - path:
+        type: Exact
+        value: /health
+    backendRefs:
+    - name: backend
+      port: 3000
+  # Dashboard routes
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: dashboard
+      port: 3001

@@ -4,9 +4,9 @@
 const CONFIG = {
   // Backend Configuration
   BACKEND: {
-    DEFAULT_URL: 'http://localhost:3000',
+    DEFAULT_URL: 'http://localhost',  // Use Gateway instead of direct backend
     DEFAULT_TOKEN: 'dev-token',
-    DEFAULT_WS_URL: 'ws://localhost:3000'
+    DEFAULT_WS_URL: 'ws://localhost/ws'  // Include /ws path for Gateway routing
   },
   
   // Extension Settings

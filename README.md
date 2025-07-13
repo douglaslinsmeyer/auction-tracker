@@ -12,7 +12,9 @@ All implementation phases completed with comprehensive testing, monitoring, and 
 - **Dashboard** (`dashboard/`): Web application for monitoring and control
 - **Extension** (`extension/`): Chrome extension for browser integration
 
-## Quick Start with Docker
+## Quick Start
+
+### Option 1: Docker Compose (Simple)
 
 ```bash
 # Start all services (backend, dashboard, redis)
@@ -24,11 +26,34 @@ docker-compose up
 # - Redis: localhost:6379
 ```
 
+### Option 2: Kubernetes (Recommended for Production)
+
+```bash
+# Quick setup for local development
+./k8s/scripts/setup-local.sh
+
+# Access via port-forward:
+kubectl -n auction-tracker-dev port-forward service/dev-backend 3000:3000
+kubectl -n auction-tracker-dev port-forward service/dev-dashboard 3001:3001
+```
+
+See [Kubernetes Deployment Guide](docs/KUBERNETES_DEPLOYMENT.md) for detailed instructions.
+
 ## Production Deployment
 
+### Docker Compose
 ```bash
 # Build and run in production mode
 docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+### Kubernetes (Rackspace Spot)
+```bash
+# Deploy to production
+./k8s/scripts/deploy.sh -e production
+
+# Or manually with kustomize
+kustomize build k8s/overlays/production | kubectl apply -f -
 ```
 
 ## Development

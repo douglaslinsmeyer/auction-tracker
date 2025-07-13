@@ -60,7 +60,6 @@
       "Bash(-e \"s|require(''../setup'')|require(''../__support__/setup'')|g\" )",
       "Bash({} ;)",
       "Bash(touch:*)",
-      "Bash(touch:*)",
       "Bash(cucumber-js:*)",
       "Bash(git merge:*)",
       "Bash(npx jest:*)",
@@ -71,7 +70,24 @@
       "Bash(gh run cancel:*)",
       "Bash(gh run watch:*)",
       "Bash(npm run build:*)",
-      "Bash(./scripts/run-all-tests.sh:*)"
+      "Bash(./scripts/run-all-tests.sh:*)",
+      "Bash(npm --version)",
+      "Bash(docker:*)",
+      "Bash(open /Users/douglaslinsmeyer/Projects/auction-tracker/test-dashboard-ws.html)",
+      "Bash(./check-dashboard.sh:*)",
+      "Bash(open:*)",
+      "Bash(npx playwright install:*)",
+      "Bash(./scripts/manage-extension.sh:*)",
+      "mcp__memory__read_graph",
+      "mcp__memory__create_entities",
+      "mcp__memory__create_relations",
+      "mcp__memory__search_nodes",
+      "mcp__fetch__fetch",
+      "Bash(kubectl config:*)",
+      "Bash(kubectl get:*)",
+      "Bash(kubectl describe:*)",
+      "Bash(kubectl apply:*)",
+      "Bash(kubectl rollout status:*)"
     ],
     "deny": []
   }

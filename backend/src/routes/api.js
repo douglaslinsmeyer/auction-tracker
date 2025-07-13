@@ -546,4 +546,265 @@ router.post('/settings', validateBody('Settings'), async (req, res) => {
   }
 });
 
+// Get hot deals - tools with great discounts
+router.get('/hot-deals', asyncHandler(async (req, res) => {
+  try {
+    const location = req.query.location || 'Phoenix';
+    const searchQuery = req.query.q || 'tools';
+    const maxDiscountRatio = parseFloat(req.query.maxRatio) || 0.15; // Default to 15% of retail
+    const maxPrice = req.query.maxPrice ? parseFloat(req.query.maxPrice) : null; // Optional max current price filter
+    const page = parseInt(req.query.page) || 1; // Page number (1-based)
+    const limit = parseInt(req.query.limit) || 20; // Items per page
+    const useMockData = req.query.mock === 'true'; // Option to use mock data for testing
+    
+    logger.info(`Fetching hot deals for ${searchQuery} in ${location}`, { useMockData });
+    
+    // Check if we should use mock data
+    if (useMockData) {
+      const mockHotDeals = [
+      {
+        id: '58040119',
+        title: 'DeWalt 20V MAX Cordless Drill/Driver Kit',
+        currentPrice: 25,
+        retailPrice: 199,
+        discountPercentage: 87,
+        location: 'Phoenix',
+        closeTime: new Date(Date.now() + 3600000).toISOString(),
+        bidCount: 15,
+        imageUrl: 'https://nellisauction.com/images/drill.jpg',
+        auctionUrl: `https://www.nellisauction.com/p/product/58040119`,
+        timeRemaining: 3600
+      },
+      {
+        id: '58040120',
+        title: 'Milwaukee M18 FUEL Hammer Drill Kit',
+        currentPrice: 35,
+        retailPrice: 329,
+        discountPercentage: 89,
+        location: 'Phoenix',
+        closeTime: new Date(Date.now() + 7200000).toISOString(),
+        bidCount: 22,
+        imageUrl: 'https://nellisauction.com/images/hammer-drill.jpg',
+        auctionUrl: `https://www.nellisauction.com/p/product/58040120`,
+        timeRemaining: 7200
+      },
+      {
+        id: '58040121',
+        title: 'Craftsman 450-Piece Mechanics Tool Set',
+        currentPrice: 40,
+        retailPrice: 299,
+        discountPercentage: 87,
+        location: 'Phoenix',
+        closeTime: new Date(Date.now() + 1800000).toISOString(),
+        bidCount: 8,
+        imageUrl: 'https://nellisauction.com/images/tool-set.jpg',
+        auctionUrl: `https://www.nellisauction.com/p/product/58040121`,
+        timeRemaining: 1800
+      },
+      {
+        id: '58040122',
+        title: 'RYOBI 18V ONE+ Cordless 6-Tool Combo Kit',
+        currentPrice: 45,
+        retailPrice: 399,
+        discountPercentage: 89,
+        location: 'Phoenix',
+        closeTime: new Date(Date.now() + 5400000).toISOString(),
+        bidCount: 19,
+        imageUrl: 'https://nellisauction.com/images/combo-kit.jpg',
+        auctionUrl: `https://www.nellisauction.com/p/product/58040122`,
+        timeRemaining: 5400
+      },
+      {
+        id: '58040123',
+        title: 'BOSCH 12V Max 2-Tool Combo Kit',
+        currentPrice: 20,
+        retailPrice: 169,
+        discountPercentage: 88,
+        location: 'Phoenix',
+        closeTime: new Date(Date.now() + 2700000).toISOString(),
+        bidCount: 11,
+        imageUrl: 'https://nellisauction.com/images/bosch-kit.jpg',
+        auctionUrl: `https://www.nellisauction.com/p/product/58040123`,
+        timeRemaining: 2700
+      }
+      ];
+      
+      // Filter based on discount ratio and max price
+      const hotDeals = mockHotDeals.filter(deal => {
+        const ratio = deal.currentPrice / deal.retailPrice;
+        const meetsDiscountCriteria = ratio <= maxDiscountRatio;
+        const meetsPriceCriteria = !maxPrice || deal.currentPrice <= maxPrice;
+        return meetsDiscountCriteria && meetsPriceCriteria;
+      });
+      
+      // Apply pagination
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedDeals = hotDeals.slice(startIndex, endIndex);
+      
+      res.json({
+        success: true,
+        location,
+        searchQuery,
+        maxDiscountRatio,
+        maxPrice,
+        count: paginatedDeals.length,
+        deals: paginatedDeals,
+        pagination: {
+          page,
+          limit,
+          totalItems: hotDeals.length,
+          totalPages: Math.ceil(hotDeals.length / limit),
+          hasMore: endIndex < hotDeals.length
+        },
+        lastUpdated: new Date().toISOString(),
+        dataSource: 'mock'
+      });
+      return;
+    }
+    
+    // Use real data from Nellis
+    try {
+      // First, search for products
+      const searchResults = await nellisApi.searchAuctions(searchQuery, { location });
+      
+      if (!searchResults || searchResults.length === 0) {
+        return res.json({
+          success: true,
+          location,
+          searchQuery,
+          maxDiscountRatio,
+          count: 0,
+          deals: [],
+          lastUpdated: new Date().toISOString(),
+          dataSource: 'live'
+        });
+      }
+      
+      // Filter by discount ratio and max price (exclude items with no bids yet)
+      const hotDeals = searchResults.filter(product => {
+        if (!product.retailPrice || product.retailPrice === 0) return false;
+        if (product.currentBid === 0) return false; // Skip items with no bids
+        const ratio = product.currentBid / product.retailPrice;
+        const meetsDiscountCriteria = ratio <= maxDiscountRatio;
+        const meetsPriceCriteria = !maxPrice || product.currentBid <= maxPrice;
+        return meetsDiscountCriteria && meetsPriceCriteria;
+      });
+      
+      // Sort by discount percentage (highest discount first)
+      hotDeals.sort((a, b) => b.discountPercentage - a.discountPercentage);
+      
+      // Apply pagination
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedDeals = hotDeals.slice(startIndex, endIndex);
+      
+      // Get detailed information for these products if needed
+      const productIds = paginatedDeals.map(deal => deal.id);
+      let detailedDeals = paginatedDeals;
+      
+      // Optionally fetch more details using the listings endpoint
+      if (req.query.detailed === 'true' && productIds.length > 0) {
+        try {
+          const detailedListings = await nellisApi.getListingsDetails(productIds);
+          if (detailedListings.length > 0) {
+            detailedDeals = detailedListings;
+          }
+        } catch (detailError) {
+          logger.warn('Could not fetch detailed listings, using search results', { error: detailError.message });
+        }
+      }
+      
+      res.json({
+        success: true,
+        location,
+        searchQuery,
+        maxDiscountRatio,
+        maxPrice,
+        count: detailedDeals.length,
+        deals: detailedDeals,
+        pagination: {
+          page,
+          limit,
+          totalItems: hotDeals.length,
+          totalPages: Math.ceil(hotDeals.length / limit),
+          hasMore: endIndex < hotDeals.length
+        },
+        lastUpdated: new Date().toISOString(),
+        dataSource: 'live',
+        totalSearchResults: searchResults.length
+      });
+      
+    } catch (searchError) {
+      logger.error('Error searching for hot deals, falling back to mock data', { error: searchError.message });
+      
+      // Fall back to mock data on error
+      const mockHotDeals = [
+        {
+          id: '58040119',
+          title: 'DeWalt 20V MAX Cordless Drill/Driver Kit',
+          currentPrice: 25,
+          retailPrice: 199,
+          discountPercentage: 87,
+          location: 'Phoenix',
+          closeTime: new Date(Date.now() + 3600000).toISOString(),
+          bidCount: 15,
+          imageUrl: 'https://nellisauction.com/images/drill.jpg',
+          auctionUrl: `https://www.nellisauction.com/p/product/58040119`,
+          timeRemaining: 3600
+        }
+      ];
+      
+      res.json({
+        success: true,
+        location,
+        searchQuery,
+        maxDiscountRatio,
+        count: mockHotDeals.length,
+        deals: mockHotDeals,
+        lastUpdated: new Date().toISOString(),
+        dataSource: 'mock-fallback',
+        error: 'Failed to fetch live data, showing sample data'
+      });
+    }
+  } catch (error) {
+    logger.error('Error fetching hot deals:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      deals: []
+    });
+  }
+}));
+
+// Get product image URL
+router.get('/product-image/:productId', asyncHandler(async (req, res) => {
+  try {
+    const productId = req.params.productId;
+    
+    // For now, return a constructed URL based on common patterns
+    // In production, this could fetch the actual product page and extract the image
+    const imageUrls = [
+      `https://images-na.ssl-images-amazon.com/images/I/${productId}.jpg`,
+      `https://firebasestorage.googleapis.com/v0/b/nellishr-cbba0.appspot.com/o/processing-photos%2F${productId}%2Fimage.jpeg`,
+      `https://via.placeholder.com/300x200/e5e7eb/6b7280?text=Product+${productId}`
+    ];
+    
+    // Return the first URL as a redirect
+    res.json({
+      success: true,
+      productId,
+      imageUrl: imageUrls[2], // Use placeholder for now
+      alternativeUrls: imageUrls
+    });
+  } catch (error) {
+    logger.error('Error fetching product image:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      imageUrl: 'https://via.placeholder.com/300x200/e5e7eb/6b7280?text=No+Image'
+    });
+  }
+}));
+
 module.exports = router;

@@ -1,0 +1,66 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: auction-tracker-routes
+spec:
+  parentRefs:
+  - name: dev-auction-tracker-gateway
+  hostnames:
+  - "localhost"
+  rules:
+  # Dashboard config endpoint (must come before /api)
+  - matches:
+    - path:
+        type: Exact
+        value: /api/config
+    backendRefs:
+    - name: dev-dashboard
+      port: 3001
+  # Backend API routes
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /api
+    backendRefs:
+    - name: dev-backend
+      port: 3000
+  # WebSocket route
+  - matches:
+    - path:
+        type: Exact
+        value: /ws
+    backendRefs:
+    - name: dev-backend
+      port: 3000
+  # Health check routes
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /health
+    backendRefs:
+    - name: dev-backend
+      port: 3000
+  # Metrics routes
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /metrics
+    backendRefs:
+    - name: dev-backend
+      port: 3000
+  # Swagger UI
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /api-docs
+    backendRefs:
+    - name: dev-backend
+      port: 3000
+  # Dashboard routes (everything else)
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: dev-dashboard
+      port: 3001

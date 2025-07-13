@@ -1,12 +1,13 @@
 // Import logger
-importScripts = importScripts || (() => {});
 try {
   if (typeof ExtensionLogger === 'undefined') {
     const script = document.createElement('script');
     script.src = chrome.runtime.getURL('src/logger.js');
     document.head.appendChild(script);
   }
-} catch (e) {}
+} catch (e) {
+  console.log('NAH: Could not load logger:', e);
+}
 
 // Use setTimeout to ensure logger is loaded
 setTimeout(() => {

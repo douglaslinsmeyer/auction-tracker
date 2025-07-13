@@ -46,5 +46,11 @@
   "options_ui": {
     "page": "options/options.html",
     "open_in_tab": true
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["src/logger.js"],
+      "matches": ["https://www.nellisauction.com/*", "https://nellisauction.com/*"]
+    }
+  ]
 }

@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  labels:
+    app: auction-tracker
+    component: backend
+data:
+  LOG_LEVEL: "info"
+  ALLOWED_EXTENSION_IDS: "nndieiblaeieakimlfknekcfmflgdpbl"
+  ALLOWED_ORIGINS: "http://dashboard:3001"
+  REDIS_URL: "redis://redis:6379"
+  # Feature flags
+  USE_SSE: "true"
+  USE_CIRCUIT_BREAKER: "true"
+  USE_POLLING_QUEUE: "true"
+  # Monitoring
+  ENABLE_METRICS: "true"
+  METRICS_PORT: "9100"
+  # Rate limiting
+  RATE_LIMIT_ENABLED: "true"
+  RATE_LIMIT_WINDOW_MS: "60000"
+  RATE_LIMIT_MAX_REQUESTS: "100"

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+  labels:
+    app: auction-tracker
+    component: redis
+data:
+  # Redis configuration
+  # These can be overridden or extended in overlays
+  REDIS_MAXMEMORY: "100mb"
+  REDIS_MAXMEMORY_POLICY: "allkeys-lru"

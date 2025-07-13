@@ -47,6 +47,12 @@
                 </svg>
                 Auctions
             </a>
+            <a href="#hot-deals" id="nav-hot-deals" class="flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 00-2-2H9a2 2 0 00-2 2v2m5 0V5a2 2 0 012-2h1a2 2 0 012 2v3m0 0h-5m5 0a2 2 0 012 2v3m-5-5v3m0 0h5m-5 0v3m0 0v2a2 2 0 002 2h1a2 2 0 002-2v-2m-5 0h5"></path>
+                </svg>
+                Hot Deals
+            </a>
             <a href="#health" id="nav-health" class="flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
                 <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
@@ -195,6 +201,19 @@
                             </div>
                         </div>
 
+                        <!-- Connection Settings -->
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Connection Settings</h3>
+                            
+                            <div class="space-y-4">
+                                <!-- Backend URL -->
+                                <div>
+                                    <label for="backend-url" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Backend API URL</label>
+                                    <input type="text" id="backend-url" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="http://localhost:3000">
+                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Leave empty to use default (http://localhost:3000)</p>
+                                </div>
+                            </div>
+                        </div>
 
                         <!-- Save Button -->
                         <div class="flex justify-end">
@@ -202,6 +221,141 @@
                                 Save Settings
                             </button>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hot Deals Page -->
+            <div id="hot-deals-page" class="page hidden">
+                <div class="max-w-7xl mx-auto">
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Hot Deals</h2>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Phoenix auctions with current price ≤ <span id="discount-percentage-display">15</span>% of retail value</p>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <div class="text-sm text-gray-500 dark:text-gray-400">
+                                <span id="hot-deals-showing">Showing 0</span> of <span id="hot-deals-total">0</span> deals
+                            </div>
+                            <button id="refresh-hot-deals" class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors">
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Filter Controls -->
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 mb-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <!-- Search Input -->
+                            <div>
+                                <label for="search-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Search Products
+                                </label>
+                                <input type="text" 
+                                    id="search-input" 
+                                    placeholder="e.g. tools, electronics, furniture"
+                                    value="tools"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                            </div>
+                            
+                            <!-- Discount Percentage Slider -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Max Discount Percentage: <span id="discount-percentage-value" class="font-bold text-primary-600">15%</span>
+                                </label>
+                                <input type="range" 
+                                    id="discount-percentage-slider" 
+                                    min="5" 
+                                    max="50" 
+                                    value="15" 
+                                    step="5"
+                                    class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-primary-600">
+                                <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    <span>5%</span>
+                                    <span>25%</span>
+                                    <span>50%</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Max Current Price Input -->
+                            <div>
+                                <label for="max-price-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Max Current Price ($)
+                                </label>
+                                <input type="number" 
+                                    id="max-price-input" 
+                                    min="0" 
+                                    step="10" 
+                                    placeholder="No limit"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                            </div>
+                            
+                            <!-- Default Max Bid Percentage -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Default Max Bid: <span id="max-bid-percentage-value" class="font-bold text-primary-600">20%</span> of retail
+                                </label>
+                                <input type="range" 
+                                    id="max-bid-percentage-slider" 
+                                    min="10" 
+                                    max="50" 
+                                    value="20" 
+                                    step="5"
+                                    class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-primary-600">
+                                <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    <span>10%</span>
+                                    <span>30%</span>
+                                    <span>50%</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Apply Filters Button -->
+                            <div class="flex items-end lg:col-span-2">
+                                <button id="apply-filters-button" class="w-full px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors">
+                                    Apply Filters
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Loading State -->
+                    <div id="hot-deals-loading" class="text-center py-12">
+                        <svg class="inline w-8 h-8 text-gray-400 dark:text-gray-600 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <p class="mt-4 text-gray-500 dark:text-gray-400">Loading hot deals...</p>
+                    </div>
+
+                    <!-- Hot Deals Grid -->
+                    <div id="hot-deals-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 hidden">
+                        <!-- Deal cards will be inserted here -->
+                    </div>
+
+                    <!-- Load More Button -->
+                    <div id="hot-deals-load-more-container" class="text-center mt-6 hidden">
+                        <button id="hot-deals-load-more" class="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors">
+                            Load More Deals
+                        </button>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                            <span id="hot-deals-remaining">0</span> more deals available
+                        </p>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div id="hot-deals-empty" class="text-center py-12 hidden">
+                        <svg class="mx-auto h-16 w-16 text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <p class="mt-4 text-lg font-medium text-gray-900 dark:text-white">No hot deals found</p>
+                        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Check back later for amazing discounts on tools!</p>
+                    </div>
+
+                    <!-- Last Update Info -->
+                    <div class="mt-6 text-center">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                            Last updated: <span id="hot-deals-last-update">Never</span>
+                        </p>
                     </div>
                 </div>
             </div>
@@ -549,8 +703,10 @@
     </div>
 
     <script src="logger.js"></script>
+    <script src="config.js"></script>
     <script src="app.js"></script>
     <script src="health.js"></script>
+    <script src="hot-deals.js"></script>
     <script>
         // Dark mode toggle
         const themeToggle = document.getElementById('theme-toggle');
@@ -634,6 +790,13 @@
             closeSidebarMenu();
         });
 
+        document.getElementById('nav-hot-deals').addEventListener('click', (e) => {
+            e.preventDefault();
+            showPage('hot-deals');
+            history.pushState({ page: 'hot-deals' }, '', '#hot-deals');
+            closeSidebarMenu();
+        });
+
         document.getElementById('nav-health').addEventListener('click', (e) => {
             e.preventDefault();
             showPage('health');
@@ -666,6 +829,70 @@
         showPage(initialPage);
         history.replaceState({ page: initialPage }, '', `#${initialPage}`);
     </script>
+    
+    <!-- Monitor Auction Modal -->
+    <div id="monitor-auction-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div class="absolute inset-0 bg-black bg-opacity-50" id="monitor-modal-backdrop"></div>
+        <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-4">Monitor Auction</h3>
+            
+            <div class="space-y-4">
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                        <span id="monitor-auction-title" class="font-medium text-gray-900 dark:text-white"></span>
+                    </p>
+                    <p class="text-xs text-gray-500 dark:text-gray-500">
+                        Current bid: $<span id="monitor-current-bid">0</span> | 
+                        Retail: $<span id="monitor-retail-price">0</span>
+                    </p>
+                </div>
+                
+                <div>
+                    <label for="monitor-max-bid" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Maximum Bid ($)
+                    </label>
+                    <input type="number" 
+                           id="monitor-max-bid" 
+                           min="1" 
+                           step="1" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                           placeholder="Enter max bid amount">
+                </div>
+                
+                <div>
+                    <label for="monitor-strategy" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Bidding Strategy
+                    </label>
+                    <select id="monitor-strategy" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                        <option value="increment">Auto (Incremental)</option>
+                        <option value="sniping">Sniping (Last Second)</option>
+                    </select>
+                </div>
+                
+                <div class="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+                    <p class="text-sm text-blue-800 dark:text-blue-200">
+                        <strong>Auto:</strong> Automatically bids when outbid, up to your max<br>
+                        <strong>Sniping:</strong> Places bid in the last 10 seconds
+                    </p>
+                </div>
+            </div>
+            
+            <div class="flex gap-3 mt-6">
+                <button id="monitor-confirm-btn" 
+                        class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors">
+                    Start Monitoring
+                </button>
+                <button id="monitor-cancel-btn" 
+                        class="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors">
+                    Cancel
+                </button>
+            </div>
+            
+            <input type="hidden" id="monitor-auction-id">
+        </div>
+    </div>
+    
     <script src="settings.js"></script>
 </body>
 </html>

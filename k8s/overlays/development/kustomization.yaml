@@ -1,0 +1,89 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Base resources
+resources:
+- namespace.yaml
+- ../../base
+
+# Development namespace
+namespace: auction-tracker-dev
+
+# Name prefix for development
+namePrefix: dev-
+
+# Development-specific patches
+patches:
+# Backend patches
+- target:
+    kind: Deployment
+    name: backend
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/env/0/value
+      value: development
+    - op: add
+      path: /spec/template/spec/containers/0/env/-
+      value:
+        name: DEBUG
+        value: "auction:*"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: "512Mi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "256Mi"
+
+# Dashboard patches
+- target:
+    kind: Deployment
+    name: dashboard
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/env/0/value
+      value: development
+
+# Redis patches
+- target:
+    kind: StatefulSet
+    name: redis
+  patch: |-
+    - op: replace
+      path: /spec/volumeClaimTemplates/0/spec/resources/requests/storage
+      value: "100Mi"
+
+# ConfigMap replacements
+configMapGenerator:
+- name: backend-config
+  behavior: merge
+  literals:
+  - LOG_LEVEL=debug
+  - ALLOWED_ORIGINS=http://localhost:3001,http://localhost:8080,http://localhost:3000
+  - RATE_LIMIT_ENABLED=false
+  - HELMET_ENABLED=false
+  - REDIS_URL=redis://dev-redis:6379
+
+- name: dashboard-config
+  behavior: merge
+  literals:
+  - EXTERNAL_BACKEND_URL=http://localhost
+  - EXTERNAL_WS_URL=ws://localhost
+  - ENABLE_ANALYTICS=false
+  - BACKEND_URL=http://dev-backend:3000
+
+# Secret generator for development
+secretGenerator:
+- name: backend-secrets
+  literals:
+  - AUTH_TOKEN=dev-token
+  - ENCRYPTION_SECRET=dev-encryption-key-change-in-production
+
+# Gateway API patches for development
+patches:
+- path: gateway-patch.yaml
+- path: httproute-patch.yaml
+
+# Development-specific labels
+labels:
+- pairs:
+    environment: development

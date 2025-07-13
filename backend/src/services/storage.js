@@ -340,7 +340,7 @@ class StorageService extends EventEmitter {
         autoBidDefault: true
       },
       bidding: {
-        snipeTiming: 5,
+        snipeTiming: 10,
         bidBuffer: 0,
         retryAttempts: 3
       }

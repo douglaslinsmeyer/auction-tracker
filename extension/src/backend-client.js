@@ -40,7 +40,8 @@ class BackendClient {
     }
 
     try {
-      const wsUrl = this.baseUrl.replace(/^http/, 'ws');
+      // Build WebSocket URL with /ws path
+      const wsUrl = this.baseUrl.replace(/^http/, 'ws') + CONFIG.WS.PATH;
       ExtensionLogger.info('Connecting to WebSocket:', wsUrl);
       
       this.ws = new WebSocket(wsUrl);

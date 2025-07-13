@@ -23,10 +23,42 @@ class AuctionMonitorUI {
             auctionCount: document.getElementById('auction-count')
         };
         
-        this.init();
+        // Don't initialize here, wait for config to load
     }
     
-    init() {
+    getBackendUrl() {
+        // Get backend URL from Config service first
+        if (window.Config) {
+            return window.Config.getBackendUrl();
+        }
+        // Fallback to settings manager or localStorage
+        if (typeof settingsManager !== 'undefined' && settingsManager.getBackendUrl) {
+            return settingsManager.getBackendUrl();
+        }
+        return localStorage.getItem('dashboard_backend_url') || 'http://localhost:3000';
+    }
+    
+    async apiCall(path, options = {}) {
+        const url = `${this.getBackendUrl()}${path}`;
+        const authToken = localStorage.getItem('authToken') || 'dev-token';
+        
+        const headers = {
+            'Authorization': authToken,
+            ...options.headers
+        };
+        
+        return fetch(url, {
+            ...options,
+            headers
+        });
+    }
+    
+    async init() {
+        // Wait for configuration to load first
+        if (window.Config) {
+            await window.Config.init();
+        }
+        
         this.connectWebSocket();
         this.attachEventListeners();
         this.initModalHandlers();
@@ -38,25 +70,13 @@ class AuctionMonitorUI {
     }
     
     async connectWebSocket() {
+        // Get WebSocket URL from Config service or derive from backend URL
         let wsUrl;
-        
-        // Try to get configuration from server
-        try {
-            const response = await fetch('/api/config');
-            if (response.ok) {
-                const config = await response.json();
-                wsUrl = config.wsUrl;
-            }
-        } catch (error) {
-            logger.info('Could not fetch config, using defaults');
-        }
-        
-        // Fallback to environment-based URL
-        if (!wsUrl) {
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const host = window.location.hostname;
-            const port = '3000'; // Default backend port
-            wsUrl = `${protocol}//${host}:${port}`;
+        if (window.Config) {
+            wsUrl = window.Config.getWebSocketUrl();
+        } else {
+            const backendUrl = this.getBackendUrl();
+            wsUrl = backendUrl.replace(/^http/, 'ws') + '/ws';
         }
         
         logger.info('Connecting to WebSocket:', wsUrl);
@@ -245,12 +265,7 @@ class AuctionMonitorUI {
     
     async loadAuctions() {
         try {
-            // Get backend URL from config
-            const configResponse = await fetch('/api/config');
-            const config = await configResponse.json();
-            const backendUrl = config.backendUrl || 'http://localhost:3000';
-            
-            const response = await fetch(`${backendUrl}/api/auctions`);
+            const response = await this.apiCall('/api/auctions');
             const data = await response.json();
             
             if (data.auctions) {
@@ -294,7 +309,7 @@ class AuctionMonitorUI {
     
     async clearAllAuctions() {
         try {
-            const response = await fetch('/api/auctions/clear', {
+            const response = await this.apiCall('/api/auctions/clear', {
                 method: 'POST'
             });
             
@@ -309,11 +324,17 @@ class AuctionMonitorUI {
     
     async stopMonitoring(auctionId) {
         try {
-            const response = await fetch(`/api/auctions/${auctionId}/stop`, {
+            const response = await this.apiCall(`/api/auctions/${auctionId}/stop`, {
                 method: 'POST'
             });
             
             if (response.ok) {
+                // Also send WebSocket message to ensure backend stops monitoring
+                this.sendMessage({
+                    type: 'stopMonitoring',
+                    auctionId: auctionId
+                });
+                
                 this.auctions.delete(auctionId);
                 this.render();
             }
@@ -892,18 +913,7 @@ class AuctionMonitorUI {
     
     async checkAuthStatus() {
         try {
-            // Get backend URL from config
-            const configResponse = await fetch('/api/config');
-            const config = await configResponse.json();
-            const backendUrl = config.backendUrl || 'http://localhost:3000';
-            
-            // Check auth status from backend
-            const authToken = localStorage.getItem('authToken');
-            const response = await fetch(`${backendUrl}/api/auth/status`, {
-                headers: {
-                    'Authorization': authToken || 'dev-token'
-                }
-            });
+            const response = await this.apiCall('/api/auth/status');
             const data = await response.json();
             
             this.updateAuthStatus(data.authenticated, data.cookieCount);
@@ -943,7 +953,7 @@ class AuctionMonitorUI {
         empty.classList.add('hidden');
         
         try {
-            const response = await fetch(`/api/auctions/${auctionId}/bids?limit=50`);
+            const response = await this.apiCall(`/api/auctions/${auctionId}/bids?limit=50`);
             const data = await response.json();
             
             if (data.success && data.bidHistory.length > 0) {
@@ -1051,6 +1061,7 @@ class AuctionMonitorUI {
 
 // Initialize the UI when the page loads
 let monitorUI;
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     monitorUI = new AuctionMonitorUI();
+    await monitorUI.init();
 });

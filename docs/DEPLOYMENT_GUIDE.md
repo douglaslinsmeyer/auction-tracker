@@ -1,13 +1,22 @@
 # Deployment Guide
 
-This guide covers the simplified deployment approach for the Nellis Auction Backend service.
+This guide covers deployment approaches for the Nellis Auction Helper system.
 
 ## Overview
 
-The deployment has been simplified from 5 Docker files to 3 core files:
+The application supports two deployment methods:
+1. **Docker Compose** - Simple deployment with 3 core files
+2. **Kubernetes** - Production-grade deployment with Kustomize
+
+### Docker Compose Files
 - `Dockerfile` - Single multi-stage file for both development and production
 - `docker-compose.yml` - Base configuration that works for development by default
 - `docker-compose.prod.yml` - Minimal production overrides
+
+### Kubernetes Structure
+- `k8s/base/` - Base manifests for all components
+- `k8s/overlays/development/` - Development-specific configuration
+- `k8s/overlays/production/` - Production configuration with HPA, PDB, etc.
 
 ## Quick Start
 
@@ -224,6 +233,37 @@ docker cp ./backups/backup.rdb nellis-redis:/data/dump.rdb
 # Start Redis
 docker-compose start redis
 ```
+
+## Kubernetes Deployment
+
+For production-grade deployments, use Kubernetes with Kustomize:
+
+### Quick Setup (Development)
+```bash
+# One-command setup for local development
+./k8s/scripts/setup-local.sh
+
+# Or step by step:
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.0.0/standard-install.yaml
+kustomize build k8s/overlays/development | kubectl apply -f -
+```
+
+### Production Deployment
+```bash
+# Deploy to production
+./k8s/scripts/deploy.sh -e production
+
+# View deployment
+kubectl -n auction-tracker get all
+```
+
+### Data Migration
+```bash
+# Migrate Redis data from Docker to Kubernetes
+./k8s/scripts/migrate-data.sh -n auction-tracker-dev
+```
+
+See [Kubernetes Deployment Guide](./KUBERNETES_DEPLOYMENT.md) for detailed instructions.
 
 ## Troubleshooting
 

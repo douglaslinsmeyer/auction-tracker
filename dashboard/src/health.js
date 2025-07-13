@@ -62,7 +62,7 @@ const HealthMonitor = {
     
     async fetchHealth() {
         try {
-            const response = await fetch('http://localhost:3000/health?detailed=true');
+            const response = await fetch('/health?detailed=true');
             
             // Parse response even if status is 503 (unhealthy)
             const healthData = await response.json();

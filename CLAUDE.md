@@ -69,6 +69,29 @@ docker-compose logs -f backend   # View backend logs
 docker-compose logs -f dashboard # View dashboard logs
 ```
 
+### Kubernetes Commands
+```bash
+# From project root - deploy to Kubernetes
+./k8s/scripts/setup-local.sh   # Quick setup for local development
+./k8s/scripts/deploy.sh -e development  # Deploy development environment
+./k8s/scripts/deploy.sh -e production   # Deploy production environment
+
+# Manual deployment with kustomize
+kustomize build k8s/overlays/development | kubectl apply -f -
+kustomize build k8s/overlays/production | kubectl apply -f -
+
+# Access services
+kubectl -n auction-tracker-dev port-forward service/dev-backend 3000:3000
+kubectl -n auction-tracker-dev port-forward service/dev-dashboard 3001:3001
+
+# View logs
+kubectl -n auction-tracker-dev logs -f deployment/dev-backend
+kubectl -n auction-tracker-dev logs -f deployment/dev-dashboard
+
+# Data migration from Docker to Kubernetes
+./k8s/scripts/migrate-data.sh -n auction-tracker-dev
+```
+
 ## Architecture
 
 ### Backend Architecture
@@ -114,7 +137,7 @@ docker-compose logs -f dashboard # View dashboard logs
 ### Bidding Strategies
 - **Manual**: User-triggered bids only
 - **Aggressive**: Auto-bid up to max when outbid
-- **Last Second**: Snipe bid in final 30 seconds
+- **Last Second**: Snipe bid in final 10 seconds
 - **The only bidding strategies we're implementing are Auto (Incremental) and Sniping**
 
 ### API Documentation
@@ -240,6 +263,10 @@ docker-compose logs -f dashboard # View dashboard logs
 - `coverage/`: Test coverage reports (generated)
 - `logs/`: Application logs (generated)
 - `backups/`: Backup files and scripts
+- `k8s/`: Kubernetes manifests and deployment configurations
+  - `base/`: Base Kubernetes resources (deployments, services, configmaps)
+  - `overlays/`: Environment-specific configurations (development, production)
+  - `scripts/`: Deployment and migration scripts
 
 #### Research Tools
 - `research/nellis-api-analysis.js`: API endpoint discovery
