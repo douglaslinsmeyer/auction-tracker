@@ -218,8 +218,8 @@ describe('Auction Monitor Integration Tests', () => {
     it('should adjust polling rate for auctions ending soon', async () => {
       await auctionMonitor.addAuction(mockAuction.id);
 
-      // Mock auction with 25 seconds left
-      const urgentData = { ...mockAuctionData, timeRemaining: 25 };
+      // Mock auction with 20 seconds left (threshold for increased polling)
+      const urgentData = { ...mockAuctionData, timeRemaining: 20 };
       nellisApi.getAuctionData.mockResolvedValue(urgentData);
 
       const adjustSpy = jest.spyOn(auctionMonitor, 'adjustPollingRate');

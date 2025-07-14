@@ -92,7 +92,8 @@
       "Bash(npm run lint)",
       "Bash(npm run lint:*)",
       "Bash(npx eslint:*)",
-      "Bash(awk:*)"
+      "Bash(awk:*)",
+      "Bash(npm run:*)"
     ],
     "deny": []
   }
