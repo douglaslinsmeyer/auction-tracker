@@ -11,13 +11,13 @@ class NellisApiClass extends INellisApi {
     super();
     // For now, delegate to singleton
     this._singleton = nellisApiSingleton;
-    
+
     // Store dependencies for future use
     this._storage = storage;
     this._logger = logger;
   }
 
-  async initialize() {
+  initialize() {
     return this._singleton.initialize();
   }
 
@@ -29,11 +29,11 @@ class NellisApiClass extends INellisApi {
     return this._singleton.getCookies();
   }
 
-  async getAuctionData(auctionId) {
+  getAuctionData(auctionId) {
     return this._singleton.getAuctionData(auctionId);
   }
 
-  async placeBid(auctionId, amount) {
+  placeBid(auctionId, amount) {
     return this._singleton.placeBid(auctionId, amount);
   }
 
@@ -55,7 +55,7 @@ class NellisApiClass extends INellisApi {
     }
   }
 
-  async getActiveBids() {
+  getActiveBids() {
     // This method might not exist in singleton yet
     if (typeof this._singleton.getActiveBids === 'function') {
       return this._singleton.getActiveBids();
@@ -63,7 +63,7 @@ class NellisApiClass extends INellisApi {
     throw new Error('getActiveBids not implemented yet');
   }
 
-  async getWonAuctions() {
+  getWonAuctions() {
     // This method might not exist in singleton yet
     if (typeof this._singleton.getWonAuctions === 'function') {
       return this._singleton.getWonAuctions();
@@ -71,7 +71,7 @@ class NellisApiClass extends INellisApi {
     throw new Error('getWonAuctions not implemented yet');
   }
 
-  async searchAuctions(query, options = {}) {
+  searchAuctions(query, options = {}) {
     // This method might not exist in singleton yet
     if (typeof this._singleton.searchAuctions === 'function') {
       return this._singleton.searchAuctions(query, options);
@@ -79,7 +79,7 @@ class NellisApiClass extends INellisApi {
     throw new Error('searchAuctions not implemented yet');
   }
 
-  async getCategories() {
+  getCategories() {
     // This method might not exist in singleton yet
     if (typeof this._singleton.getCategories === 'function') {
       return this._singleton.getCategories();

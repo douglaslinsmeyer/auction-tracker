@@ -83,7 +83,7 @@ class RequestSigner {
   async hmacSha256(message, secret) {
     const enc = new TextEncoder();
     const keyData = enc.encode(secret);
-    
+
     const key = await crypto.subtle.importKey(
       'raw',
       keyData,
@@ -93,7 +93,7 @@ class RequestSigner {
     );
 
     const messageData = enc.encode(message);
-    return await crypto.subtle.sign('HMAC', key, messageData);
+    return crypto.subtle.sign('HMAC', key, messageData);
   }
 
   /**

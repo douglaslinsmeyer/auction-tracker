@@ -56,14 +56,14 @@ describe('Auction Dashboard UI', () => {
 
       // Click dark mode toggle
       await page.click('#theme-toggle');
-      
+
       // Check if dark mode is enabled
       const darkModeEnabled = await page.$eval('html', el => el.classList.contains('dark'));
       expect(darkModeEnabled).toBe(true);
 
       // Click again to toggle back
       await page.click('#theme-toggle');
-      
+
       // Check if dark mode is disabled
       const darkModeDisabled = await page.$eval('html', el => el.classList.contains('dark'));
       expect(darkModeDisabled).toBe(false);
@@ -74,11 +74,11 @@ describe('Auction Dashboard UI', () => {
     test('should navigate to settings page', async () => {
       // Click settings link
       await page.click('#nav-settings');
-      
+
       // Check if settings page is visible
       const settingsPageVisible = await page.$eval('#settings-page', el => !el.classList.contains('hidden'));
       expect(settingsPageVisible).toBe(true);
-      
+
       // Check if auctions page is hidden
       const auctionsPageHidden = await page.$eval('#auctions-page', el => el.classList.contains('hidden'));
       expect(auctionsPageHidden).toBe(true);
@@ -87,14 +87,14 @@ describe('Auction Dashboard UI', () => {
     test('should navigate back to auctions page', async () => {
       // Navigate to settings first
       await page.click('#nav-settings');
-      
+
       // Navigate back to auctions
       await page.click('#nav-auctions');
-      
+
       // Check if auctions page is visible
       const auctionsPageVisible = await page.$eval('#auctions-page', el => !el.classList.contains('hidden'));
       expect(auctionsPageVisible).toBe(true);
-      
+
       // Check if settings page is hidden
       const settingsPageHidden = await page.$eval('#settings-page', el => el.classList.contains('hidden'));
       expect(settingsPageHidden).toBe(true);
@@ -105,21 +105,21 @@ describe('Auction Dashboard UI', () => {
     test('should open and close sidebar on mobile', async () => {
       // Set viewport to mobile size
       await page.setViewport({ width: 375, height: 667 });
-      
+
       // Check initial state (sidebar should be closed)
       const initialSidebarState = await page.$eval('#sidebar', el => el.classList.contains('-translate-x-full'));
       expect(initialSidebarState).toBe(true);
-      
+
       // Click menu toggle
       await page.click('#menu-toggle');
-      
+
       // Check if sidebar is open
       const sidebarOpen = await page.$eval('#sidebar', el => !el.classList.contains('-translate-x-full'));
       expect(sidebarOpen).toBe(true);
-      
+
       // Click close button
       await page.click('#close-sidebar');
-      
+
       // Check if sidebar is closed
       const sidebarClosed = await page.$eval('#sidebar', el => el.classList.contains('-translate-x-full'));
       expect(sidebarClosed).toBe(true);
@@ -140,7 +140,7 @@ describe('Auction Dashboard UI', () => {
       const snipeTiming = await page.$('#snipe-timing');
       const bidBuffer = await page.$('#bid-buffer');
       const retryAttempts = await page.$('#retry-attempts');
-      
+
       expect(defaultMaxBid).toBeTruthy();
       expect(defaultStrategy).toBeTruthy();
       expect(autoBidDefault).toBeTruthy();
@@ -153,10 +153,10 @@ describe('Auction Dashboard UI', () => {
       // Clear and type new value for max bid
       await page.click('#default-max-bid', { clickCount: 3 });
       await page.type('#default-max-bid', '250');
-      
+
       const maxBidValue = await page.$eval('#default-max-bid', el => el.value);
       expect(maxBidValue).toBe('250');
-      
+
       // Change strategy dropdown
       await page.select('#default-strategy', 'sniping');
       const strategyValue = await page.$eval('#default-strategy', el => el.value);
@@ -166,7 +166,7 @@ describe('Auction Dashboard UI', () => {
     test('should have save button', async () => {
       const saveButton = await page.$('#save-settings');
       expect(saveButton).toBeTruthy();
-      
+
       const buttonText = await page.$eval('#save-settings', el => el.textContent);
       expect(buttonText.trim()).toBe('Save Settings');
     });
@@ -176,7 +176,7 @@ describe('Auction Dashboard UI', () => {
     test('should display connection status', async () => {
       const connectionStatus = await page.$('#connection-status');
       expect(connectionStatus).toBeTruthy();
-      
+
       const connectionText = await page.$eval('#connection-text', el => el.textContent);
       expect(connectionText).toBe('Connecting');
     });
@@ -191,7 +191,7 @@ describe('Auction Dashboard UI', () => {
     test('should show empty state when no auctions', async () => {
       const emptyState = await page.$('#empty-state');
       expect(emptyState).toBeTruthy();
-      
+
       const emptyStateText = await page.$eval('#empty-state p', el => el.textContent);
       expect(emptyStateText).toContain('No auctions being monitored');
     });
@@ -200,7 +200,7 @@ describe('Auction Dashboard UI', () => {
   describe('Responsive Design', () => {
     test('should adapt layout for desktop', async () => {
       await page.setViewport({ width: 1920, height: 1080 });
-      
+
       // On desktop, sidebar toggle should still work
       const menuToggle = await page.$('#menu-toggle');
       expect(menuToggle).toBeTruthy();
@@ -208,7 +208,7 @@ describe('Auction Dashboard UI', () => {
 
     test('should adapt layout for tablet', async () => {
       await page.setViewport({ width: 768, height: 1024 });
-      
+
       // Check if grid layout adjusts
       const gridClasses = await page.$eval('#auctions-grid', el => el.className);
       expect(gridClasses).toContain('sm:grid-cols-2');

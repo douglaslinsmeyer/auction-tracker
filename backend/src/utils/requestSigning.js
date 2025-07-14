@@ -50,7 +50,7 @@ class RequestSigning {
     try {
       // Extract signature headers
       const signature = req.headers['x-signature'];
-      const timestamp = parseInt(req.headers['x-timestamp']);
+      const timestamp = parseInt(req.headers['x-timestamp'], 10);
 
       if (!signature) {
         return { valid: false, error: 'Missing signature header' };
@@ -112,10 +112,10 @@ class RequestSigning {
    * @returns {Function} Express middleware
    */
   middleware(secret, options = {}) {
-    const { 
-      required = false, 
-      excludePaths = ['/health', '/api-docs'], 
-      headerName = 'x-signature-required' 
+    const {
+      required = false,
+      excludePaths = ['/health', '/api-docs'],
+      headerName = 'x-signature-required'
     } = options;
 
     return (req, res, next) => {
@@ -130,7 +130,7 @@ class RequestSigning {
       // If signature is present, verify it
       if (req.headers['x-signature']) {
         const result = this.verifySignature(req, secret);
-        
+
         if (!result.valid) {
           logger.warn('Request signature verification failed', {
             error: result.error,
@@ -162,6 +162,7 @@ class RequestSigning {
       }
 
       next();
+      return undefined;
     };
   }
 

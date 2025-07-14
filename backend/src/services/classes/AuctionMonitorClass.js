@@ -12,26 +12,26 @@ class AuctionMonitorClass extends IAuctionMonitor {
     // For now, delegate to singleton
     // In future, this will contain the actual implementation
     this._singleton = auctionMonitorSingleton;
-    
+
     // Store dependencies for future use
     this._storage = storage;
     this._nellisApi = nellisApi;
     this._logger = logger;
   }
 
-  async initialize(wss, broadcastHandler) {
+  initialize(wss, broadcastHandler) {
     return this._singleton.initialize(wss, broadcastHandler);
   }
 
-  async addAuction(auctionId, config, metadata) {
+  addAuction(auctionId, config, metadata) {
     return this._singleton.addAuction(auctionId, config, metadata);
   }
 
-  async removeAuction(auctionId) {
+  removeAuction(auctionId) {
     return this._singleton.removeAuction(auctionId);
   }
 
-  async updateAuctionConfig(auctionId, configUpdates) {
+  updateAuctionConfig(auctionId, configUpdates) {
     return this._singleton.updateAuctionConfig(auctionId, configUpdates);
   }
 
@@ -47,7 +47,7 @@ class AuctionMonitorClass extends IAuctionMonitor {
     return this._singleton.isMonitoring(auctionId);
   }
 
-  async handleBid(auctionId, amount, strategy) {
+  handleBid(auctionId, amount, strategy) {
     return this._singleton.handleBid(auctionId, amount, strategy);
   }
 
@@ -61,6 +61,7 @@ class AuctionMonitorClass extends IAuctionMonitor {
     if (auction) {
       await this._singleton.updateAuction(auctionId);
     }
+    return undefined;
   }
 
   shutdown() {

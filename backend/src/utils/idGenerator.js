@@ -15,11 +15,11 @@ class IdGenerator {
   static generate(prefix = '', byteLength = 16) {
     const randomBytes = crypto.randomBytes(byteLength);
     const randomId = randomBytes.toString('hex');
-    
+
     if (prefix) {
       return `${prefix}_${randomId}`;
     }
-    
+
     return randomId;
   }
 
@@ -61,11 +61,11 @@ class IdGenerator {
    */
   static generateUUID() {
     const bytes = crypto.randomBytes(16);
-    
+
     // Set version (4) and variant bits
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    
+
     const hex = bytes.toString('hex');
     return [
       hex.substring(0, 8),
@@ -85,11 +85,11 @@ class IdGenerator {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     const bytes = crypto.randomBytes(length);
     let result = '';
-    
+
     for (let i = 0; i < length; i++) {
       result += chars[bytes[i] % chars.length];
     }
-    
+
     return result;
   }
 

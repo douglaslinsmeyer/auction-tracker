@@ -1,3 +1,4 @@
+/* eslint-disable require-await */
 /**
  * Interface for Auction Monitor Service
  * Defines the contract for auction monitoring functionality
@@ -10,7 +11,7 @@ class IAuctionMonitor {
    * @param {Function} broadcastHandler - Handler for broadcasting updates
    * @returns {Promise<void>}
    */
-  async initialize(wss, broadcastHandler) {
+  async initialize(_wss, _broadcastHandler) {
     throw new Error('Method initialize() must be implemented');
   }
 
@@ -21,7 +22,7 @@ class IAuctionMonitor {
    * @param {Object} metadata - Optional metadata
    * @returns {Promise<boolean>} Success status
    */
-  async addAuction(auctionId, config, metadata) {
+  async addAuction(_auctionId, _config, _metadata) {
     throw new Error('Method addAuction() must be implemented');
   }
 
@@ -30,7 +31,7 @@ class IAuctionMonitor {
    * @param {string} auctionId - The auction ID
    * @returns {Promise<boolean>} Success status
    */
-  async removeAuction(auctionId) {
+  async removeAuction(_auctionId) {
     throw new Error('Method removeAuction() must be implemented');
   }
 
@@ -40,7 +41,7 @@ class IAuctionMonitor {
    * @param {Object} configUpdates - Configuration updates
    * @returns {Promise<boolean>} Success status
    */
-  async updateAuctionConfig(auctionId, configUpdates) {
+  async updateAuctionConfig(_auctionId, _configUpdates) {
     throw new Error('Method updateAuctionConfig() must be implemented');
   }
 
@@ -65,7 +66,7 @@ class IAuctionMonitor {
    * @param {string} auctionId - The auction ID
    * @returns {boolean} True if monitored
    */
-  isMonitoring(auctionId) {
+  isMonitoring(_auctionId) {
     throw new Error('Method isMonitoring() must be implemented');
   }
 
@@ -76,7 +77,7 @@ class IAuctionMonitor {
    * @param {string} strategy - Bidding strategy
    * @returns {Promise<Object>} Bid result
    */
-  async handleBid(auctionId, amount, strategy) {
+  async handleBid(_auctionId, _amount, _strategy) {
     throw new Error('Method handleBid() must be implemented');
   }
 
@@ -85,7 +86,7 @@ class IAuctionMonitor {
    * @param {string} auctionId - The auction ID
    * @returns {Promise<void>}
    */
-  async forceUpdate(auctionId) {
+  async forceUpdate(_auctionId) {
     throw new Error('Method forceUpdate() must be implemented');
   }
 

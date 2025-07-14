@@ -22,7 +22,7 @@ class MockNellisServer {
     this.app.get('/auction/:auctionId', (req, res) => {
       const { auctionId } = req.params;
       const auction = this.auctions.get(auctionId) || this.createDefaultAuction(auctionId);
-      
+
       res.send(this.generateAuctionHTML(auction));
     });
 
@@ -30,37 +30,37 @@ class MockNellisServer {
     this.app.get('/api/auction/:auctionId', (req, res) => {
       const { auctionId } = req.params;
       const auction = this.auctions.get(auctionId);
-      
+
       if (!auction) {
         return res.status(404).json({ error: 'Auction not found' });
       }
-      
-      res.json(auction);
+
+      return res.json(auction);
     });
 
     this.app.post('/api/bid', (req, res) => {
       const { auctionId, amount, userId } = req.body;
       const auction = this.auctions.get(auctionId);
-      
+
       if (!auction) {
         return res.status(404).json({ error: 'Auction not found' });
       }
-      
+
       if (amount <= auction.currentBid) {
         return res.status(400).json({ error: 'Bid too low' });
       }
-      
+
       // Update auction
       auction.currentBid = amount;
       auction.bidCount++;
       auction.lastBidder = userId;
       auction.lastBidTime = new Date().toISOString();
-      
+
       // Reset timer if bid in last 30 seconds
       if (auction.timeLeft <= 30) {
         auction.timeLeft = 30;
       }
-      
+
       // Store bid
       if (!this.bids.has(auctionId)) {
         this.bids.set(auctionId, []);
@@ -70,32 +70,32 @@ class MockNellisServer {
         userId,
         timestamp: new Date().toISOString()
       });
-      
+
       // Broadcast update
       this.broadcastAuctionUpdate(auction);
-      
-      res.json({ success: true, auction });
+
+      return res.json({ success: true, auction });
     });
 
     // SSE endpoint
     this.app.get('/sse/:channelId', (req, res) => {
       const { channelId } = req.params;
-      
+
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
         'Access-Control-Allow-Origin': '*'
       });
-      
+
       // Send initial connection event
       res.write(`data: {"type":"connected","channel":"${channelId}"}\n\n`);
-      
+
       // Store connection
       const client = { res, channelId };
-      if (!this.sseClients) this.sseClients = [];
+      if (!this.sseClients) { this.sseClients = []; }
       this.sseClients.push(client);
-      
+
       // Handle client disconnect
       req.on('close', () => {
         this.sseClients = this.sseClients.filter(c => c !== client);
@@ -119,7 +119,7 @@ class MockNellisServer {
       lastBidder: 'user123',
       lastBidTime: new Date().toISOString()
     };
-    
+
     this.auctions.set(auctionId, auction);
     return auction;
   }
@@ -215,7 +215,7 @@ class MockNellisServer {
       type: 'auctionUpdate',
       auction
     });
-    
+
     // WebSocket broadcast
     if (this.wss) {
       this.wss.clients.forEach(client => {
@@ -224,33 +224,33 @@ class MockNellisServer {
         }
       });
     }
-    
+
     // SSE broadcast
     if (this.sseClients) {
       const sseMessage = `data: ${JSON.stringify({
         type: 'ch_product_bids:' + auction.id,
         data: auction
       })}\n\n`;
-      
+
       this.sseClients.forEach(client => {
         client.res.write(sseMessage);
       });
     }
   }
 
-  async start() {
+  start() {
     return new Promise((resolve) => {
       this.server = http.createServer(this.app);
-      
+
       // Setup WebSocket
       this.wss = new WebSocket.Server({ server: this.server });
-      
+
       this.wss.on('connection', (ws) => {
-        ws.on('message', (message) => {
+        ws.on('message', (_message) => {
           // Handle WebSocket messages if needed
         });
       });
-      
+
       this.server.listen(this.port, () => {
         console.log(`Mock Nellis server running on http://localhost:${this.port}`);
         resolve();
@@ -258,16 +258,17 @@ class MockNellisServer {
     });
   }
 
-  async stop() {
+  stop() {
     if (this.wss) {
       this.wss.close();
     }
-    
+
     if (this.server) {
       return new Promise((resolve) => {
         this.server.close(resolve);
       });
     }
+    return Promise.resolve();
   }
 
   // Test control methods
@@ -286,11 +287,11 @@ class MockNellisServer {
       auction.bidCount++;
       auction.lastBidder = userId;
       auction.lastBidTime = new Date().toISOString();
-      
+
       if (auction.timeLeft <= 30) {
         auction.timeLeft = 30;
       }
-      
+
       this.broadcastAuctionUpdate(auction);
     }
   }
@@ -301,14 +302,14 @@ class MockNellisServer {
       auction.timeLeft = 0;
       auction.status = 'closed';
       this.broadcastAuctionUpdate(auction);
-      
+
       // Send SSE close event
       if (this.sseClients) {
         const closeMessage = `data: ${JSON.stringify({
           type: 'ch_product_closed:' + auction.id,
           data: auction
         })}\n\n`;
-        
+
         this.sseClients.forEach(client => {
           client.res.write(closeMessage);
         });

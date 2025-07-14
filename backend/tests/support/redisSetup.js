@@ -9,7 +9,7 @@ async function waitForRedis(timeout = 30000) {
   });
 
   const startTime = Date.now();
-  
+
   while (Date.now() - startTime < timeout) {
     try {
       await redis.connect();
@@ -23,7 +23,7 @@ async function waitForRedis(timeout = 30000) {
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
   }
-  
+
   throw new Error(`Redis not ready after ${timeout}ms`);
 }
 

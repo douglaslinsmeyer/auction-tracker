@@ -1,7 +1,7 @@
 /**
  * Enhanced Health Check System
  * Provides comprehensive health status for production monitoring
- * 
+ *
  * Now includes independent health storage to survive Redis failures
  */
 
@@ -13,13 +13,13 @@ class HealthChecker {
   constructor() {
     this.checks = new Map();
     this.startTime = Date.now();
-    
+
     // Register default checks
     this.registerCheck('memory', this.checkMemory.bind(this));
     this.registerCheck('eventLoop', this.checkEventLoop.bind(this));
     this.registerCheck('diskSpace', this.checkDiskSpace.bind(this));
   }
-  
+
   /**
    * Register a health check
    * @param {string} name - Check name
@@ -28,7 +28,7 @@ class HealthChecker {
   registerCheck(name, checkFn) {
     this.checks.set(name, checkFn);
   }
-  
+
   /**
    * Run all health checks
    * @param {boolean} detailed - Include detailed information
@@ -41,14 +41,14 @@ class HealthChecker {
       uptime: Math.floor((Date.now() - this.startTime) / 1000),
       checks: {}
     };
-    
+
     // Run all checks in parallel
     const checkPromises = Array.from(this.checks.entries()).map(async ([name, checkFn]) => {
       try {
         const startTime = Date.now();
         const result = await checkFn();
         const duration = Date.now() - startTime;
-        
+
         return {
           name,
           status: result.status || 'healthy',
@@ -66,23 +66,23 @@ class HealthChecker {
         };
       }
     });
-    
+
     const checkResults = await Promise.all(checkPromises);
-    
+
     // Aggregate results
     let overallStatus = 'healthy';
     for (const check of checkResults) {
       results.checks[check.name] = check;
-      
+
       if (check.status === 'unhealthy') {
         overallStatus = 'unhealthy';
       } else if (check.status === 'degraded' && overallStatus === 'healthy') {
         overallStatus = 'degraded';
       }
     }
-    
+
     results.status = overallStatus;
-    
+
     // Store health check result in independent storage
     try {
       await healthStorage.addHealthCheck(results);
@@ -90,26 +90,26 @@ class HealthChecker {
       // Don't fail health check if storage fails
       logger.debug('Failed to store health check result:', error);
     }
-    
+
     return results;
   }
-  
+
   /**
    * Check memory usage
    */
-  async checkMemory() {
+  checkMemory() {
     const memUsage = process.memoryUsage();
     const totalMemory = os.totalmem();
     const freeMemory = os.freemem();
-    
+
     const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
     const heapTotalMB = Math.round(memUsage.heapTotal / 1024 / 1024);
     const rssMB = Math.round(memUsage.rss / 1024 / 1024);
-    
+
     // Check if we're approaching the 256MB limit
     let status = 'healthy';
     let message = `Heap: ${heapUsedMB}MB/${heapTotalMB}MB, RSS: ${rssMB}MB`;
-    
+
     if (rssMB > 200) {
       status = 'degraded';
       message = `High memory usage: ${rssMB}MB (approaching 256MB limit)`;
@@ -117,7 +117,7 @@ class HealthChecker {
       status = 'unhealthy';
       message = `Critical memory usage: ${rssMB}MB (exceeds safe threshold)`;
     }
-    
+
     return {
       status,
       message,
@@ -136,21 +136,21 @@ class HealthChecker {
       }
     };
   }
-  
+
   /**
    * Check event loop lag
    */
-  async checkEventLoop() {
+  checkEventLoop() {
     return new Promise((resolve) => {
       const start = process.hrtime.bigint();
-      
+
       setImmediate(() => {
         const end = process.hrtime.bigint();
         const lagMs = Number(end - start) / 1000000; // Convert to milliseconds
-        
+
         let status = 'healthy';
         let message = `Event loop lag: ${lagMs.toFixed(2)}ms`;
-        
+
         if (lagMs > 100) {
           status = 'degraded';
           message = `High event loop lag: ${lagMs.toFixed(2)}ms`;
@@ -158,7 +158,7 @@ class HealthChecker {
           status = 'unhealthy';
           message = `Critical event loop lag: ${lagMs.toFixed(2)}ms`;
         }
-        
+
         resolve({
           status,
           message,
@@ -173,7 +173,7 @@ class HealthChecker {
       });
     });
   }
-  
+
   /**
    * Check disk space for logs
    */
@@ -182,24 +182,24 @@ class HealthChecker {
       const { promisify } = require('util');
       const { exec } = require('child_process');
       const execAsync = promisify(exec);
-      
+
       // Check disk space for the logs directory
       const { stdout } = await execAsync('df -h /app/logs 2>/dev/null || df -h .');
       const lines = stdout.trim().split('\n');
-      
+
       if (lines.length < 2) {
         return {
           status: 'degraded',
           message: 'Unable to determine disk space'
         };
       }
-      
+
       const diskInfo = lines[1].split(/\s+/);
-      const usePercentage = parseInt(diskInfo[4].replace('%', ''));
-      
+      const usePercentage = parseInt(diskInfo[4].replace('%', ''), 10);
+
       let status = 'healthy';
       let message = `Disk usage: ${diskInfo[4]} (${diskInfo[3]} available)`;
-      
+
       if (usePercentage > 80) {
         status = 'degraded';
         message = `High disk usage: ${diskInfo[4]} (${diskInfo[3]} available)`;
@@ -207,7 +207,7 @@ class HealthChecker {
         status = 'unhealthy';
         message = `Critical disk usage: ${diskInfo[4]} (${diskInfo[3]} available)`;
       }
-      
+
       return {
         status,
         message,
@@ -227,7 +227,7 @@ class HealthChecker {
       };
     }
   }
-  
+
   /**
    * Create a simple health check (for load balancers)
    */
@@ -238,7 +238,7 @@ class HealthChecker {
       timestamp: health.timestamp
     };
   }
-  
+
   /**
    * Get readiness status (for k8s-style deployments)
    */
@@ -248,8 +248,8 @@ class HealthChecker {
     const results = await Promise.all(
       checks.map(async (name) => {
         const checkFn = this.checks.get(name);
-        if (!checkFn) return { status: 'healthy' };
-        
+        if (!checkFn) { return { status: 'healthy' }; }
+
         try {
           const result = await checkFn();
           return result;
@@ -258,20 +258,20 @@ class HealthChecker {
         }
       })
     );
-    
+
     const isReady = results.every(r => r.status !== 'unhealthy');
-    
+
     return {
       ready: isReady,
       timestamp: new Date().toISOString(),
       checks: results.length
     };
   }
-  
+
   /**
    * Get liveness status (for k8s-style deployments)
    */
-  async getLiveness() {
+  getLiveness() {
     // Simple check that the process is responsive
     return {
       alive: true,

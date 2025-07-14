@@ -1,9 +1,9 @@
 const { launchBrowserWithExtension, openExtensionPopup } = require('../helpers/extensionLoader');
-const { 
-  configureAuthToken, 
-  connectToBackend, 
-  navigateToAuction,
-  startMonitoringFromPage,
+const {
+  configureAuthToken,
+  connectToBackend,
+  // navigateToAuction,
+  // startMonitoringFromPage,
   getMonitoredAuctions,
   waitForAuctionUpdate
 } = require('../helpers/extensionHelpers');
@@ -57,8 +57,8 @@ describeSkipIfHeadless('Auction Monitoring via Extension', () => {
 
     // Navigate to auction page
     const auctionPage = await browser.newPage();
-    await auctionPage.goto(`http://localhost:${mockPort}/auction/${auctionId}`, { 
-      waitUntil: 'networkidle0' 
+    await auctionPage.goto(`http://localhost:${mockPort}/auction/${auctionId}`, {
+      waitUntil: 'networkidle0'
     });
 
     // Wait for extension content script to inject
@@ -87,13 +87,13 @@ describeSkipIfHeadless('Auction Monitoring via Extension', () => {
 
     // Open popup to verify monitoring started
     const popupPage = await openExtensionPopup(browser, extensionId);
-    
+
     // Wait for auction to appear in monitored list
     await popupPage.waitForTimeout(2000);
-    
+
     const monitoredAuctions = await getMonitoredAuctions(popupPage);
     const isMonitoring = monitoredAuctions.some(a => a.id === auctionId);
-    
+
     expect(monitoredAuctions.length).toBeGreaterThan(0);
     // If backend is running, should show the auction
     if (isMonitoring) {
@@ -126,10 +126,10 @@ describeSkipIfHeadless('Auction Monitoring via Extension', () => {
 
     // Get monitored auctions
     const monitoredAuctions = await getMonitoredAuctions(popupPage);
-    
+
     // Should have multiple auctions (if backend is running)
     console.log(`Monitoring ${monitoredAuctions.length} auctions`);
-    
+
     // Verify UI shows multiple auctions
     const auctionElements = await popupPage.$$('.auction-item');
     expect(auctionElements.length).toBeGreaterThanOrEqual(0);
@@ -141,8 +141,8 @@ describeSkipIfHeadless('Auction Monitoring via Extension', () => {
 
     // Start monitoring
     const auctionPage = await browser.newPage();
-    await auctionPage.goto(`http://localhost:${mockPort}/auction/${auctionId}`, { 
-      waitUntil: 'networkidle0' 
+    await auctionPage.goto(`http://localhost:${mockPort}/auction/${auctionId}`, {
+      waitUntil: 'networkidle0'
     });
 
     // Open popup
@@ -166,16 +166,16 @@ describeSkipIfHeadless('Auction Monitoring via Extension', () => {
     // Wait for update in popup
     try {
       await waitForAuctionUpdate(
-        popupPage, 
-        auctionId, 
+        popupPage,
+        auctionId,
         (auction) => auction.currentBid && auction.currentBid.includes('75'),
         5000
       );
-      
+
       // Verify bid updated
       const auctions = await getMonitoredAuctions(popupPage);
       const updatedAuction = auctions.find(a => a.id === auctionId);
-      
+
       if (updatedAuction) {
         expect(updatedAuction.currentBid).toContain('75');
       }
@@ -205,7 +205,7 @@ describeSkipIfHeadless('Auction Monitoring via Extension', () => {
     const stopButton = await popupPage.$(`.auction-item[data-auction-id="${auctionId}"] .stop-button`);
     if (stopButton) {
       await stopButton.click();
-      
+
       // Wait for removal
       await popupPage.waitForFunction(
         (id) => !document.querySelector(`.auction-item[data-auction-id="${id}"]`),
@@ -279,7 +279,7 @@ describeSkipIfHeadless('Auction Monitoring via Extension', () => {
       // Verify auction shows as closed
       const auctions = await getMonitoredAuctions(popupPage);
       const closedAuction = auctions.find(a => a.id === auctionId);
-      
+
       if (closedAuction) {
         expect(closedAuction.status.toLowerCase()).toContain('closed');
       }

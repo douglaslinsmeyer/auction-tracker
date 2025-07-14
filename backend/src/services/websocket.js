@@ -1,17 +1,18 @@
 const WebSocket = require('ws');
 const auctionMonitor = require('./auctionMonitor');
 const schemas = require('../validators/schemas');
-const { sanitizeObject } = require('../middleware/validation');
+// const { sanitizeObject } = require('../middleware/validation'); // Currently unused
 const IdGenerator = require('../utils/idGenerator');
+const logger = require('../utils/logger');
 
 class WebSocketHandler {
   constructor() {
     this.clients = new Map();
   }
 
-  handleConnection(ws, wss) {
+  handleConnection(ws) {
     const clientId = this.generateClientId();
-    
+
     // Store client info
     this.clients.set(clientId, {
       ws: ws,
@@ -19,7 +20,7 @@ class WebSocketHandler {
       authenticated: false
     });
 
-    console.info(`WebSocket client connected: ${clientId}`);
+    logger.info(`WebSocket client connected: ${clientId}`);
 
     // Send welcome message
     ws.send(JSON.stringify({
@@ -40,7 +41,7 @@ class WebSocketHandler {
 
     // Handle errors
     ws.on('error', (error) => {
-      console.error(`WebSocket error for client ${clientId}:`, error);
+      logger.error(`WebSocket error for client ${clientId}:`, error);
     });
 
     // Send current monitored auctions
@@ -49,60 +50,60 @@ class WebSocketHandler {
 
   handleMessage(clientId, message) {
     const client = this.clients.get(clientId);
-    if (!client) return;
+    if (!client) { return; }
 
     try {
       const data = JSON.parse(message);
-      console.log(`Received message from client ${clientId}:`, data);
-      
+      logger.info(`Received message from client ${clientId}:`, data);
+
       // Store requestId to include in response
       const requestId = data.requestId;
-      console.log(`RequestId for this message: ${requestId}`);
-      
+      logger.info(`RequestId for this message: ${requestId}`);
+
       switch (data.type) {
         case 'authenticate':
-          console.log(`Calling handleAuthentication with requestId: ${requestId}`);
+          logger.info(`Calling handleAuthentication with requestId: ${requestId}`);
           this.handleAuthentication(clientId, data, requestId);
           break;
-          
+
         case 'subscribe':
           this.handleSubscribe(clientId, data.auctionId);
           break;
-          
+
         case 'unsubscribe':
           this.handleUnsubscribe(clientId, data.auctionId);
           break;
-          
+
         case 'startMonitoring':
           this.handleStartMonitoring(clientId, data, requestId);
           break;
-          
+
         case 'stopMonitoring':
           this.handleStopMonitoring(clientId, data.auctionId, requestId);
           break;
-          
+
         case 'updateConfig':
           this.handleUpdateConfig(clientId, data, requestId);
           break;
-          
+
         case 'placeBid':
           this.handlePlaceBid(clientId, data);
           break;
-          
+
         case 'ping':
-          console.log(`Received ping from client ${clientId}, sending pong`);
+          logger.info(`Received ping from client ${clientId}, sending pong`);
           client.ws.send(JSON.stringify({ type: 'pong' }));
           break;
-          
+
         case 'getMonitoredAuctions':
           this.handleGetMonitoredAuctions(clientId, requestId);
           break;
-          
+
         default:
-          console.warn(`Unknown message type: ${data.type}`);
+          logger.warn(`Unknown message type: ${data.type}`);
       }
     } catch (error) {
-      console.error(`Error handling message from client ${clientId}:`, error);
+      logger.error(`Error handling message from client ${clientId}:`, error);
       client.ws.send(JSON.stringify({
         type: 'error',
         error: 'Invalid message format'
@@ -112,14 +113,14 @@ class WebSocketHandler {
 
   handleAuthentication(clientId, data, requestId) {
     const client = this.clients.get(clientId);
-    if (!client) return;
+    if (!client) { return; }
 
     // Simple token-based auth for now
     // In production, implement proper JWT or OAuth
     const validToken = process.env.AUTH_TOKEN;
-    
+
     if (!validToken) {
-      console.error('AUTH_TOKEN environment variable is not set');
+      logger.error('AUTH_TOKEN environment variable is not set');
       client.ws.send(JSON.stringify({
         type: 'authenticated',
         success: false,
@@ -128,7 +129,7 @@ class WebSocketHandler {
       }));
       return;
     }
-    
+
     if (data.token === validToken) {
       client.authenticated = true;
       const response = {
@@ -136,9 +137,9 @@ class WebSocketHandler {
         success: true,
         requestId: requestId
       };
-      console.log(`Sending auth response to client ${clientId}:`, response);
+      logger.info(`Sending auth response to client ${clientId}:`, response);
       client.ws.send(JSON.stringify(response));
-      console.info(`Client ${clientId} authenticated successfully`);
+      logger.info(`Client ${clientId} authenticated successfully`);
     } else {
       client.ws.send(JSON.stringify({
         type: 'authenticated',
@@ -146,7 +147,7 @@ class WebSocketHandler {
         error: 'Invalid authentication token',
         requestId: requestId
       }));
-      console.warn(`Client ${clientId} failed authentication`);
+      logger.warn(`Client ${clientId} failed authentication`);
     }
   }
 
@@ -158,12 +159,12 @@ class WebSocketHandler {
     }
 
     client.subscriptions.add(auctionId);
-    console.info(`Client ${clientId} subscribed to auction ${auctionId}`);
-    
+    logger.info(`Client ${clientId} subscribed to auction ${auctionId}`);
+
     // Send current auction data
     const auctions = auctionMonitor.getMonitoredAuctions();
     const auction = auctions.find(a => a.id === auctionId);
-    
+
     if (auction) {
       client.ws.send(JSON.stringify({
         type: 'auctionUpdate',
@@ -175,18 +176,18 @@ class WebSocketHandler {
 
   handleUnsubscribe(clientId, auctionId) {
     const client = this.clients.get(clientId);
-    if (!client) return;
+    if (!client) { return; }
 
     client.subscriptions.delete(auctionId);
-    console.info(`Client ${clientId} unsubscribed from auction ${auctionId}`);
+    logger.info(`Client ${clientId} unsubscribed from auction ${auctionId}`);
   }
 
   async handleStartMonitoring(clientId, data, requestId) {
-    console.log(`Handling startMonitoring for client ${clientId}, requestId: ${requestId}`, data);
-    
+    logger.info(`Handling startMonitoring for client ${clientId}, requestId: ${requestId}`, data);
+
     const client = this.clients.get(clientId);
     if (!client || !client.authenticated) {
-      console.log(`Client ${clientId} not authenticated`);
+      logger.info(`Client ${clientId} not authenticated`);
       this.sendError(clientId, 'Not authenticated', requestId);
       return;
     }
@@ -210,10 +211,10 @@ class WebSocketHandler {
 
     const { auctionId } = data;
     const { config, metadata } = validatedData;
-    console.log(`Adding auction ${auctionId} to monitor`);
+    logger.info(`Adding auction ${auctionId} to monitor`);
     const success = await auctionMonitor.addAuction(auctionId, config, metadata);
-    console.log(`Auction ${auctionId} monitoring result: ${success}`);
-    
+    logger.info(`Auction ${auctionId} monitoring result: ${success}`);
+
     const response = {
       type: 'response',
       action: 'startMonitoring',
@@ -221,8 +222,8 @@ class WebSocketHandler {
       success: success,
       requestId: requestId
     };
-    
-    console.log(`Sending response to client ${clientId}:`, response);
+
+    logger.info(`Sending response to client ${clientId}:`, response);
     client.ws.send(JSON.stringify(response));
 
     if (success) {
@@ -240,7 +241,7 @@ class WebSocketHandler {
     }
 
     const success = await auctionMonitor.removeAuction(auctionId);
-    
+
     client.ws.send(JSON.stringify({
       type: 'response',
       action: 'stopMonitoring',
@@ -257,16 +258,16 @@ class WebSocketHandler {
   async handleUpdateConfig(clientId, data, requestId) {
     const client = this.clients.get(clientId);
     if (!client || !client.authenticated) {
-      console.log(`Client ${clientId} not authenticated for updateConfig`);
+      logger.info(`Client ${clientId} not authenticated for updateConfig`);
       this.sendError(clientId, 'Not authenticated', requestId);
       return;
     }
 
     const { auctionId, config } = data;
-    console.log(`Updating config for auction ${auctionId}:`, config);
-    
+    logger.info(`Updating config for auction ${auctionId}:`, config);
+
     const success = await auctionMonitor.updateAuctionConfig(auctionId, config);
-    
+
     if (success) {
       // Send success response
       client.ws.send(JSON.stringify({
@@ -274,7 +275,7 @@ class WebSocketHandler {
         requestId: requestId,
         data: { success: true }
       }));
-      
+
       // Broadcast full auction state to all clients
       this.broadcastAuctionState(auctionId);
     } else {
@@ -306,7 +307,7 @@ class WebSocketHandler {
     const { auctionId } = data;
     const { amount } = validatedBid;
     const nellisApi = require('./nellisApi');
-    
+
     try {
       const result = await nellisApi.placeBid(auctionId, amount);
       client.ws.send(JSON.stringify({
@@ -321,7 +322,7 @@ class WebSocketHandler {
 
   handleGetMonitoredAuctions(clientId, requestId) {
     const client = this.clients.get(clientId);
-    if (!client) return;
+    if (!client) { return; }
 
     const auctions = auctionMonitor.getMonitoredAuctions();
     client.ws.send(JSON.stringify({
@@ -335,12 +336,12 @@ class WebSocketHandler {
 
   handleDisconnection(clientId) {
     this.clients.delete(clientId);
-    console.info(`WebSocket client disconnected: ${clientId}`);
+    logger.info(`WebSocket client disconnected: ${clientId}`);
   }
 
   sendMonitoredAuctions(clientId) {
     const client = this.clients.get(clientId);
-    if (!client) return;
+    if (!client) { return; }
 
     const auctions = auctionMonitor.getMonitoredAuctions();
     client.ws.send(JSON.stringify({
@@ -367,7 +368,7 @@ class WebSocketHandler {
 
   // Broadcast to subscribed clients
   broadcastToSubscribers(auctionId, message) {
-    this.clients.forEach((client, clientId) => {
+    this.clients.forEach((client) => {
       if (client.subscriptions.has(auctionId) && client.ws.readyState === WebSocket.OPEN) {
         client.ws.send(JSON.stringify(message));
       }
@@ -376,22 +377,22 @@ class WebSocketHandler {
 
   // Broadcast to all authenticated clients
   broadcastToAll(message) {
-    console.log(`Broadcasting message to all authenticated clients:`, message.type);
+    logger.info('Broadcasting message to all authenticated clients:', message.type);
     let broadcastCount = 0;
-    this.clients.forEach((client, clientId) => {
+    this.clients.forEach((client) => {
       if (client.authenticated && client.ws.readyState === WebSocket.OPEN) {
         client.ws.send(JSON.stringify(message));
         broadcastCount++;
       }
     });
-    console.log(`Broadcast sent to ${broadcastCount} clients`);
+    logger.info(`Broadcast sent to ${broadcastCount} clients`);
   }
 
   // Broadcast full auction state
   broadcastAuctionState(auctionId) {
     const auctions = auctionMonitor.getMonitoredAuctions();
     const auction = auctions.find(a => a.id === auctionId);
-    
+
     if (auction) {
       this.broadcastToAll({
         type: 'auctionState',

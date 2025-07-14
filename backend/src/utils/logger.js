@@ -14,7 +14,7 @@ const REDACTION_PATTERNS = [
   // Credit card numbers
   { pattern: /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/g, replacement: '[CARD_REDACTED]' },
   // Email addresses (partial redaction)
-  { pattern: /\b([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b/g, 
+  { pattern: /\b([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b/g,
     replacement: (match, local, domain) => `${local.substring(0, 2)}***@${domain}` },
   // Dollar amounts in logs (for bid privacy)
   { pattern: /\$\d+(\.\d{2})?/g, replacement: '$[AMOUNT]' },
@@ -33,14 +33,14 @@ const redactFormat = winston.format.printf(({ level, message, timestamp, ...meta
       safeMessage = safeMessage.replace(pattern, replacement);
     });
   }
-  
+
   // Redact metadata
   let safeMeta = {};
   if (Object.keys(meta).length > 0) {
     safeMeta = JSON.parse(JSON.stringify(meta)); // Deep clone
     redactObject(safeMeta);
   }
-  
+
   const metaStr = Object.keys(safeMeta).length > 0 ? ` ${JSON.stringify(safeMeta)}` : '';
   return `${timestamp} [${level.toUpperCase()}]: ${safeMessage}${metaStr}`;
 });
@@ -52,16 +52,16 @@ function redactObject(obj) {
     'secret', 'key', 'apikey', 'api_key', 'authorization', 'credit_card',
     'card_number', 'cvv', 'ssn', 'amount', 'bid', 'maxBid', 'cookies'
   ];
-  
+
   for (const [key, value] of Object.entries(obj)) {
     const lowerKey = key.toLowerCase();
-    
+
     // Check if key contains sensitive words
     if (sensitiveKeys.some(sensitive => lowerKey.includes(sensitive))) {
       obj[key] = '[REDACTED]';
       continue;
     }
-    
+
     // Recursively check nested objects
     if (value && typeof value === 'object' && !Array.isArray(value)) {
       redactObject(value);
@@ -86,13 +86,13 @@ function redactObject(obj) {
 const logger = winston.createLogger({
   // Use silent property to completely suppress in test mode
   silent: process.env.NODE_ENV === 'test' && process.env.ENABLE_TEST_LOGS !== 'true',
-  
+
   // Set appropriate log levels per environment
   level: process.env.LOG_LEVEL || (
-    process.env.NODE_ENV === 'test' ? 'error' : 
-    process.env.NODE_ENV === 'production' ? 'info' : 'debug'
+    process.env.NODE_ENV === 'test' ? 'error' :
+      process.env.NODE_ENV === 'production' ? 'info' : 'debug'
   ),
-  
+
   format: winston.format.combine(
     winston.format.timestamp({
       format: 'YYYY-MM-DD HH:mm:ss'
@@ -100,7 +100,7 @@ const logger = winston.createLogger({
     winston.format.errors({ stack: true }),
     redactFormat
   ),
-  
+
   transports: [
     // Console transport with test suppression
     new winston.transports.Console({
@@ -110,7 +110,7 @@ const logger = winston.createLogger({
         redactFormat
       )
     }),
-    
+
     // File transports (conditional for tests)
     ...(process.env.NODE_ENV !== 'test' || process.env.LOG_FILES_IN_TEST === 'true' ? [
       new winston.transports.File({
@@ -126,7 +126,7 @@ const logger = winston.createLogger({
       })
     ] : [])
   ],
-  
+
   // Don't exit on handled exceptions
   exitOnError: false
 });
@@ -168,11 +168,13 @@ logger.logSecurityEvent = (event, severity, metadata = {}) => {
 };
 
 // Override console methods in test AND production environments
+/* eslint-disable no-console */
 if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'test') {
   console.log = (...args) => logger.info(args.join(' '));
   console.error = (...args) => logger.error(args.join(' '));
   console.warn = (...args) => logger.warn(args.join(' '));
   console.info = (...args) => logger.info(args.join(' '));
 }
+/* eslint-enable no-console */
 
 module.exports = logger;

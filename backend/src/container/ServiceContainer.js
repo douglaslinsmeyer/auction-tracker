@@ -30,9 +30,9 @@ class ServiceContainer {
     const { singleton = true, dependencies = [], factory = false } = options;
 
     if (factory) {
-      this.factories.set(name, { 
-        factory: implementation, 
-        dependencies 
+      this.factories.set(name, {
+        factory: implementation,
+        dependencies
       });
     } else {
       this.services.set(name, {
@@ -65,13 +65,13 @@ class ServiceContainer {
     if (this.services.has(name)) {
       const { implementation, dependencies, singleton } = this.services.get(name);
       const resolvedDeps = this.resolveDependencies(dependencies);
-      
+
       const instance = new implementation(...resolvedDeps);
-      
+
       if (singleton) {
         this.singletons.set(name, instance);
       }
-      
+
       return instance;
     }
 
@@ -111,21 +111,21 @@ class ServiceContainer {
    */
   createScope() {
     const scope = new ServiceContainer();
-    
+
     // Copy service and factory registrations (not singletons)
     this.services.forEach((value, key) => {
       scope.services.set(key, value);
     });
-    
+
     this.factories.forEach((value, key) => {
       scope.factories.set(key, value);
     });
-    
+
     // Share interface registrations
     this.interfaces.forEach((value, key) => {
       scope.interfaces.set(key, value);
     });
-    
+
     return scope;
   }
 

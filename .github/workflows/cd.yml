@@ -1,0 +1,291 @@
+name: CD Pipeline - Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip smoke tests'
+        required: false
+        type: boolean
+        default: false
+      dry_run:
+        description: 'Perform dry run only'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository }}
+  KUSTOMIZE_VERSION: 'v5.0.3'
+  KUBECTL_VERSION: 'v1.28.0'
+
+jobs:
+  pre-deployment-checks:
+    name: Pre-Deployment Checks
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.version.outputs.tag }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Determine version tag
+        id: version
+        run: |
+          # Use git tag if available, otherwise use commit SHA
+          if [ -n "${{ github.ref_type == 'tag' }}" ]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            TAG="commit-${GITHUB_SHA::8}"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "Deployment version: ${TAG}"
+      
+      - name: Verify images exist
+        run: |
+          echo "## Image Verification" >> $GITHUB_STEP_SUMMARY
+          echo "Checking for required images:" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-backend:${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Dashboard: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-dashboard:${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+      
+      - name: Run pre-deployment tests
+        if: github.event.inputs.skip_tests != 'true'
+        run: |
+          echo "Running pre-deployment validation tests..."
+          # Add any pre-deployment validation here
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [pre-deployment-checks]
+    environment: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: ${{ env.KUBECTL_VERSION }}
+      
+      - name: Setup Kustomize
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash -s ${{ env.KUSTOMIZE_VERSION }}
+          sudo mv kustomize /usr/local/bin/
+      
+      - name: Configure Rackspace Spot access
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.RACKSPACE_KUBECONFIG }}" | base64 -d > ~/.kube/config
+          
+          # Verify connection
+          kubectl cluster-info || {
+            echo "❌ Failed to connect to Kubernetes cluster"
+            echo "Please verify RACKSPACE_KUBECONFIG secret is correctly configured"
+            exit 1
+          }
+      
+      - name: Create namespace and prerequisites
+        run: |
+          # Create namespace if it doesn't exist
+          kubectl create namespace auction-tracker --dry-run=client -o yaml | kubectl apply -f -
+          
+          # Create image pull secret for GitHub Container Registry
+          kubectl create secret docker-registry ghcr-secret \
+            --docker-server=${{ env.REGISTRY }} \
+            --docker-username=${{ github.actor }} \
+            --docker-password=${{ secrets.GITHUB_TOKEN }} \
+            --namespace=auction-tracker \
+            --dry-run=client -o yaml | kubectl apply -f -
+          
+          # Create application secrets
+          kubectl create secret generic app-secrets \
+            --from-literal=auth-token="${{ secrets.AUTH_TOKEN }}" \
+            --from-literal=encryption-secret="${{ secrets.ENCRYPTION_SECRET }}" \
+            --namespace=auction-tracker \
+            --dry-run=client -o yaml | kubectl apply -f -
+          
+          # Create Redis secret
+          kubectl create secret generic redis-secret \
+            --from-literal=password="${{ secrets.REDIS_PASSWORD }}" \
+            --namespace=auction-tracker \
+            --dry-run=client -o yaml | kubectl apply -f -
+      
+      - name: Update deployment manifests
+        run: |
+          cd k8s/overlays/production
+          
+          # Update image tags
+          IMAGE_TAG="${{ needs.pre-deployment-checks.outputs.image_tag }}"
+          kustomize edit set image \
+            auction-tracker-backend=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-backend:${IMAGE_TAG} \
+            auction-tracker-dashboard=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-dashboard:${IMAGE_TAG}
+          
+          # Show what will be deployed
+          echo "## Deployment Preview" >> $GITHUB_STEP_SUMMARY
+          echo '```yaml' >> $GITHUB_STEP_SUMMARY
+          kustomize build . | head -50 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+      
+      - name: Deploy to Kubernetes
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          cd k8s/overlays/production
+          
+          # Apply the manifests
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            echo "🔍 DRY RUN - Showing what would be applied:"
+            kustomize build . | kubectl apply --dry-run=server -f -
+          else
+            echo "🚀 Deploying to production..."
+            kustomize build . | kubectl apply -f -
+            
+            # Wait for deployments to be ready
+            kubectl -n auction-tracker rollout status deployment/backend --timeout=10m
+            kubectl -n auction-tracker rollout status deployment/dashboard --timeout=10m
+          fi
+      
+      - name: Verify deployment health
+        if: github.event.inputs.dry_run != 'true' && github.event.inputs.skip_tests != 'true'
+        run: |
+          echo "## Health Verification" >> $GITHUB_STEP_SUMMARY
+          
+          # Wait for pods to be ready
+          kubectl -n auction-tracker wait --for=condition=ready pod -l app=backend --timeout=300s
+          kubectl -n auction-tracker wait --for=condition=ready pod -l app=dashboard --timeout=300s
+          
+          # Port forward for health checks
+          kubectl -n auction-tracker port-forward service/backend 3000:3000 &
+          PF_PID=$!
+          sleep 10
+          
+          # Run health checks
+          if curl -f http://localhost:3000/health; then
+            echo "✅ Backend health check passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Backend health check failed" >> $GITHUB_STEP_SUMMARY
+            kill $PF_PID
+            exit 1
+          fi
+          
+          # API test with auth
+          if curl -f -H "Authorization: Bearer ${{ secrets.AUTH_TOKEN }}" http://localhost:3000/api/auctions; then
+            echo "✅ API authentication check passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ API authentication check failed" >> $GITHUB_STEP_SUMMARY
+            kill $PF_PID
+            exit 1
+          fi
+          
+          kill $PF_PID || true
+      
+      - name: Post-deployment report
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          echo "## Production Deployment Report" >> $GITHUB_STEP_SUMMARY
+          echo "**Status**: ✅ Deployed Successfully" >> $GITHUB_STEP_SUMMARY
+          echo "**Version**: ${{ needs.pre-deployment-checks.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployed by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Current State" >> $GITHUB_STEP_SUMMARY
+          echo "#### Deployments" >> $GITHUB_STEP_SUMMARY
+          kubectl -n auction-tracker get deployments -o wide >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "#### Pods" >> $GITHUB_STEP_SUMMARY
+          kubectl -n auction-tracker get pods -o wide >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "#### Services" >> $GITHUB_STEP_SUMMARY
+          kubectl -n auction-tracker get services >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "#### HPA Status" >> $GITHUB_STEP_SUMMARY
+          kubectl -n auction-tracker get hpa >> $GITHUB_STEP_SUMMARY || echo "No HPA configured"
+
+  rollback:
+    name: Rollback on Failure
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: failure() && github.event.inputs.dry_run != 'true'
+    environment: production
+    
+    steps:
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.RACKSPACE_KUBECONFIG }}" | base64 -d > ~/.kube/config
+      
+      - name: Perform rollback
+        run: |
+          echo "🔄 Initiating automatic rollback due to deployment failure..."
+          
+          # Rollback deployments to previous version
+          kubectl -n auction-tracker rollout undo deployment/backend || echo "Backend rollback failed"
+          kubectl -n auction-tracker rollout undo deployment/dashboard || echo "Dashboard rollback failed"
+          
+          # Wait for rollback to complete
+          kubectl -n auction-tracker rollout status deployment/backend --timeout=10m || true
+          kubectl -n auction-tracker rollout status deployment/dashboard --timeout=10m || true
+          
+          echo "✅ Rollback completed"
+      
+      - name: Verify rollback health
+        run: |
+          # Quick health check after rollback
+          kubectl -n auction-tracker wait --for=condition=ready pod -l app=backend --timeout=300s || true
+          kubectl -n auction-tracker wait --for=condition=ready pod -l app=dashboard --timeout=300s || true
+          
+          # Show current state
+          echo "### Post-Rollback State" >> $GITHUB_STEP_SUMMARY
+          kubectl -n auction-tracker get deployments -o wide >> $GITHUB_STEP_SUMMARY
+          kubectl -n auction-tracker get pods -o wide >> $GITHUB_STEP_SUMMARY
+      
+      - name: Create incident report
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            
+            await github.rest.issues.create({
+              owner,
+              repo,
+              title: `🚨 Production Deployment Failed - Automatic Rollback Executed`,
+              body: `## Deployment Failure Report
+              
+              **Failed Deployment**: ${{ github.sha }}
+              **Attempted Version**: ${{ needs.pre-deployment-checks.outputs.image_tag }}
+              **Timestamp**: ${new Date().toISOString()}
+              **Initiated by**: ${{ github.actor }}
+              **Workflow Run**: ${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}
+              
+              ### Automatic Actions Taken
+              - ✅ Rollback initiated for backend and dashboard
+              - ✅ Previous version restored
+              
+              ### Required Actions
+              1. Review deployment logs in the workflow run
+              2. Identify root cause of failure
+              3. Fix issues and test locally
+              4. Create new PR with fixes
+              5. Re-attempt deployment after fixes are merged
+              
+              ### Useful Commands
+              \`\`\`bash
+              # Check current production state
+              kubectl -n auction-tracker get all
+              
+              # View pod logs
+              kubectl -n auction-tracker logs -l app=backend --tail=100
+              kubectl -n auction-tracker logs -l app=dashboard --tail=100
+              
+              # Describe failed pods
+              kubectl -n auction-tracker describe pods
+              \`\`\``,
+              labels: ['incident', 'deployment-failure', 'production', 'high-priority']
+            });

@@ -9,7 +9,7 @@ const logger = require('../utils/logger');
  * Error handler middleware
  * Must be the last middleware added to Express
  */
-function errorHandler(err, req, res, next) {
+function errorHandler(err, req, res, _next) {
   // Log the full error internally
   logger.error('Request error:', {
     error: err.message,

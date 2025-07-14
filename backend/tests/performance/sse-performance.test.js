@@ -3,7 +3,7 @@
  * Tests SSE client performance under various load conditions
  */
 
-const { EventSource } = require('eventsource');
+// const { EventSource } = require('eventsource');
 const EventEmitter = require('events');
 
 describe('SSE Performance Tests', () => {
@@ -16,7 +16,7 @@ describe('SSE Performance Tests', () => {
   beforeEach(() => {
     // Reset mocks
     jest.clearAllMocks();
-    
+
     // Mock EventSource with performance tracking
     mockEventSources = [];
     MockEventSource = jest.fn().mockImplementation((url, options) => {
@@ -30,16 +30,16 @@ describe('SSE Performance Tests', () => {
       eventSource.addEventListener = jest.fn((event, handler) => {
         eventSource.on(event, handler);
       });
-      
+
       mockEventSources.push(eventSource);
-      
+
       // Simulate connection after next tick
       process.nextTick(() => {
         if (eventSource.onopen) {
           eventSource.onopen();
         }
       });
-      
+
       return eventSource;
     });
 
@@ -79,12 +79,12 @@ describe('SSE Performance Tests', () => {
     test('should handle rapid bid updates without memory leaks', async () => {
       const productId = '12345';
       const auctionId = 'auction_12345';
-      
+
       // Track performance metrics
       const startMemory = process.memoryUsage();
       const startTime = process.hrtime.bigint();
       const eventsProcessed = [];
-      
+
       // Set up event tracking
       eventEmitter.on('auction:update', (data) => {
         eventsProcessed.push({
@@ -92,13 +92,13 @@ describe('SSE Performance Tests', () => {
           data
         });
       });
-      
+
       await sseClient.connectToAuction(productId, auctionId);
-      
+
       // Simulate 100 rapid bid updates
       const eventSource = mockEventSources[0];
       const bidUpdates = [];
-      
+
       for (let i = 0; i < 100; i++) {
         const bidData = {
           currentBid: 100 + i,
@@ -107,7 +107,7 @@ describe('SSE Performance Tests', () => {
           timestamp: new Date().toISOString()
         };
         bidUpdates.push(bidData);
-        
+
         // Simulate event with minimal delay
         setTimeout(() => {
           eventSource.emit(`ch_product_bids:${productId}`, {
@@ -115,26 +115,26 @@ describe('SSE Performance Tests', () => {
           });
         }, i * 10); // 10ms between events = 100 events/second
       }
-      
+
       // Wait for all events to process
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+
       const endTime = process.hrtime.bigint();
       const endMemory = process.memoryUsage();
       const processingTime = Number(endTime - startTime) / 1000000; // Convert to ms
-      
+
       // Performance assertions
       expect(eventsProcessed.length).toBe(100);
       expect(processingTime).toBeLessThan(5000); // Should process within 5 seconds
-      
+
       // Memory usage should not increase dramatically
       const memoryIncrease = endMemory.heapUsed - startMemory.heapUsed;
       expect(memoryIncrease).toBeLessThan(50 * 1024 * 1024); // Less than 50MB increase
-      
+
       // Calculate average processing time per event
       const avgProcessingTime = processingTime / 100;
       expect(avgProcessingTime).toBeLessThan(50); // Less than 50ms per event
-      
+
       console.log(`Performance Metrics:
 - Total events: ${eventsProcessed.length}
 - Total time: ${processingTime.toFixed(2)}ms
@@ -145,7 +145,7 @@ describe('SSE Performance Tests', () => {
     test('should handle multiple concurrent SSE connections', async () => {
       const connections = [];
       const startTime = process.hrtime.bigint();
-      
+
       // Create 10 concurrent connections
       for (let i = 0; i < 10; i++) {
         const productId = `product_${i}`;
@@ -153,21 +153,21 @@ describe('SSE Performance Tests', () => {
         connections.push({ productId, auctionId });
         await sseClient.connectToAuction(productId, auctionId);
       }
-      
+
       expect(mockEventSources.length).toBe(10);
       expect(sseClient.connections.size).toBe(10);
-      
+
       // Simulate events on all connections simultaneously
       const eventsReceived = [];
       eventEmitter.on('auction:update', (data) => {
         eventsReceived.push(data);
       });
-      
+
       // Send 5 events to each connection
       for (let i = 0; i < 10; i++) {
         const eventSource = mockEventSources[i];
         const productId = `product_${i}`;
-        
+
         for (let j = 0; j < 5; j++) {
           setTimeout(() => {
             eventSource.emit(`ch_product_bids:${productId}`, {
@@ -180,16 +180,16 @@ describe('SSE Performance Tests', () => {
           }, j * 100); // 100ms between events per connection
         }
       }
-      
+
       // Wait for all events
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       const endTime = process.hrtime.bigint();
       const totalTime = Number(endTime - startTime) / 1000000;
-      
+
       expect(eventsReceived.length).toBe(50); // 10 connections × 5 events
       expect(totalTime).toBeLessThan(2000); // Should complete within 2 seconds
-      
+
       // Cleanup
       sseClient.disconnectAll();
       expect(sseClient.connections.size).toBe(0);
@@ -199,14 +199,14 @@ describe('SSE Performance Tests', () => {
       const productId = '12345';
       const auctionId = 'auction_12345';
       const errorEvents = [];
-      
+
       eventEmitter.on('sse:error', (error) => {
         errorEvents.push(error);
       });
-      
+
       await sseClient.connectToAuction(productId, auctionId);
       const eventSource = mockEventSources[0];
-      
+
       // Simulate connection failure during high load
       setTimeout(() => {
         eventSource.readyState = 2; // CLOSED
@@ -214,7 +214,7 @@ describe('SSE Performance Tests', () => {
           eventSource.onerror(new Error('Connection lost'));
         }
       }, 100);
-      
+
       // Continue sending events after failure
       for (let i = 0; i < 10; i++) {
         setTimeout(() => {
@@ -231,9 +231,9 @@ describe('SSE Performance Tests', () => {
           }
         }, 150 + (i * 50));
       }
-      
+
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       // Should have received error events
       expect(errorEvents.length).toBeGreaterThan(0);
       expect(errorEvents[0].productId).toBe(productId);
@@ -244,24 +244,24 @@ describe('SSE Performance Tests', () => {
     test('should properly clean up resources on disconnection', async () => {
       const productIds = ['prod1', 'prod2', 'prod3'];
       const auctionIds = ['auction1', 'auction2', 'auction3'];
-      
+
       // Create multiple connections
       for (let i = 0; i < 3; i++) {
         await sseClient.connectToAuction(productIds[i], auctionIds[i]);
       }
-      
+
       expect(sseClient.connections.size).toBe(3);
       expect(mockEventSources.length).toBe(3);
-      
+
       // Disconnect specific connection
       sseClient.disconnect(productIds[0]);
       expect(sseClient.connections.size).toBe(2);
       expect(mockEventSources[0].close).toHaveBeenCalled();
-      
+
       // Disconnect all
       sseClient.disconnectAll();
       expect(sseClient.connections.size).toBe(0);
-      
+
       // Verify all connections were closed
       mockEventSources.forEach(es => {
         expect(es.close).toHaveBeenCalled();
@@ -271,16 +271,16 @@ describe('SSE Performance Tests', () => {
     test('should handle rapid connect/disconnect cycles', async () => {
       const productId = '12345';
       const auctionId = 'auction_12345';
-      
+
       // Rapid connect/disconnect cycles
       for (let i = 0; i < 20; i++) {
         await sseClient.connectToAuction(productId, auctionId);
         expect(sseClient.connections.has(productId)).toBe(true);
-        
+
         sseClient.disconnect(productId);
         expect(sseClient.connections.has(productId)).toBe(false);
       }
-      
+
       // Should handle gracefully without memory leaks
       expect(sseClient.connections.size).toBe(0);
       expect(mockEventSources.length).toBe(20); // One per connection attempt
@@ -292,18 +292,18 @@ describe('SSE Performance Tests', () => {
       const productId = '12345';
       const auctionId = 'auction_12345';
       const latencies = [];
-      
+
       eventEmitter.on('auction:update', (data) => {
         const receiveTime = Date.now();
         // Extract timestamp from event data
-        const eventTimestamp = data.data && data.data.timestamp ? parseInt(data.data.timestamp) : receiveTime;
+        const eventTimestamp = data.data && data.data.timestamp ? parseInt(data.data.timestamp, 10) : receiveTime;
         const latency = receiveTime - eventTimestamp;
         latencies.push(Math.abs(latency)); // Ensure positive latency
       });
-      
+
       await sseClient.connectToAuction(productId, auctionId);
       const eventSource = mockEventSources[0];
-      
+
       // Send 10 events with precise timing
       for (let i = 0; i < 10; i++) {
         const sendTime = Date.now();
@@ -315,23 +315,23 @@ describe('SSE Performance Tests', () => {
             timestamp: sendTime
           })
         });
-        
+
         // Small delay between events
         await new Promise(resolve => setTimeout(resolve, 10));
       }
-      
+
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       expect(latencies.length).toBe(10);
-      
+
       // Calculate average latency
       const avgLatency = latencies.reduce((sum, lat) => sum + lat, 0) / latencies.length;
       const maxLatency = Math.max(...latencies);
-      
+
       // Latency should be minimal (under 10ms average)
       expect(avgLatency).toBeLessThan(10);
       expect(maxLatency).toBeLessThan(50);
-      
+
       console.log(`Latency Metrics:
 - Average: ${avgLatency.toFixed(2)}ms
 - Maximum: ${maxLatency.toFixed(2)}ms

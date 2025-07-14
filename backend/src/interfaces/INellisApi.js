@@ -1,3 +1,4 @@
+/* eslint-disable require-await */
 /**
  * Interface for Nellis Auction API Service
  * Defines the contract for interacting with nellisauction.com
@@ -8,7 +9,7 @@ class INellisApi {
    * Initialize the API service
    * @returns {Promise<void>}
    */
-  async initialize() {
+  initialize() {
     throw new Error('Method initialize() must be implemented');
   }
 
@@ -16,7 +17,7 @@ class INellisApi {
    * Set authentication cookies
    * @param {string} cookies - Cookie string
    */
-  setCookies(cookies) {
+  setCookies(_cookies) {
     throw new Error('Method setCookies() must be implemented');
   }
 
@@ -33,7 +34,7 @@ class INellisApi {
    * @param {string} auctionId - The auction ID
    * @returns {Promise<Object>} Auction data
    */
-  async getAuctionData(auctionId) {
+  async getAuctionData(_auctionId) {
     throw new Error('Method getAuctionData() must be implemented');
   }
 
@@ -43,7 +44,7 @@ class INellisApi {
    * @param {number} amount - Bid amount
    * @returns {Promise<Object>} Bid result
    */
-  async placeBid(auctionId, amount) {
+  async placeBid(_auctionId, _amount) {
     throw new Error('Method placeBid() must be implemented');
   }
 
@@ -51,7 +52,7 @@ class INellisApi {
    * Check if cookies are valid
    * @returns {Promise<boolean>} True if cookies are valid
    */
-  async validateCookies() {
+  validateCookies() {
     throw new Error('Method validateCookies() must be implemented');
   }
 
@@ -59,7 +60,7 @@ class INellisApi {
    * Get user's active bids
    * @returns {Promise<Array>} Array of active bids
    */
-  async getActiveBids() {
+  getActiveBids() {
     throw new Error('Method getActiveBids() must be implemented');
   }
 
@@ -67,7 +68,7 @@ class INellisApi {
    * Get user's won auctions
    * @returns {Promise<Array>} Array of won auctions
    */
-  async getWonAuctions() {
+  getWonAuctions() {
     throw new Error('Method getWonAuctions() must be implemented');
   }
 
@@ -77,7 +78,7 @@ class INellisApi {
    * @param {Object} options - Search options
    * @returns {Promise<Array>} Array of auction results
    */
-  async searchAuctions(query, options = {}) {
+  searchAuctions(_query, _options = {}) {
     throw new Error('Method searchAuctions() must be implemented');
   }
 
@@ -85,7 +86,7 @@ class INellisApi {
    * Get auction categories
    * @returns {Promise<Array>} Array of categories
    */
-  async getCategories() {
+  getCategories() {
     throw new Error('Method getCategories() must be implemented');
   }
 
@@ -93,7 +94,7 @@ class INellisApi {
    * Check API health/availability
    * @returns {Promise<boolean>} True if API is available
    */
-  async checkHealth() {
+  checkHealth() {
     throw new Error('Method checkHealth() must be implemented');
   }
 }

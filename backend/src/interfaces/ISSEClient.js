@@ -8,7 +8,7 @@ class ISSEClient {
    * Initialize the SSE client
    * @returns {Promise<void>}
    */
-  async initialize() {
+  initialize() {
     throw new Error('ISSEClient.initialize() must be implemented');
   }
 
@@ -18,7 +18,7 @@ class ISSEClient {
    * @param {string} auctionId - The auction ID (for reference)
    * @returns {Promise<boolean>} True if connection was successful
    */
-  async connectToAuction(productId, auctionId) {
+  connectToAuction(_productId, _auctionId) {
     throw new Error('ISSEClient.connectToAuction() must be implemented');
   }
 
@@ -27,7 +27,7 @@ class ISSEClient {
    * @param {string} productId - The product ID to disconnect
    * @returns {void}
    */
-  disconnect(productId) {
+  disconnect(_productId) {
     throw new Error('ISSEClient.disconnect() must be implemented');
   }
 
@@ -54,7 +54,7 @@ class ISSEClient {
    * @param {Object} bidData - The bid data from SSE
    * @returns {Promise<void>}
    */
-  async handleBidUpdate(productId, auctionId, bidData) {
+  handleBidUpdate(_productId, _auctionId, _bidData) {
     throw new Error('ISSEClient.handleBidUpdate() must be implemented');
   }
 
@@ -65,7 +65,7 @@ class ISSEClient {
    * @param {Object} closeData - The auction close data from SSE
    * @returns {Promise<void>}
    */
-  async handleAuctionClosed(productId, auctionId, closeData) {
+  handleAuctionClosed(_productId, _auctionId, _closeData) {
     throw new Error('ISSEClient.handleAuctionClosed() must be implemented');
   }
 
@@ -75,7 +75,7 @@ class ISSEClient {
    * @param {string} auctionId - The auction ID
    * @returns {Promise<void>}
    */
-  async handleReconnection(productId, auctionId) {
+  handleReconnection(_productId, _auctionId) {
     throw new Error('ISSEClient.handleReconnection() must be implemented');
   }
 
@@ -84,7 +84,7 @@ class ISSEClient {
    * @param {string} url - The auction URL
    * @returns {string|null} Product ID or null if not found
    */
-  static extractProductId(url) {
+  static extractProductId(_url) {
     throw new Error('ISSEClient.extractProductId() must be implemented');
   }
 }

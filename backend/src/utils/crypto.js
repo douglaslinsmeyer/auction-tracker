@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const logger = require('./logger');
 
 class CryptoUtil {
   constructor() {
@@ -8,7 +9,7 @@ class CryptoUtil {
     this.ivLength = 16; // 128 bits
     this.tagLength = 16; // 128 bits
     this.saltLength = 32; // 256 bits
-    
+
     // Initialize encryption key
     this.initializeKey();
   }
@@ -33,8 +34,8 @@ class CryptoUtil {
       );
     } else {
       // Generate a random key for this session (not recommended for production)
-      console.warn('WARNING: No ENCRYPTION_KEY or ENCRYPTION_SECRET provided. Using random key for this session only.');
-      console.warn('Encrypted data will not be readable after restart. Set ENCRYPTION_SECRET in production.');
+      logger.warn('WARNING: No ENCRYPTION_KEY or ENCRYPTION_SECRET provided. Using random key for this session only.');
+      logger.warn('Encrypted data will not be readable after restart. Set ENCRYPTION_SECRET in production.');
       this.encryptionKey = crypto.randomBytes(this.keyLength);
     }
   }
@@ -48,19 +49,19 @@ class CryptoUtil {
     try {
       // Generate random IV for each encryption
       const iv = crypto.randomBytes(this.ivLength);
-      
+
       // Create cipher
       const cipher = crypto.createCipheriv(this.algorithm, this.encryptionKey, iv);
-      
+
       // Encrypt the data
       const encrypted = Buffer.concat([
         cipher.update(text, 'utf8'),
         cipher.final()
       ]);
-      
+
       // Get the authentication tag
       const authTag = cipher.getAuthTag();
-      
+
       // Combine iv:authTag:encrypted and encode as base64
       const combined = Buffer.concat([iv, authTag, encrypted]);
       return combined.toString('base64');
@@ -79,22 +80,22 @@ class CryptoUtil {
     try {
       // Decode from base64
       const combined = Buffer.from(encryptedData, 'base64');
-      
+
       // Extract components
       const iv = combined.slice(0, this.ivLength);
       const authTag = combined.slice(this.ivLength, this.ivLength + this.tagLength);
       const encrypted = combined.slice(this.ivLength + this.tagLength);
-      
+
       // Create decipher
       const decipher = crypto.createDecipheriv(this.algorithm, this.encryptionKey, iv);
       decipher.setAuthTag(authTag);
-      
+
       // Decrypt the data
       const decrypted = Buffer.concat([
         decipher.update(encrypted),
         decipher.final()
       ]);
-      
+
       return decrypted.toString('utf8');
     } catch (error) {
       console.error('Decryption error:', error.message);

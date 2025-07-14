@@ -8,7 +8,7 @@ class IStorage {
    * Initialize the storage service
    * @returns {Promise<void>}
    */
-  async initialize() {
+  initialize() {
     throw new Error('Method initialize() must be implemented');
   }
 
@@ -26,7 +26,7 @@ class IStorage {
    * @param {Object} auctionData - Auction data to save
    * @returns {Promise<void>}
    */
-  async saveAuction(auctionId, auctionData) {
+  saveAuction(_auctionId, _auctionData) {
     throw new Error('Method saveAuction() must be implemented');
   }
 
@@ -35,7 +35,7 @@ class IStorage {
    * @param {string} auctionId - The auction ID
    * @returns {Promise<Object|null>} Auction data or null
    */
-  async getAuction(auctionId) {
+  getAuction(_auctionId) {
     throw new Error('Method getAuction() must be implemented');
   }
 
@@ -44,7 +44,7 @@ class IStorage {
    * @param {string} auctionId - The auction ID
    * @returns {Promise<boolean>} Success status
    */
-  async deleteAuction(auctionId) {
+  deleteAuction(_auctionId) {
     throw new Error('Method deleteAuction() must be implemented');
   }
 
@@ -52,7 +52,7 @@ class IStorage {
    * Get all auction IDs
    * @returns {Promise<Array<string>>} Array of auction IDs
    */
-  async getAllAuctionIds() {
+  getAllAuctionIds() {
     throw new Error('Method getAllAuctionIds() must be implemented');
   }
 
@@ -60,7 +60,7 @@ class IStorage {
    * Get all auctions
    * @returns {Promise<Array>} Array of auction objects
    */
-  async getAllAuctions() {
+  getAllAuctions() {
     throw new Error('Method getAllAuctions() must be implemented');
   }
 
@@ -69,7 +69,7 @@ class IStorage {
    * @param {string} cookies - Cookie string
    * @returns {Promise<void>}
    */
-  async saveCookies(cookies) {
+  saveCookies(_cookies) {
     throw new Error('Method saveCookies() must be implemented');
   }
 
@@ -77,7 +77,7 @@ class IStorage {
    * Get authentication cookies
    * @returns {Promise<string|null>} Cookie string or null
    */
-  async getCookies() {
+  getCookies() {
     throw new Error('Method getCookies() must be implemented');
   }
 
@@ -86,7 +86,7 @@ class IStorage {
    * @param {Object} settings - Settings object
    * @returns {Promise<void>}
    */
-  async saveSettings(settings) {
+  saveSettings(_settings) {
     throw new Error('Method saveSettings() must be implemented');
   }
 
@@ -94,7 +94,7 @@ class IStorage {
    * Get user settings
    * @returns {Promise<Object>} Settings object
    */
-  async getSettings() {
+  getSettings() {
     throw new Error('Method getSettings() must be implemented');
   }
 
@@ -102,7 +102,7 @@ class IStorage {
    * Clear all data
    * @returns {Promise<void>}
    */
-  async clearAll() {
+  clearAll() {
     throw new Error('Method clearAll() must be implemented');
   }
 
@@ -110,7 +110,7 @@ class IStorage {
    * Get storage statistics
    * @returns {Promise<Object>} Statistics object
    */
-  async getStats() {
+  getStats() {
     throw new Error('Method getStats() must be implemented');
   }
 }

@@ -11,18 +11,18 @@ class TestServer {
     this.port = null;
   }
 
-  async start(port = 0) {
+  start(port = 0) {
     // Create Express app
     this.app = express();
     this.app.use(cors());
     this.app.use(express.json());
-    
+
     // Create HTTP server
     this.server = http.createServer(this.app);
-    
+
     // Create WebSocket server
     this.wss = new WebSocket.Server({ server: this.server });
-    
+
     // Start server
     return new Promise((resolve) => {
       this.server.listen(port, () => {
@@ -33,7 +33,7 @@ class TestServer {
     });
   }
 
-  async stop() {
+  stop() {
     if (this.wss) {
       // Close all WebSocket connections
       this.wss.clients.forEach(client => {
@@ -52,6 +52,7 @@ class TestServer {
         });
       });
     }
+    return undefined;
   }
 
   getApp() {

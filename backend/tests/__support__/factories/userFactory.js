@@ -18,10 +18,10 @@ class UserFactory {
         totalSpent: 0
       }
     };
-    
+
     return { ...defaults, ...overrides };
   }
-  
+
   static createWithStrategy(strategy, overrides = {}) {
     return this.create({
       strategy,
@@ -32,7 +32,7 @@ class UserFactory {
       ...overrides
     });
   }
-  
+
   static createUnauthenticated(overrides = {}) {
     return this.create({
       isAuthenticated: false,
@@ -40,11 +40,11 @@ class UserFactory {
       ...overrides
     });
   }
-  
+
   static generateId() {
     return 'USR' + Math.random().toString(36).substr(2, 9);
   }
-  
+
   static generateCookies() {
     // Mock cookie structure similar to Nellis
     return {

@@ -1,6 +1,6 @@
 const { launchBrowserWithExtension, openExtensionPopup } = require('../helpers/extensionLoader');
-const { 
-  configureAuthToken, 
+const {
+  configureAuthToken,
   connectToBackend,
   getMonitoredAuctions,
   placeBidFromPopup,
@@ -52,8 +52,8 @@ describeSkipIfHeadless('Bidding Through Extension', () => {
 
   test('Manual bid placement', async () => {
     const auctionId = 'manual-bid-001';
-    const auction = mockNellis.createDefaultAuction(auctionId);
-    auction.currentBid = 50.00;
+    const mockAuction = mockNellis.createDefaultAuction(auctionId);
+    mockAuction.currentBid = 50.00;
 
     const popupPage = await openExtensionPopup(browser, extensionId);
 
@@ -70,19 +70,19 @@ describeSkipIfHeadless('Bidding Through Extension', () => {
     const bidAmount = '55.00';
     try {
       await placeBidFromPopup(popupPage, auctionId, bidAmount);
-      
+
       // Wait for bid confirmation
       await waitForAuctionUpdate(
         popupPage,
         auctionId,
-        (auction) => auction.myBid && auction.myBid.includes('55'),
+        (_auction) => mockAuction.myBid && mockAuction.myBid.includes('55'),
         5000
       );
 
       // Verify bid was placed
       const auctions = await getMonitoredAuctions(popupPage);
       const updatedAuction = auctions.find(a => a.id === auctionId);
-      
+
       if (updatedAuction && updatedAuction.myBid) {
         expect(updatedAuction.myBid).toContain('55');
       }
@@ -93,8 +93,8 @@ describeSkipIfHeadless('Bidding Through Extension', () => {
 
   test('Aggressive strategy auto-bidding', async () => {
     const auctionId = 'aggressive-001';
-    const auction = mockNellis.createDefaultAuction(auctionId);
-    auction.currentBid = 50.00;
+    const mockAuction = mockNellis.createDefaultAuction(auctionId);
+    mockAuction.currentBid = 50.00;
 
     const popupPage = await openExtensionPopup(browser, extensionId);
 
@@ -103,13 +103,13 @@ describeSkipIfHeadless('Bidding Through Extension', () => {
     const addButton = await popupPage.$('#addAuctionButton');
     if (addInput && addButton) {
       await addInput.type(auctionId);
-      
+
       // Set max bid before adding
       const maxBidInput = await popupPage.$('#maxBidInput');
       if (maxBidInput) {
         await maxBidInput.type('100.00');
       }
-      
+
       await addButton.click();
       await popupPage.waitForTimeout(1000);
     }
@@ -125,8 +125,8 @@ describeSkipIfHeadless('Bidding Through Extension', () => {
       await waitForAuctionUpdate(
         popupPage,
         auctionId,
-        (auction) => {
-          const bid = parseFloat(auction.currentBid?.replace('$', '') || 0);
+        (_auction) => {
+          const bid = parseFloat(mockAuction.currentBid?.replace('$', '') || 0);
           return bid > 60.00;
         },
         10000
@@ -135,7 +135,7 @@ describeSkipIfHeadless('Bidding Through Extension', () => {
       // Verify auto-bid was placed
       const auctions = await getMonitoredAuctions(popupPage);
       const updatedAuction = auctions.find(a => a.id === auctionId);
-      
+
       if (updatedAuction) {
         const currentBid = parseFloat(updatedAuction.currentBid?.replace('$', '') || 0);
         expect(currentBid).toBeGreaterThan(60.00);
@@ -147,9 +147,9 @@ describeSkipIfHeadless('Bidding Through Extension', () => {
 
   test('Last second strategy timing', async () => {
     const auctionId = 'snipe-001';
-    const auction = mockNellis.createDefaultAuction(auctionId);
-    auction.currentBid = 50.00;
-    auction.timeLeft = 45; // 45 seconds left
+    const mockAuction = mockNellis.createDefaultAuction(auctionId);
+    mockAuction.currentBid = 50.00;
+    mockAuction.timeLeft = 45; // 45 seconds left
 
     const popupPage = await openExtensionPopup(browser, extensionId);
 
@@ -158,13 +158,13 @@ describeSkipIfHeadless('Bidding Through Extension', () => {
     const addButton = await popupPage.$('#addAuctionButton');
     if (addInput && addButton) {
       await addInput.type(auctionId);
-      
+
       // Set max bid
       const maxBidInput = await popupPage.$('#maxBidInput');
       if (maxBidInput) {
         await maxBidInput.type('100.00');
       }
-      
+
       await addButton.click();
       await popupPage.waitForTimeout(1000);
     }
@@ -180,10 +180,10 @@ describeSkipIfHeadless('Bidding Through Extension', () => {
       await waitForAuctionUpdate(
         popupPage,
         auctionId,
-        (auction) => {
+        (_auction) => {
           // Should place bid when time is under 30 seconds
-          const timeLeft = parseInt(auction.timeLeft?.replace(/\D/g, '') || 0);
-          const hasBid = auction.myBid && parseFloat(auction.myBid.replace('$', '')) > 0;
+          const timeLeft = parseInt(mockAuction.timeLeft?.replace(/\D/g, ''), 10) || 0;
+          const hasBid = mockAuction.myBid && parseFloat(mockAuction.myBid.replace('$', '')) > 0;
           return timeLeft < 30 && hasBid;
         },
         15000
@@ -191,7 +191,7 @@ describeSkipIfHeadless('Bidding Through Extension', () => {
 
       const auctions = await getMonitoredAuctions(popupPage);
       const sniperAuction = auctions.find(a => a.id === auctionId);
-      
+
       if (sniperAuction && sniperAuction.myBid) {
         expect(sniperAuction.strategy).toBe('lastSecond');
         expect(parseFloat(sniperAuction.myBid.replace('$', ''))).toBeGreaterThan(50);
@@ -203,8 +203,8 @@ describeSkipIfHeadless('Bidding Through Extension', () => {
 
   test('Max bid limit enforcement', async () => {
     const auctionId = 'maxbid-001';
-    const auction = mockNellis.createDefaultAuction(auctionId);
-    auction.currentBid = 90.00;
+    const mockAuction = mockNellis.createDefaultAuction(auctionId);
+    mockAuction.currentBid = 90.00;
 
     const popupPage = await openExtensionPopup(browser, extensionId);
 
@@ -213,13 +213,13 @@ describeSkipIfHeadless('Bidding Through Extension', () => {
     const addButton = await popupPage.$('#addAuctionButton');
     if (addInput && addButton) {
       await addInput.type(auctionId);
-      
+
       // Set max bid below current
       const maxBidInput = await popupPage.$('#maxBidInput');
       if (maxBidInput) {
         await maxBidInput.type('80.00');
       }
-      
+
       await addButton.click();
       await popupPage.waitForTimeout(1000);
     }
@@ -235,20 +235,20 @@ describeSkipIfHeadless('Bidding Through Extension', () => {
 
     const auctions = await getMonitoredAuctions(popupPage);
     const limitedAuction = auctions.find(a => a.id === auctionId);
-    
+
     if (limitedAuction) {
       // Should show warning or status about max bid exceeded
-      const hasWarning = limitedAuction.status?.toLowerCase().includes('max') ||
-                        limitedAuction.status?.toLowerCase().includes('limit');
+      // const hasWarning = limitedAuction.status?.toLowerCase().includes('max') ||
+      limitedAuction.status?.toLowerCase().includes('limit');
       console.log(`Max bid limit status: ${limitedAuction.status}`);
     }
   }, 30000);
 
   test('Bid increment configuration', async () => {
     const auctionId = 'increment-001';
-    const auction = mockNellis.createDefaultAuction(auctionId);
-    auction.currentBid = 50.00;
-    auction.bidIncrement = 10.00;
+    const mockAuction = mockNellis.createDefaultAuction(auctionId);
+    mockAuction.currentBid = 50.00;
+    mockAuction.bidIncrement = 10.00;
 
     const popupPage = await openExtensionPopup(browser, extensionId);
 
@@ -257,14 +257,14 @@ describeSkipIfHeadless('Bidding Through Extension', () => {
     const addButton = await popupPage.$('#addAuctionButton');
     if (addInput && addButton) {
       await addInput.type(auctionId);
-      
+
       // Set custom increment
       const incrementInput = await popupPage.$('#incrementInput');
       if (incrementInput) {
         await incrementInput.clear();
         await incrementInput.type('15.00');
       }
-      
+
       await addButton.click();
       await popupPage.waitForTimeout(1000);
     }
@@ -272,12 +272,12 @@ describeSkipIfHeadless('Bidding Through Extension', () => {
     // Place bid with custom increment
     try {
       await placeBidFromPopup(popupPage, auctionId, '65.00'); // 50 + 15
-      
+
       // Verify bid amount
       await waitForAuctionUpdate(
         popupPage,
         auctionId,
-        (auction) => auction.myBid && auction.myBid.includes('65'),
+        (_auction) => mockAuction.myBid && mockAuction.myBid.includes('65'),
         5000
       );
     } catch (error) {
@@ -287,7 +287,7 @@ describeSkipIfHeadless('Bidding Through Extension', () => {
 
   test('Bidding notification system', async () => {
     const auctionId = 'notify-001';
-    const auction = mockNellis.createDefaultAuction(auctionId);
+    mockNellis.createDefaultAuction(auctionId);
 
     const popupPage = await openExtensionPopup(browser, extensionId);
 
@@ -319,7 +319,7 @@ describeSkipIfHeadless('Bidding Through Extension', () => {
     if (hasNotificationArea || hasNotificationBadge) {
       // Wait for notification
       await popupPage.waitForTimeout(2000);
-      
+
       // Check for outbid notification
       const notifications = await popupPage.$$('.notification-item');
       console.log(`Found ${notifications.length} notifications`);
@@ -328,7 +328,7 @@ describeSkipIfHeadless('Bidding Through Extension', () => {
 
   test('Strategy switching during active auction', async () => {
     const auctionId = 'switch-001';
-    const auction = mockNellis.createDefaultAuction(auctionId);
+    // const auction = mockNellis.createDefaultAuction(auctionId);
 
     const popupPage = await openExtensionPopup(browser, extensionId);
 

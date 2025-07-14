@@ -9,10 +9,10 @@ class WsTestClient extends EventEmitter {
     this.connected = false;
   }
 
-  async connect(url) {
+  connect(url) {
     return new Promise((resolve, reject) => {
       this.ws = new WebSocket(url);
-      
+
       this.ws.on('open', () => {
         this.connected = true;
         this.emit('open');
@@ -24,7 +24,7 @@ class WsTestClient extends EventEmitter {
           const message = JSON.parse(data);
           this.messages.push(message);
           this.emit('message', message);
-          
+
           // Emit specific event types (but not error to avoid unhandled errors)
           if (message.type && message.type !== 'error') {
             this.emit(message.type, message);
@@ -58,12 +58,12 @@ class WsTestClient extends EventEmitter {
     if (!this.connected) {
       throw new Error('WebSocket not connected');
     }
-    
+
     const message = typeof data === 'string' ? data : JSON.stringify(data);
     this.ws.send(message);
   }
 
-  async waitForMessage(type, timeout = 5000) {
+  waitForMessage(type, timeout = 5000) {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         reject(new Error(`Timeout waiting for message type: ${type}`));

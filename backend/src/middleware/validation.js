@@ -29,6 +29,7 @@ function validateBody(schemaName) {
     // Replace body with validated and sanitized value
     req.body = value;
     next();
+    return undefined;
   };
 }
 
@@ -62,6 +63,7 @@ function validateParam(paramName, schemaName) {
     // Replace param with validated value
     req.params[paramName] = value;
     next();
+    return undefined;
   };
 }
 
@@ -76,8 +78,8 @@ const validateAuctionId = validateParam('id', 'AuctionId');
  * @returns {string} Sanitized string
  */
 function sanitizeString(input) {
-  if (typeof input !== 'string') return input;
-  
+  if (typeof input !== 'string') { return input; }
+
   // Remove any HTML tags
   return input
     .replace(/<[^>]*>/g, '')
@@ -91,8 +93,8 @@ function sanitizeString(input) {
  * @returns {Object} Sanitized object
  */
 function sanitizeObject(obj) {
-  if (!obj || typeof obj !== 'object') return obj;
-  
+  if (!obj || typeof obj !== 'object') { return obj; }
+
   const sanitized = {};
   for (const [key, value] of Object.entries(obj)) {
     if (typeof value === 'string') {

@@ -29,7 +29,7 @@ const FEATURE_FLAGS = {
     defaultValue: false,
     phase: 3
   },
-  
+
   // Phase 4 - Testing & Monitoring
   ENABLE_PERFORMANCE_METRICS: {
     name: 'ENABLE_PERFORMANCE_METRICS',
@@ -37,7 +37,7 @@ const FEATURE_FLAGS = {
     defaultValue: false,
     phase: 4
   },
-  
+
   // Phase 4.5 - SSE Integration
   USE_SSE: {
     name: 'USE_SSE',
@@ -45,7 +45,7 @@ const FEATURE_FLAGS = {
     defaultValue: false,
     phase: 4.5
   },
-  
+
   // Phase 5 - Advanced Features
   USE_SMART_BIDDING: {
     name: 'USE_SMART_BIDDING',
@@ -77,7 +77,7 @@ class FeatureFlags {
    */
   async initialize(redisClient = null) {
     this.redisClient = redisClient;
-    
+
     // Load from environment variables
     for (const [key, config] of Object.entries(FEATURE_FLAGS)) {
       const envValue = process.env[config.name];
@@ -88,12 +88,12 @@ class FeatureFlags {
         this.flags[key] = config.defaultValue;
       }
     }
-    
+
     // Load from Redis if available
     if (this.redisClient && this.redisClient.connected) {
       await this.loadFromRedis();
     }
-    
+
     this.initialized = true;
     this.logStatus();
   }
@@ -126,7 +126,7 @@ class FeatureFlags {
       logger.warn('Feature flags not initialized, using defaults');
       return FEATURE_FLAGS[featureName]?.defaultValue || false;
     }
-    
+
     return this.flags[featureName] || false;
   }
 
@@ -175,7 +175,7 @@ class FeatureFlags {
   logStatus() {
     logger.info('Feature Flag Status:');
     const status = this.getStatus();
-    for (const [key, info] of Object.entries(status)) {
+    for (const info of Object.values(status)) {
       logger.info(`  ${info.name}: ${info.enabled ? 'ENABLED' : 'DISABLED'} - ${info.description}`);
     }
   }
@@ -189,16 +189,16 @@ class FeatureFlags {
     if (!this.redisClient || !this.redisClient.connected) {
       throw new Error('Redis not available for feature flag updates');
     }
-    
+
     const config = FEATURE_FLAGS[featureName];
     if (!config) {
       throw new Error(`Unknown feature flag: ${featureName}`);
     }
-    
+
     const redisKey = `feature:${config.name.toLowerCase()}`;
     await this.redisClient.set(redisKey, enabled.toString());
     this.flags[featureName] = enabled;
-    
+
     logger.info(`Feature flag ${featureName} updated to ${enabled} in Redis`);
   }
 

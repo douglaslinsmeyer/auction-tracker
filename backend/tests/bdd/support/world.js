@@ -8,9 +8,8 @@ const axios = require('axios');
 const WebSocket = require('ws');
 const sinon = require('sinon');
 const { expect } = require('chai');
-const { app, server: existingServer } = require('../../../src/index');
+const { app } = require('../../../src/index');
 const { Server: WebSocketServer } = require('ws');
-const storage = require('../../../src/services/storage');
 const auctionMonitor = require('../../../src/services/auctionMonitor');
 const nellisApi = require('../../../src/services/nellisApi');
 const wsHandler = require('../../../src/services/websocket');
@@ -25,16 +24,16 @@ class CustomWorld {
     this.serverPort = null;
     this.baseUrl = null;
     this.wsUrl = null;
-    
+
     // WebSocket connections
     this.wsConnections = [];
-    
+
     // Test data
     this.authToken = process.env.AUTH_TOKEN;
     this.lastResponse = null;
     this.lastError = null;
     this.monitoredAuctions = new Map();
-    
+
     // Stubs and mocks
     this.stubs = {};
   }
@@ -43,31 +42,32 @@ class CustomWorld {
    * Start the test server
    */
   async startServer() {
-    return new Promise(async (resolve) => {
-      // Storage is already initialized in BeforeAll hook
-      
-      // Initialize nellisApi to recover cookies
-      await nellisApi.initialize();
-      
+    // Storage is already initialized in BeforeAll hook
+
+    // Initialize nellisApi to recover cookies
+    await nellisApi.initialize();
+
+    return new Promise((resolve) => {
+
       // Find available port
       this.server = app.listen(0, async () => {
         this.serverPort = this.server.address().port;
         this.baseUrl = `http://localhost:${this.serverPort}`;
         this.wsUrl = `ws://localhost:${this.serverPort}/ws`;
-        
+
         // Create WebSocket server
         const wss = new WebSocketServer({ server: this.server, path: '/ws' });
-        
+
         // Set up WebSocket connection handler
-        wss.on('connection', (ws, req) => {
+        wss.on('connection', (ws, _req) => {
           wsHandler.handleConnection(ws, wss);
         });
-        
+
         // Initialize auction monitor with WebSocket handler's broadcast method
         await auctionMonitor.initialize(wss, (auctionId) => {
           wsHandler.broadcastAuctionState(auctionId);
         });
-        
+
         resolve();
       });
     });
@@ -76,7 +76,7 @@ class CustomWorld {
   /**
    * Stop the test server
    */
-  async stopServer() {
+  stopServer() {
     // Close all WebSocket connections
     for (const ws of this.wsConnections) {
       if (ws.readyState === WebSocket.OPEN) {
@@ -91,6 +91,7 @@ class CustomWorld {
         this.server.close(resolve);
       });
     }
+    return Promise.resolve();
   }
 
   /**
@@ -127,19 +128,19 @@ class CustomWorld {
    * Create a WebSocket connection
    * @param {boolean} authenticate - Whether to authenticate after connecting
    */
-  async createWebSocketConnection(authenticate = true) {
+  createWebSocketConnection(authenticate = true) {
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(this.wsUrl);
-      
-      ws.on('open', async () => {
+
+      ws.on('open', () => {
         this.wsConnections.push(ws);
-        
+
         if (authenticate) {
           ws.send(JSON.stringify({
             type: 'authenticate',
             token: this.authToken
           }));
-          
+
           // Wait for authentication response
           ws.once('message', (data) => {
             const message = JSON.parse(data);
@@ -164,7 +165,7 @@ class CustomWorld {
    * @param {string} messageType - Expected message type
    * @param {number} timeout - Timeout in milliseconds
    */
-  async waitForMessage(ws, messageType, timeout = 5000) {
+  waitForMessage(ws, messageType, timeout = 5000) {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         reject(new Error(`Timeout waiting for message type: ${messageType}`));

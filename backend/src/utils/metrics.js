@@ -15,7 +15,7 @@ class MetricsCollector {
     this.gauges = new Map();
     this.histograms = new Map();
     this.startTime = Date.now();
-    
+
     // Initialize metrics
     this.initializeSSEMetrics();
     this.initializePollingMetrics();
@@ -30,11 +30,11 @@ class MetricsCollector {
     this.counters.set('sse_events_received_total', { value: 0, help: 'Total SSE events received', labels: {} });
     this.counters.set('sse_reconnection_attempts', { value: 0, help: 'SSE reconnection attempts' });
     this.counters.set('sse_fallback_activations', { value: 0, help: 'Times SSE fell back to polling' });
-    
+
     this.gauges.set('sse_active_connections', { value: 0, help: 'Currently active SSE connections' });
     this.gauges.set('sse_connection_errors', { value: 0, help: 'Current connection error count' });
-    
-    this.histograms.set('sse_event_processing_duration', { 
+
+    this.histograms.set('sse_event_processing_duration', {
       buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000],
       values: [],
       help: 'Time to process SSE events in milliseconds'
@@ -47,9 +47,9 @@ class MetricsCollector {
     this.counters.set('polling_requests_successful', { value: 0, help: 'Successful polling requests' });
     this.counters.set('polling_requests_failed', { value: 0, help: 'Failed polling requests' });
     this.counters.set('update_source_total', { value: 0, help: 'Auction updates by source', labels: {} });
-    
+
     this.gauges.set('polling_active_auctions', { value: 0, help: 'Currently polling auctions' });
-    
+
     this.histograms.set('polling_response_duration', {
       buckets: [100, 250, 500, 1000, 2000, 5000, 10000],
       values: [],
@@ -62,7 +62,7 @@ class MetricsCollector {
     this.counters.set('auction_monitors_total', { value: 0, help: 'Total auction monitors created' });
     this.counters.set('bids_placed_total', { value: 0, help: 'Total bids placed' });
     this.counters.set('auctions_completed_total', { value: 0, help: 'Total auctions completed' });
-    
+
     this.gauges.set('active_auction_monitors', { value: 0, help: 'Currently active auction monitors' });
     this.gauges.set('websocket_connections', { value: 0, help: 'Active WebSocket connections' });
   }
@@ -148,7 +148,7 @@ class MetricsCollector {
         value,
         timestamp: Date.now()
       });
-      
+
       // Keep only last 1000 values for memory management
       if (histogram.values.length > 1000) {
         histogram.values = histogram.values.slice(-1000);
@@ -238,8 +238,8 @@ class MetricsCollector {
   calculateSuccessRate(successCounter, totalCounter) {
     const success = this.counters.get(successCounter)?.value || 0;
     const total = this.counters.get(totalCounter)?.value || 0;
-    
-    if (total === 0) return 0;
+
+    if (total === 0) { return 0; }
     return Math.round((success / total) * 100 * 100) / 100; // Round to 2 decimal places
   }
 
@@ -286,16 +286,16 @@ class MetricsCollector {
    * @returns {number} Percentile value
    */
   percentile(sortedValues, p) {
-    if (sortedValues.length === 0) return 0;
-    
+    if (sortedValues.length === 0) { return 0; }
+
     const index = p * (sortedValues.length - 1);
     const lower = Math.floor(index);
     const upper = Math.ceil(index);
-    
+
     if (lower === upper) {
       return sortedValues[lower];
     }
-    
+
     const weight = index - lower;
     return sortedValues[lower] * (1 - weight) + sortedValues[upper] * weight;
   }
@@ -320,16 +320,16 @@ class MetricsCollector {
       counter.value = 0;
       counter.labels = {};
     }
-    
+
     for (const gauge of this.gauges.values()) {
       gauge.value = 0;
       gauge.labels = {};
     }
-    
+
     for (const histogram of this.histograms.values()) {
       histogram.values = [];
     }
-    
+
     this.startTime = Date.now();
   }
 
@@ -338,7 +338,7 @@ class MetricsCollector {
    */
   logMetricsSummary() {
     const sse = this.getSSEMetrics();
-    
+
     logger.info('SSE Metrics Summary', {
       connections: {
         active: sse.connections.active,

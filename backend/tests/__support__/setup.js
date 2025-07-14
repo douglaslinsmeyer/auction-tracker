@@ -26,7 +26,7 @@ jest.setTimeout(30000);
 // Redis setup for CI environment
 if (process.env.CI && process.env.REDIS_HOST) {
   const { waitForRedis } = require('../support/redisSetup');
-  
+
   beforeAll(async () => {
     console.log('CI environment detected, waiting for Redis...');
     await waitForRedis();

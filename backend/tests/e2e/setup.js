@@ -8,7 +8,7 @@ jest.setTimeout(60000);
 // Setup global test utilities
 global.testHelpers = {
   delay: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
-  
+
   waitForCondition: async (condition, timeout = 10000, interval = 100) => {
     const startTime = Date.now();
     while (Date.now() - startTime < timeout) {
@@ -24,7 +24,7 @@ global.testHelpers = {
 // Ensure required directories exist
 beforeAll(async () => {
   const extensionPath = path.join(__dirname, '../../../nellis-auction-helper');
-  
+
   try {
     await fs.access(extensionPath);
     console.log('✓ Chrome extension found at:', extensionPath);

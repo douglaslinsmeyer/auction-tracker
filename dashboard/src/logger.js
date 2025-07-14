@@ -5,7 +5,7 @@
 
 const LOG_LEVELS = {
   ERROR: 0,
-  WARN: 1, 
+  WARN: 1,
   INFO: 2,
   DEBUG: 3
 };
@@ -16,9 +16,9 @@ const LOG_LEVELS = {
  */
 const isTestEnvironment = () => {
   // Check for common test environment indicators
-  return window.location.search.includes('test=true') || 
+  return window.location.search.includes('test=true') ||
          window.location.search.includes('e2e=true') ||
-         (window.location.hostname === 'localhost' && 
+         (window.location.hostname === 'localhost' &&
           window.location.search.includes('headless=true')) ||
          window.navigator.webdriver === true ||
          window.__TEST_MODE__ === true;
@@ -32,12 +32,12 @@ const getCurrentLogLevel = () => {
   if (isTestEnvironment()) {
     return LOG_LEVELS.ERROR; // Only errors in test mode
   }
-  
+
   // Check for explicit log level in URL or localStorage
   const urlParams = new URLSearchParams(window.location.search);
   const urlLogLevel = urlParams.get('logLevel');
   const storedLogLevel = localStorage.getItem('dashboard_log_level');
-  
+
   const logLevelStr = urlLogLevel || storedLogLevel || 'INFO';
   return LOG_LEVELS[logLevelStr.toUpperCase()] ?? LOG_LEVELS.INFO;
 };

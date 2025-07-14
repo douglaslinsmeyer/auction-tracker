@@ -17,14 +17,14 @@ class SafeMath {
     // Ensure inputs are numbers
     const numA = Number(a) || 0;
     const numB = Number(b) || 0;
-    
+
     // Check for overflow before addition
     if (numA > MAX_SAFE_BID - numB) {
       return MAX_SAFE_BID;
     }
-    
+
     const result = numA + numB;
-    
+
     // Ensure result is within bounds
     return Math.min(Math.max(result, MIN_BID), MAX_SAFE_BID);
   }
@@ -41,10 +41,10 @@ class SafeMath {
     const safeCurrent = this.validateBidAmount(currentBid);
     const safeIncrement = Math.max(0, Math.min(Number(increment) || 5, 1000));
     const safeBuffer = Math.max(0, Math.min(Number(buffer) || 0, 100));
-    
+
     // Calculate minimum required bid
     const minimumBid = this.addMoney(safeCurrent, safeIncrement);
-    
+
     // Add buffer if specified
     return this.addMoney(minimumBid, safeBuffer);
   }
@@ -56,24 +56,24 @@ class SafeMath {
    */
   static validateBidAmount(amount) {
     const num = Number(amount);
-    
+
     // Check for invalid values
     if (!Number.isFinite(num) || Number.isNaN(num)) {
       throw new Error('Invalid bid amount');
     }
-    
+
     // Round to nearest dollar (no cents)
     const rounded = Math.round(num);
-    
+
     // Ensure within bounds
     if (rounded < MIN_BID) {
       throw new Error(`Bid amount must be at least $${MIN_BID}`);
     }
-    
+
     if (rounded > MAX_SAFE_BID) {
       throw new Error(`Bid amount cannot exceed $${MAX_SAFE_BID.toLocaleString()}`);
     }
-    
+
     return rounded;
   }
 
@@ -103,9 +103,9 @@ class SafeMath {
     try {
       const safeCurrent = this.validateBidAmount(currentBid);
       const safeMax = this.validateBidAmount(maxBid);
-      
-      if (safeMax === 0) return 0;
-      
+
+      if (safeMax === 0) { return 0; }
+
       return Math.round((safeCurrent / safeMax) * 100);
     } catch (error) {
       return 0;
@@ -134,11 +134,11 @@ class SafeMath {
     if (typeof currencyStr !== 'string') {
       return this.validateBidAmount(currencyStr);
     }
-    
+
     // Remove currency symbols and commas
     const cleaned = currencyStr.replace(/[$,]/g, '').trim();
     const parsed = parseFloat(cleaned);
-    
+
     return this.validateBidAmount(parsed);
   }
 }

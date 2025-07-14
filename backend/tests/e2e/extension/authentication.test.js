@@ -95,7 +95,7 @@ describeSkipIfHeadless('Extension Authentication Flow', () => {
     }
 
     // Should show authentication error
-    const errorOccurred = await popupPage.waitForFunction(
+    await popupPage.waitForFunction(
       () => {
         const errorMsg = document.querySelector('.error-message');
         const status = document.querySelector('#connectionStatus');
@@ -107,7 +107,7 @@ describeSkipIfHeadless('Extension Authentication Flow', () => {
 
     // Either error message or failed connection status
     const hasError = await popupPage.$('.error-message') !== null;
-    const connectionFailed = await popupPage.$eval('#connectionStatus', el => 
+    const connectionFailed = await popupPage.$eval('#connectionStatus', el =>
       el.textContent.includes('Failed') || el.textContent.includes('Disconnected')
     ).catch(() => true);
 
@@ -248,7 +248,7 @@ describeSkipIfHeadless('Extension Authentication Flow', () => {
     expect(updatedToken).toBe('refreshed-token');
 
     // Connection might need to be re-established with new token
-    const needsReconnect = await popupPage.$eval('#connectionStatus', el => 
+    const needsReconnect = await popupPage.$eval('#connectionStatus', el =>
       !el.textContent.includes('Connected')
     ).catch(() => true);
 

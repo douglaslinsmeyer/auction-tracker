@@ -16,7 +16,7 @@ class StorageService extends EventEmitter {
     this.config = {
       keyPrefix: 'nellis:',
       cookieTTL: 86400, // 24 hours in seconds
-      auctionDataTTL: 3600, // 1 hour for auction data cache
+      auctionDataTTL: 3600 // 1 hour for auction data cache
     };
   }
 
@@ -24,7 +24,7 @@ class StorageService extends EventEmitter {
     try {
       const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
       logger.info('Connecting to Redis:', redisUrl);
-      
+
       this.redis = new Redis(redisUrl, {
         retryStrategy: (times) => {
           // Use exponential backoff with max delay of 30 seconds
@@ -35,7 +35,7 @@ class StorageService extends EventEmitter {
         maxRetriesPerRequest: 3,
         enableReadyCheck: true,
         enableOfflineQueue: true,
-        lazyConnect: true, // Don't connect immediately
+        lazyConnect: true // Don't connect immediately
       });
 
       this.redis.on('connect', () => {
@@ -72,11 +72,11 @@ class StorageService extends EventEmitter {
 
       // Try to connect
       await this.redis.connect();
-      
+
       // Test connection
       await this.redis.ping();
       logger.info('Redis connection successful');
-      
+
     } catch (error) {
       logger.warn('Failed to connect to Redis, using in-memory fallback:', error);
       this.connected = false;
@@ -92,7 +92,7 @@ class StorageService extends EventEmitter {
   async saveAuction(auctionId, auctionData) {
     const key = this._key('auction', auctionId);
     const data = JSON.stringify(auctionData);
-    
+
     if (this.connected) {
       try {
         await this.redis.set(key, data);
@@ -102,7 +102,7 @@ class StorageService extends EventEmitter {
         logger.error('Redis save error:', error);
       }
     }
-    
+
     // Fallback to memory
     this.memoryFallback.set(key, auctionData);
     return true;
@@ -110,7 +110,7 @@ class StorageService extends EventEmitter {
 
   async getAuction(auctionId) {
     const key = this._key('auction', auctionId);
-    
+
     if (this.connected) {
       try {
         const data = await this.redis.get(key);
@@ -119,7 +119,7 @@ class StorageService extends EventEmitter {
         logger.error('Redis get error:', error);
       }
     }
-    
+
     // Fallback to memory
     return this.memoryFallback.get(key) || null;
   }
@@ -129,13 +129,13 @@ class StorageService extends EventEmitter {
       try {
         const pattern = this._key('auction', '*');
         const keys = await this.redis.keys(pattern);
-        
-        if (keys.length === 0) return [];
-        
+
+        if (keys.length === 0) { return []; }
+
         const pipeline = this.redis.pipeline();
         keys.forEach(key => pipeline.get(key));
         const results = await pipeline.exec();
-        
+
         return results
           .filter(([err, data]) => !err && data)
           .map(([, data]) => JSON.parse(data));
@@ -143,7 +143,7 @@ class StorageService extends EventEmitter {
         logger.error('Redis getAllAuctions error:', error);
       }
     }
-    
+
     // Fallback to memory
     const auctions = [];
     const pattern = this._key('auction', '');
@@ -157,7 +157,7 @@ class StorageService extends EventEmitter {
 
   async removeAuction(auctionId) {
     const key = this._key('auction', auctionId);
-    
+
     if (this.connected) {
       try {
         await this.redis.del(key);
@@ -165,7 +165,7 @@ class StorageService extends EventEmitter {
         logger.error('Redis delete error:', error);
       }
     }
-    
+
     // Also remove from memory fallback
     this.memoryFallback.delete(key);
     return true;
@@ -174,11 +174,11 @@ class StorageService extends EventEmitter {
   // Cookie management
   async saveCookies(cookies) {
     const key = this._key('auth', 'cookies');
-    
+
     try {
       // Encrypt cookies before storage
       const encryptedCookies = cryptoUtil.encrypt(cookies);
-      
+
       if (this.connected) {
         try {
           await this.redis.set(key, encryptedCookies);
@@ -188,7 +188,7 @@ class StorageService extends EventEmitter {
           logger.error('Redis save cookies error:', error);
         }
       }
-      
+
       // Fallback to memory (still encrypted)
       this.memoryFallback.set(key, encryptedCookies);
       return true;
@@ -201,7 +201,7 @@ class StorageService extends EventEmitter {
   async getCookies() {
     const key = this._key('auth', 'cookies');
     let encryptedCookies = null;
-    
+
     if (this.connected) {
       try {
         encryptedCookies = await this.redis.get(key);
@@ -209,12 +209,12 @@ class StorageService extends EventEmitter {
         logger.error('Redis get cookies error:', error);
       }
     }
-    
+
     // Fallback to memory if Redis failed or returned null
     if (!encryptedCookies) {
       encryptedCookies = this.memoryFallback.get(key) || null;
     }
-    
+
     // Decrypt cookies before returning
     if (encryptedCookies) {
       try {
@@ -226,7 +226,7 @@ class StorageService extends EventEmitter {
         return null;
       }
     }
-    
+
     return null;
   }
 
@@ -235,7 +235,7 @@ class StorageService extends EventEmitter {
     const key = this._key('bid_history', auctionId);
     const timestamp = Date.now();
     const entry = JSON.stringify({ ...bidData, timestamp });
-    
+
     if (this.connected) {
       try {
         await this.redis.zadd(key, timestamp, entry);
@@ -247,13 +247,13 @@ class StorageService extends EventEmitter {
         logger.error('Redis save bid history error:', error);
       }
     }
-    
+
     return true;
   }
 
   async getBidHistory(auctionId, limit = 50) {
     const key = this._key('bid_history', auctionId);
-    
+
     if (this.connected) {
       try {
         const entries = await this.redis.zrevrange(key, 0, limit - 1);
@@ -262,7 +262,7 @@ class StorageService extends EventEmitter {
         logger.error('Redis get bid history error:', error);
       }
     }
-    
+
     return [];
   }
 
@@ -270,7 +270,7 @@ class StorageService extends EventEmitter {
   async saveSystemState(state) {
     const key = this._key('system', 'state');
     const data = JSON.stringify(state);
-    
+
     if (this.connected) {
       try {
         await this.redis.set(key, data);
@@ -279,14 +279,14 @@ class StorageService extends EventEmitter {
         logger.error('Redis save system state error:', error);
       }
     }
-    
+
     this.memoryFallback.set(key, state);
     return true;
   }
 
   async getSystemState() {
     const key = this._key('system', 'state');
-    
+
     if (this.connected) {
       try {
         const data = await this.redis.get(key);
@@ -295,14 +295,14 @@ class StorageService extends EventEmitter {
         logger.error('Redis get system state error:', error);
       }
     }
-    
+
     return this.memoryFallback.get(key) || null;
   }
 
   // Settings management
   async getSettings() {
     const key = this._key('system', 'settings');
-    
+
     if (this.connected) {
       try {
         const data = await this.redis.get(key);
@@ -311,14 +311,14 @@ class StorageService extends EventEmitter {
         logger.error('Redis get settings error:', error);
       }
     }
-    
+
     return this.memoryFallback.get(key) || this.getDefaultSettings();
   }
 
   async saveSettings(settings) {
     const key = this._key('system', 'settings');
     const data = JSON.stringify(settings);
-    
+
     if (this.connected) {
       try {
         await this.redis.set(key, data);
@@ -327,7 +327,7 @@ class StorageService extends EventEmitter {
         logger.error('Redis save settings error:', error);
       }
     }
-    
+
     this.memoryFallback.set(key, settings);
     return true;
   }
@@ -377,8 +377,8 @@ class StorageService extends EventEmitter {
 
   // Health check
   async isHealthy() {
-    if (!this.connected) return false;
-    
+    if (!this.connected) { return false; }
+
     try {
       const result = await this.redis.ping();
       return result === 'PONG';

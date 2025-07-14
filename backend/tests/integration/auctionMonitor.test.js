@@ -14,17 +14,17 @@ describe('Auction Monitor Integration Tests', () => {
   beforeAll(() => {
     // Use fake timers to control polling
     jest.useFakeTimers();
-    
+
     // Force use of real Redis in CI environment for integration tests
     if (process.env.CI && process.env.USE_REAL_REDIS === 'true') {
       // Temporarily disable the ioredis mock for integration tests
       jest.unmock('ioredis');
     }
-    
+
     // Import mocked modules
     storage = require('../../src/services/storage');
     nellisApi = require('../../src/services/nellisApi');
-    
+
     // Setup storage mocks BEFORE importing auctionMonitor
     storage.initialize = jest.fn().mockResolvedValue();
     storage.saveAuction = jest.fn().mockResolvedValue(true);
@@ -45,14 +45,14 @@ describe('Auction Monitor Integration Tests', () => {
       }
     });
     storage.connected = true;
-    
+
     // Setup nellisApi mocks
     nellisApi.getAuctionData = jest.fn().mockResolvedValue(mockAuctionData);
     nellisApi.placeBid = jest.fn().mockResolvedValue({ success: true });
-    
+
     // Now import auctionMonitor after mocks are set
     auctionMonitor = require('../../src/services/auctionMonitor');
-    
+
     // Create mock WebSocket server
     mockWss = {
       clients: new Set(),
@@ -65,13 +65,13 @@ describe('Auction Monitor Integration Tests', () => {
     auctionMonitor.monitoredAuctions.forEach((auction, auctionId) => {
       auctionMonitor.stopPolling(auctionId);
     });
-    
+
     jest.clearAllMocks();
     auctionMonitor.monitoredAuctions.clear();
     auctionMonitor.pollingIntervals.clear();
     // Clear any timers to prevent polling during tests
     jest.clearAllTimers();
-    
+
     // Add Redis cleanup for CI environment
     if (process.env.CI && storage.redis) {
       try {
@@ -89,7 +89,7 @@ describe('Auction Monitor Integration Tests', () => {
   describe('Initialization', () => {
     it('should initialize with storage', async () => {
       await auctionMonitor.initialize(mockWss);
-      
+
       expect(storage.initialize).toHaveBeenCalled();
       expect(auctionMonitor.wss).toBe(mockWss);
       expect(auctionMonitor.storageInitialized).toBe(true);
@@ -101,11 +101,11 @@ describe('Auction Monitor Integration Tests', () => {
         status: 'monitoring',
         data: mockAuctionData
       };
-      
+
       storage.getAllAuctions.mockResolvedValue([persistedAuction]);
-      
+
       await auctionMonitor.initialize(mockWss);
-      
+
       expect(auctionMonitor.monitoredAuctions.has(mockAuction.id)).toBe(true);
       expect(auctionMonitor.pollingIntervals.has(mockAuction.id)).toBe(true);
     });
@@ -115,11 +115,11 @@ describe('Auction Monitor Integration Tests', () => {
         ...mockAuction,
         status: 'ended'
       };
-      
+
       storage.getAllAuctions.mockResolvedValue([endedAuction]);
-      
+
       await auctionMonitor.initialize(mockWss);
-      
+
       expect(auctionMonitor.monitoredAuctions.has(mockAuction.id)).toBe(false);
     });
   });
@@ -135,32 +135,32 @@ describe('Auction Monitor Integration Tests', () => {
         mockAuction.config,
         { title: mockAuction.title }
       );
-      
+
       expect(result).toBe(true);
       expect(auctionMonitor.monitoredAuctions.has(mockAuction.id)).toBe(true);
       expect(storage.saveAuction).toHaveBeenCalled();
-      
+
       // Check if polling started
       expect(auctionMonitor.pollingIntervals.has(mockAuction.id)).toBe(true);
     });
 
     it('should not add duplicate auction', async () => {
       await auctionMonitor.addAuction(mockAuction.id);
-      
+
       // Clear the mock to only count the second call
       storage.saveAuction.mockClear();
-      
+
       const result = await auctionMonitor.addAuction(mockAuction.id);
-      
+
       expect(result).toBe(false);
       expect(storage.saveAuction).not.toHaveBeenCalled();
     });
 
     it('should remove auction and stop polling', async () => {
       await auctionMonitor.addAuction(mockAuction.id);
-      
+
       const result = await auctionMonitor.removeAuction(mockAuction.id);
-      
+
       expect(result).toBe(true);
       expect(auctionMonitor.monitoredAuctions.has(mockAuction.id)).toBe(false);
       expect(auctionMonitor.pollingIntervals.has(mockAuction.id)).toBe(false);
@@ -169,12 +169,12 @@ describe('Auction Monitor Integration Tests', () => {
 
     it('should update auction configuration', async () => {
       await auctionMonitor.addAuction(mockAuction.id, mockAuction.config);
-      
+
       const newConfig = { maxBid: 200 };
       const result = await auctionMonitor.updateAuctionConfig(mockAuction.id, newConfig);
-      
+
       expect(result).toBe(true);
-      
+
       const auction = auctionMonitor.monitoredAuctions.get(mockAuction.id);
       expect(auction.config.maxBid).toBe(200);
       expect(storage.saveAuction).toHaveBeenCalled();
@@ -189,13 +189,13 @@ describe('Auction Monitor Integration Tests', () => {
 
     it('should update auction data on poll', async () => {
       await auctionMonitor.addAuction(mockAuction.id);
-      
+
       // Clear initial call
       storage.saveAuction.mockClear();
-      
+
       // Trigger update
       await auctionMonitor.updateAuction(mockAuction.id);
-      
+
       const auction = auctionMonitor.monitoredAuctions.get(mockAuction.id);
       expect(auction.data).toEqual(mockAuctionData);
       expect(storage.saveAuction).toHaveBeenCalledWith(mockAuction.id, auction);
@@ -203,13 +203,13 @@ describe('Auction Monitor Integration Tests', () => {
 
     it('should handle auction ending', async () => {
       await auctionMonitor.addAuction(mockAuction.id);
-      
+
       // Mock ended auction
       const endedData = { ...mockAuctionData, isClosed: true, timeRemaining: 0 };
       nellisApi.getAuctionData.mockResolvedValue(endedData);
-      
+
       await auctionMonitor.updateAuction(mockAuction.id);
-      
+
       const auction = auctionMonitor.monitoredAuctions.get(mockAuction.id);
       expect(auction.status).toBe('ended');
       expect(auctionMonitor.pollingIntervals.has(mockAuction.id)).toBe(false);
@@ -217,15 +217,15 @@ describe('Auction Monitor Integration Tests', () => {
 
     it('should adjust polling rate for auctions ending soon', async () => {
       await auctionMonitor.addAuction(mockAuction.id);
-      
+
       // Mock auction with 25 seconds left
       const urgentData = { ...mockAuctionData, timeRemaining: 25 };
       nellisApi.getAuctionData.mockResolvedValue(urgentData);
-      
+
       const adjustSpy = jest.spyOn(auctionMonitor, 'adjustPollingRate');
-      
+
       await auctionMonitor.updateAuction(mockAuction.id);
-      
+
       expect(adjustSpy).toHaveBeenCalledWith(mockAuction.id, 2000);
     });
   });
@@ -234,7 +234,7 @@ describe('Auction Monitor Integration Tests', () => {
     beforeEach(async () => {
       // Get a fresh instance to avoid pollution
       jest.resetModules();
-      
+
       // Re-setup mocks for fresh instance
       storage = require('../../src/services/storage');
       nellisApi = require('../../src/services/nellisApi');
@@ -257,16 +257,16 @@ describe('Auction Monitor Integration Tests', () => {
         }
       });
       storage.connected = true;
-      
+
       nellisApi.getAuctionData = jest.fn().mockResolvedValue(mockAuctionData);
       nellisApi.placeBid = jest.fn();
-      
+
       // Get fresh auction monitor instance
       auctionMonitor = require('../../src/services/auctionMonitor');
-      
+
       jest.clearAllMocks();
       jest.clearAllTimers();
-      
+
       await auctionMonitor.initialize(mockWss);
     });
 
@@ -276,10 +276,10 @@ describe('Auction Monitor Integration Tests', () => {
         strategy: 'auto',
         autoBid: false
       });
-      
+
       const auctionData = { ...mockAuctionData, isWinning: false };
       await auctionMonitor.executeAutoBid(mockAuction.id, auctionData);
-      
+
       expect(nellisApi.placeBid).not.toHaveBeenCalled();
     });
 
@@ -289,12 +289,12 @@ describe('Auction Monitor Integration Tests', () => {
         strategy: 'auto',
         bidIncrement: 5
       });
-      
+
       nellisApi.placeBid.mockResolvedValue({ success: true, data: {} });
-      
+
       const auctionData = { ...mockAuctionData, isWinning: false, nextBid: 35 };
       await auctionMonitor.executeAutoBid(mockAuction.id, auctionData);
-      
+
       expect(nellisApi.placeBid).toHaveBeenCalledWith(mockAuction.id, 35);
       expect(storage.saveBidHistory).toHaveBeenCalled();
     });
@@ -303,18 +303,18 @@ describe('Auction Monitor Integration Tests', () => {
       await auctionMonitor.addAuction(mockAuction.id, {
         maxBid: 30,
         strategy: 'auto',
-        autoBid: true  // Enable auto-bidding to test max bid logic
+        autoBid: true // Enable auto-bidding to test max bid logic
       });
-      
+
       // Clear any polling-triggered calls
       jest.clearAllMocks();
-      
+
       // Use a high nextBid that definitely exceeds maxBid (30)
       const auctionData = { ...mockAuctionData, isWinning: false, nextBid: 35 };
       await auctionMonitor.executeAutoBid(mockAuction.id, auctionData);
-      
+
       expect(nellisApi.placeBid).not.toHaveBeenCalled();
-      
+
       const auction = auctionMonitor.monitoredAuctions.get(mockAuction.id);
       expect(auction.maxBidReached).toBe(true);
     });
@@ -323,22 +323,22 @@ describe('Auction Monitor Integration Tests', () => {
       await auctionMonitor.addAuction(mockAuction.id, {
         maxBid: 100,
         strategy: 'sniping',
-        autoBid: true  // Enable auto-bidding to test sniping logic
+        autoBid: true // Enable auto-bidding to test sniping logic
       });
-      
+
       // Clear any polling-triggered calls
       jest.clearAllMocks();
-      
+
       // More than 30 seconds left (should not bid in sniping mode)
       const auctionData = { ...mockAuctionData, isWinning: false, timeRemaining: 60, nextBid: 35 };
       await auctionMonitor.executeAutoBid(mockAuction.id, auctionData);
-      
+
       expect(nellisApi.placeBid).not.toHaveBeenCalled();
-      
+
       // Less than 30 seconds left
       const urgentData = { ...mockAuctionData, timeRemaining: 25, nextBid: 35 };
       await auctionMonitor.executeAutoBid(mockAuction.id, urgentData);
-      
+
       expect(nellisApi.placeBid).toHaveBeenCalledWith(mockAuction.id, 35);
     });
 
@@ -347,14 +347,14 @@ describe('Auction Monitor Integration Tests', () => {
         maxBid: 100,
         strategy: 'auto'
       });
-      
+
       nellisApi.placeBid.mockResolvedValue(mockOutbidResponse);
-      
+
       const auctionData = { ...mockAuctionData, nextBid: 35 };
       await auctionMonitor.executeAutoBid(mockAuction.id, auctionData);
-      
+
       expect(nellisApi.placeBid).toHaveBeenCalledWith(mockAuction.id, 35);
-      
+
       // Should update auction data with response
       expect(auctionData.currentBid).toBe(35);
       expect(auctionData.nextBid).toBe(40);
@@ -365,13 +365,13 @@ describe('Auction Monitor Integration Tests', () => {
         maxBid: 100,
         strategy: 'auto'
       });
-      
+
       const error = 'Bid rejected';
       nellisApi.placeBid.mockResolvedValue({ success: false, error });
-      
+
       const auctionData = { ...mockAuctionData, nextBid: 35 };
       await auctionMonitor.executeAutoBid(mockAuction.id, auctionData);
-      
+
       expect(storage.saveBidHistory).toHaveBeenCalledWith(
         mockAuction.id,
         expect.objectContaining({
@@ -390,15 +390,15 @@ describe('Auction Monitor Integration Tests', () => {
     it('should emit outbid event', async () => {
       const outbidHandler = jest.fn();
       auctionMonitor.on('outbid', outbidHandler);
-      
+
       await auctionMonitor.addAuction(mockAuction.id);
-      
+
       // Simulate being outbid
       const oldData = { ...mockAuctionData, isWinning: true };
       const newData = { ...mockAuctionData, isWinning: false, currentBid: 40 };
-      
+
       auctionMonitor.handleBidUpdate(mockAuction.id, newData, oldData);
-      
+
       expect(outbidHandler).toHaveBeenCalledWith({
         auctionId: mockAuction.id,
         currentBid: 40
@@ -408,12 +408,12 @@ describe('Auction Monitor Integration Tests', () => {
     it('should emit auctionEnded event', async () => {
       const endHandler = jest.fn();
       auctionMonitor.on('auctionEnded', endHandler);
-      
+
       await auctionMonitor.addAuction(mockAuction.id);
-      
+
       const endedData = { ...mockAuctionData, currentBid: 50, isWinning: true };
       auctionMonitor.handleAuctionEnd(mockAuction.id, endedData);
-      
+
       expect(endHandler).toHaveBeenCalledWith({
         auctionId: mockAuction.id,
         finalPrice: 50,
@@ -424,20 +424,20 @@ describe('Auction Monitor Integration Tests', () => {
     it('should emit bidPlaced event', async () => {
       const bidHandler = jest.fn();
       auctionMonitor.on('bidPlaced', bidHandler);
-      
+
       await auctionMonitor.addAuction(mockAuction.id, {
         maxBid: 100,
         strategy: 'auto'
       });
-      
-      nellisApi.placeBid.mockResolvedValue({ 
-        success: true, 
-        data: { message: 'Bid placed' } 
+
+      nellisApi.placeBid.mockResolvedValue({
+        success: true,
+        data: { message: 'Bid placed' }
       });
-      
+
       const auctionData = { ...mockAuctionData, nextBid: 35 };
       await auctionMonitor.executeAutoBid(mockAuction.id, auctionData);
-      
+
       expect(bidHandler).toHaveBeenCalledWith({
         auctionId: mockAuction.id,
         amount: 35,
@@ -451,9 +451,9 @@ describe('Auction Monitor Integration Tests', () => {
       await auctionMonitor.initialize(mockWss);
       await auctionMonitor.addAuction('123');
       await auctionMonitor.addAuction('456');
-      
+
       auctionMonitor.shutdown();
-      
+
       expect(auctionMonitor.monitoredAuctions.size).toBe(0);
       expect(auctionMonitor.pollingIntervals.size).toBe(0);
     });

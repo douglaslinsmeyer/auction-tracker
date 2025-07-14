@@ -12,10 +12,10 @@ class AuctionFactory {
       bidHistory: [],
       isMonitored: false
     };
-    
+
     return { ...defaults, ...overrides };
   }
-  
+
   static createEnding(overrides = {}) {
     return this.create({
       timeLeft: 30,
@@ -23,7 +23,7 @@ class AuctionFactory {
       ...overrides
     });
   }
-  
+
   static createEnded(overrides = {}) {
     return this.create({
       status: 'ended',
@@ -33,12 +33,12 @@ class AuctionFactory {
       ...overrides
     });
   }
-  
+
   static createWithBids(bidCount = 3, overrides = {}) {
     const auction = this.create(overrides);
     const bidHistory = [];
     let currentBid = auction.currentBid;
-    
+
     for (let i = 0; i < bidCount; i++) {
       currentBid += auction.minimumBid;
       bidHistory.push({
@@ -47,12 +47,12 @@ class AuctionFactory {
         timestamp: new Date(Date.now() - (bidCount - i) * 60000)
       });
     }
-    
+
     auction.currentBid = currentBid;
     auction.bidHistory = bidHistory;
     return auction;
   }
-  
+
   static generateId() {
     return 'AUC' + Math.random().toString(36).substr(2, 9).toUpperCase();
   }

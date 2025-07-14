@@ -37,7 +37,7 @@ class TestRedis {
 
     // Clear test database
     await this.flushAll();
-    
+
     return this.client;
   }
 
@@ -59,14 +59,14 @@ class TestRedis {
       // redis-mock uses callback style
       return new Promise((resolve, reject) => {
         this.client.flushall((err) => {
-          if (err) reject(err);
-          else resolve();
+          if (err) { reject(err); } else { resolve(); }
         });
       });
     } else {
       // Real Redis client uses promises
       await this.client.flushAll();
     }
+    return undefined;
   }
 
   /**
@@ -77,18 +77,16 @@ class TestRedis {
    */
   async set(key, value, ttl) {
     const stringValue = typeof value === 'object' ? JSON.stringify(value) : value;
-    
+
     if (this.useMock) {
       return new Promise((resolve, reject) => {
         if (ttl) {
           this.client.setex(key, ttl, stringValue, (err) => {
-            if (err) reject(err);
-            else resolve();
+            if (err) { reject(err); } else { resolve(); }
           });
         } else {
           this.client.set(key, stringValue, (err) => {
-            if (err) reject(err);
-            else resolve();
+            if (err) { reject(err); } else { resolve(); }
           });
         }
       });
@@ -99,6 +97,7 @@ class TestRedis {
         await this.client.set(key, stringValue);
       }
     }
+    return undefined;
   }
 
   /**
@@ -110,8 +109,7 @@ class TestRedis {
     if (this.useMock) {
       return new Promise((resolve, reject) => {
         this.client.get(key, (err, value) => {
-          if (err) reject(err);
-          else {
+          if (err) { reject(err); } else {
             try {
               resolve(value ? JSON.parse(value) : null);
             } catch {
@@ -138,13 +136,13 @@ class TestRedis {
     if (this.useMock) {
       return new Promise((resolve, reject) => {
         this.client.del(key, (err) => {
-          if (err) reject(err);
-          else resolve();
+          if (err) { reject(err); } else { resolve(); }
         });
       });
     } else {
       await this.client.del(key);
     }
+    return undefined;
   }
 
   /**
@@ -156,8 +154,7 @@ class TestRedis {
     if (this.useMock) {
       return new Promise((resolve, reject) => {
         this.client.exists(key, (err, exists) => {
-          if (err) reject(err);
-          else resolve(exists === 1);
+          if (err) { reject(err); } else { resolve(exists === 1); }
         });
       });
     } else {
@@ -171,16 +168,15 @@ class TestRedis {
    * @param {string} pattern
    * @returns {Promise<string[]>}
    */
-  async keys(pattern) {
+  keys(pattern) {
     if (this.useMock) {
       return new Promise((resolve, reject) => {
         this.client.keys(pattern, (err, keys) => {
-          if (err) reject(err);
-          else resolve(keys);
+          if (err) { reject(err); } else { resolve(keys); }
         });
       });
     } else {
-      return await this.client.keys(pattern);
+      return this.client.keys(pattern);
     }
   }
 
@@ -205,12 +201,12 @@ class TestRedis {
   createTestStorage() {
     const Storage = require('../../src/services/storage');
     const storage = Object.create(Storage);
-    
+
     // Override the Redis client
     storage.redis = this.client;
     storage.connected = true;
     storage.initialized = true;
-    
+
     return storage;
   }
 }

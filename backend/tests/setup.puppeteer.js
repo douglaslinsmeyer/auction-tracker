@@ -16,12 +16,12 @@ process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
-beforeAll(async () => {
+beforeAll(() => {
   // Any global setup needed before Puppeteer tests
   logger.info('Starting Puppeteer tests...');
 });
 
-afterAll(async () => {
+afterAll(() => {
   // Cleanup after all tests
   logger.info('Puppeteer tests completed.');
 });

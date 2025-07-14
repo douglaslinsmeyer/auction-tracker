@@ -31,7 +31,7 @@ describeSkipIfHeadless('Chrome Extension Installation & Setup', () => {
 
     // Open popup to verify it loads
     const popupPage = await openExtensionPopup(browser, extensionId);
-    
+
     // Check popup title
     const title = await popupPage.title();
     expect(title).toContain('Nellis Auction Helper');
@@ -39,7 +39,7 @@ describeSkipIfHeadless('Chrome Extension Installation & Setup', () => {
     // Check for main UI elements
     const hasAuthSection = await popupPage.$('#authToken') !== null;
     const hasConnectionStatus = await popupPage.$('#connectionStatus') !== null;
-    
+
     expect(hasAuthSection).toBe(true);
     expect(hasConnectionStatus).toBe(true);
   }, 30000);
@@ -86,7 +86,7 @@ describeSkipIfHeadless('Chrome Extension Installation & Setup', () => {
 
     // Try to connect to non-existent backend
     await configureAuthToken(popupPage, 'test-token');
-    
+
     // Attempt connection to wrong port
     const urlInput = await popupPage.$('#backendUrl');
     if (urlInput) {
@@ -108,7 +108,7 @@ describeSkipIfHeadless('Chrome Extension Installation & Setup', () => {
 
     const errorVisible = await popupPage.$('.error-message') !== null;
     const statusFailed = await popupPage.$eval('#connectionStatus', el => el.textContent).then(text => text.includes('Failed')).catch(() => false);
-    
+
     expect(errorVisible || statusFailed).toBe(true);
   }, 30000);
 
@@ -128,7 +128,7 @@ describeSkipIfHeadless('Chrome Extension Installation & Setup', () => {
     for (const tab of tabs) {
       await tab.click();
       await popupPage.waitForTimeout(200);
-      
+
       // Verify tab content changes
       const isActive = await tab.evaluate(el => el.classList.contains('active'));
       expect(isActive).toBe(true);
@@ -145,7 +145,7 @@ describeSkipIfHeadless('Chrome Extension Installation & Setup', () => {
       const extensionsManager = document.querySelector('extensions-manager');
       const itemList = extensionsManager.shadowRoot.querySelector('extensions-item-list');
       const items = itemList.shadowRoot.querySelectorAll('extensions-item');
-      
+
       for (const item of items) {
         if (item.id === extId) {
           // Check for required permissions indicators

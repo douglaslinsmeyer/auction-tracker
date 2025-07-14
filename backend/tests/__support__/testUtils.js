@@ -7,14 +7,14 @@ class TestUtils {
 
   static async waitFor(condition, timeout = 5000, interval = 100) {
     const startTime = Date.now();
-    
+
     while (Date.now() - startTime < timeout) {
       if (await condition()) {
         return true;
       }
       await new Promise(resolve => setTimeout(resolve, interval));
     }
-    
+
     throw new Error('Timeout waiting for condition');
   }
 

@@ -53,7 +53,7 @@ function createSigningMiddleware(options = {}) {
     }
 
     // Check for signature
-    const hasSignature = !!req.headers['x-signature'];
+    const hasSignature = Boolean(req.headers['x-signature']);
 
     if (hasSignature) {
       // Verify the signature
@@ -77,7 +77,7 @@ function createSigningMiddleware(options = {}) {
 
       // Mark request as verified
       req.signatureVerified = true;
-      req.signatureTimestamp = parseInt(req.headers['x-timestamp']);
+      req.signatureTimestamp = parseInt(req.headers['x-timestamp'], 10);
     } else if (isRequired) {
       // Signature required but not present
       return res.status(401).json({
@@ -96,6 +96,7 @@ function createSigningMiddleware(options = {}) {
     }
 
     next();
+    return undefined;
   };
 }
 
@@ -106,7 +107,7 @@ function addSignatureInfo(req, res, next) {
   if (process.env.ENABLE_REQUEST_SIGNING === 'true') {
     res.setHeader('X-Signature-Supported', 'true');
     res.setHeader('X-Signature-Algorithm', 'HMAC-SHA256');
-    
+
     if (req.signatureVerified) {
       res.setHeader('X-Signature-Verified', 'true');
     }

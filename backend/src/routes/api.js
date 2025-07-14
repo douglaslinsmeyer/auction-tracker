@@ -5,13 +5,13 @@ const auctionMonitor = require('../services/auctionMonitor');
 const nellisApi = require('../services/nellisApi');
 const storage = require('../services/storage');
 const { validateBody, validateAuctionId } = require('../middleware/validation');
-const { asyncHandler, createError } = require('../middleware/errorHandler');
+const { asyncHandler } = require('../middleware/errorHandler');
 const logger = require('../utils/logger');
 
 // Create a specific rate limiter for bid operations
 const bidLimiter = rateLimit({
-  windowMs: parseInt(process.env.BID_RATE_LIMIT_WINDOW_MS) || 60 * 1000, // 1 minute window
-  max: parseInt(process.env.BID_RATE_LIMIT_MAX) || 10, // limit each IP to 10 bid requests per minute
+  windowMs: parseInt(process.env.BID_RATE_LIMIT_WINDOW_MS, 10) || 60 * 1000, // 1 minute window
+  max: parseInt(process.env.BID_RATE_LIMIT_MAX, 10) || 10, // limit each IP to 10 bid requests per minute
   message: 'Too many bid attempts, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
@@ -30,7 +30,7 @@ const bidLimiter = rateLimit({
 });
 
 // Get all monitored auctions
-router.get('/auctions', asyncHandler(async (req, res) => {
+router.get('/auctions', asyncHandler((req, res) => {
   const auctions = auctionMonitor.getMonitoredAuctions();
   res.json({ success: true, auctions });
 }));
@@ -45,13 +45,13 @@ router.get('/auctions/:id', validateAuctionId, asyncHandler(async (req, res) => 
 // Validate auction configuration
 function validateAuctionConfig(config) {
   const errors = [];
-  
+
   // Validate strategy
   const validStrategies = ['manual', 'increment', 'sniping'];
   if (config.strategy && !validStrategies.includes(config.strategy)) {
     errors.push(`Invalid strategy: ${config.strategy}. Must be one of: ${validStrategies.join(', ')}`);
   }
-  
+
   // Validate maxBid for non-manual strategies
   if (config.strategy && config.strategy !== 'manual') {
     if (!config.maxBid) {
@@ -64,7 +64,7 @@ function validateAuctionConfig(config) {
       errors.push('maxBid cannot exceed $10,000 for safety');
     }
   }
-  
+
   // Validate spending limits
   if (config.dailyLimit !== undefined) {
     if (typeof config.dailyLimit !== 'number' || isNaN(config.dailyLimit)) {
@@ -75,7 +75,7 @@ function validateAuctionConfig(config) {
       errors.push('dailyLimit cannot exceed $50,000');
     }
   }
-  
+
   if (config.totalLimit !== undefined) {
     if (typeof config.totalLimit !== 'number' || isNaN(config.totalLimit)) {
       errors.push('totalLimit must be a valid number');
@@ -85,7 +85,7 @@ function validateAuctionConfig(config) {
       errors.push('totalLimit cannot exceed $100,000');
     }
   }
-  
+
   // Validate increment
   if (config.increment !== undefined) {
     if (typeof config.increment !== 'number' || isNaN(config.increment)) {
@@ -96,23 +96,23 @@ function validateAuctionConfig(config) {
       errors.push('increment cannot exceed $1,000');
     }
   }
-  
+
   // Validate enabled flag
   if (config.enabled !== undefined && typeof config.enabled !== 'boolean') {
     errors.push('enabled must be a boolean value');
   }
-  
+
   return errors;
 }
 
 // Start monitoring an auction
-router.post('/auctions/:id/monitor', validateAuctionId, validateBody('StartMonitoring'), async (req, res) => {
+router.post('/auctions/:id/monitor', validateAuctionId, validateBody('StartMonitoring'), async (req, res, next) => {
   try {
     const auctionId = req.params.id;
     const { config, metadata } = req.body;
-    
+
     const success = await auctionMonitor.addAuction(auctionId, config, metadata);
-    
+
     if (success) {
       res.json({ success: true, message: `Started monitoring auction ${auctionId}`, config });
     } else {
@@ -129,7 +129,7 @@ router.delete('/auctions/:id/monitor', validateAuctionId, (req, res) => {
   try {
     const auctionId = req.params.id;
     const success = auctionMonitor.removeAuction(auctionId);
-    
+
     if (success) {
       res.json({ success: true, message: `Stopped monitoring auction ${auctionId}` });
     } else {
@@ -146,7 +146,7 @@ router.post('/auctions/:id/stop', (req, res) => {
   try {
     const auctionId = req.params.id;
     const success = auctionMonitor.removeAuction(auctionId);
-    
+
     if (success) {
       res.json({ success: true, message: `Stopped monitoring auction ${auctionId}` });
     } else {
@@ -163,17 +163,17 @@ router.post('/auctions/clear', (req, res) => {
   try {
     const auctions = auctionMonitor.getMonitoredAuctions();
     let cleared = 0;
-    
+
     auctions.forEach(auction => {
       if (auctionMonitor.removeAuction(auction.id)) {
         cleared++;
       }
     });
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: `Cleared ${cleared} auctions`,
-      cleared 
+      cleared
     });
   } catch (error) {
     logger.error('Error clearing all auctions:', error);
@@ -186,46 +186,47 @@ router.put('/auctions/:id/config', validateAuctionId, validateBody('AuctionConfi
   try {
     const auctionId = req.params.id;
     const config = req.body.config;
-    
+
     const auction = auctionMonitor.monitoredAuctions.get(auctionId);
     if (!auction) {
       return res.status(404).json({ success: false, error: 'Auction not being monitored' });
     }
-    
+
     // Merge new config with existing and validate
     const mergedConfig = { ...auction.config, ...config };
     const validationErrors = validateAuctionConfig(mergedConfig);
     if (validationErrors.length > 0) {
-      return res.status(400).json({ 
-        success: false, 
+      return res.status(400).json({
+        success: false,
         error: 'Configuration validation failed',
         details: validationErrors
       });
     }
-    
+
     // Update configuration
     auction.config = mergedConfig;
-    
+
     // Save updated auction to storage
-    auctionMonitor.updateAuctionConfig(auctionId, mergedConfig);
-    
+    await auctionMonitor.updateAuctionConfig(auctionId, mergedConfig);
+
     res.json({ success: true, config: auction.config });
   } catch (error) {
     logger.error(`Error updating config for auction ${req.params.id}:`, error);
     res.status(500).json({ success: false, error: error.message });
   }
+  return undefined;
 });
 
 // Get bid history for an auction
 router.get('/auctions/:id/bids', async (req, res) => {
   try {
     const auctionId = req.params.id;
-    const limit = parseInt(req.query.limit) || 50;
-    
+    const limit = parseInt(req.query.limit, 10) || 50;
+
     if (limit > 100) {
       return res.status(400).json({ success: false, error: 'Limit cannot exceed 100' });
     }
-    
+
     const bidHistory = await storage.getBidHistory(auctionId, limit);
     res.json({
       success: true,
@@ -237,6 +238,7 @@ router.get('/auctions/:id/bids', async (req, res) => {
     logger.error(`Error getting bid history for auction ${req.params.id}:`, error);
     res.status(500).json({ success: false, error: error.message });
   }
+  return undefined;
 });
 
 // Place a bid (with rate limiting)
@@ -244,31 +246,32 @@ router.post('/auctions/:id/bid', validateAuctionId, bidLimiter, validateBody('Bi
   try {
     const auctionId = req.params.id;
     const { amount } = req.body;
-    
+
     const result = await nellisApi.placeBid(auctionId, amount);
-    
+
     // Handle different error types with appropriate HTTP status codes
     if (!result.success && result.errorType) {
       const statusMap = {
         'DUPLICATE_BID_AMOUNT': 409, // Conflict
-        'BID_TOO_LOW': 400,          // Bad Request
-        'AUCTION_ENDED': 410,        // Gone
+        'BID_TOO_LOW': 400, // Bad Request
+        'AUCTION_ENDED': 410, // Gone
         'AUTHENTICATION_ERROR': 401, // Unauthorized
-        'OUTBID': 409,              // Conflict
-        'CONNECTION_ERROR': 503,     // Service Unavailable
-        'SERVER_ERROR': 502,         // Bad Gateway
-        'UNKNOWN_ERROR': 500         // Internal Server Error
+        'OUTBID': 409, // Conflict
+        'CONNECTION_ERROR': 503, // Service Unavailable
+        'SERVER_ERROR': 502, // Bad Gateway
+        'UNKNOWN_ERROR': 500 // Internal Server Error
       };
-      
+
       const statusCode = statusMap[result.errorType] || 500;
       return res.status(statusCode).json(result);
     }
-    
+
     res.json(result);
   } catch (error) {
     logger.error(`Error placing bid on auction ${req.params.id}:`, error);
     res.status(500).json({ success: false, error: error.message });
   }
+  return undefined;
 });
 
 // Set authentication credentials
@@ -279,44 +282,45 @@ router.post('/auth', validateBody('Auth'), async (req, res) => {
       headers: req.headers,
       contentType: req.get('content-type')
     });
-    
+
     const { cookies } = req.body;
-    
+
     if (!cookies) {
       logger.warn('Auth failed: No cookies in request body');
-      return res.status(400).json({ 
-        success: false, 
+      return res.status(400).json({
+        success: false,
         error: 'Cookies required',
         code: 'MISSING_COOKIES'
       });
     }
-    
+
     const success = await nellisApi.authenticate({ cookies });
     res.json({ success });
   } catch (error) {
     logger.error('Error setting authentication:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: 'Internal server error',
       code: 'INTERNAL_ERROR'
     });
   }
+  return undefined;
 });
 
 // Validate authentication and test bid placement
 router.post('/auth/validate', async (req, res) => {
   try {
     const { auctionId, testBidAmount } = req.body;
-    
+
     // Check if we have cookies
     if (!nellisApi.cookies) {
-      return res.json({ 
-        success: false, 
+      return res.json({
+        success: false,
         authenticated: false,
         error: 'No authentication cookies set'
       });
     }
-    
+
     // Test 1: Try to fetch auction data (validates cookies work)
     let auctionData = null;
     try {
@@ -336,17 +340,17 @@ router.post('/auth/validate', async (req, res) => {
         details: error.message
       });
     }
-    
+
     // Test 2: Check user state in auction
     const userAuthenticated = auctionData.isWatching !== undefined || auctionData.isWinning !== undefined;
-    
+
     // Test 3: Optionally test bid placement (dry run)
     let bidTestResult = null;
     if (testBidAmount && auctionData && !auctionData.isClosed) {
       logger.info('Testing bid placement (dry run)...');
       // For safety, we'll only test with a bid that's below current bid
       const safeBidAmount = Math.min(testBidAmount, auctionData.currentBid - 1);
-      
+
       try {
         // Note: This will likely fail but we can check the error response
         bidTestResult = await nellisApi.placeBid(auctionData.id, safeBidAmount);
@@ -359,12 +363,12 @@ router.post('/auth/validate', async (req, res) => {
         };
       }
     }
-    
+
     res.json({
       success: true,
       authenticated: userAuthenticated,
-      cookiesSet: !!nellisApi.cookies,
-      auctionDataFetched: !!auctionData,
+      cookiesSet: Boolean(nellisApi.cookies),
+      auctionDataFetched: Boolean(auctionData),
       userState: {
         isWatching: auctionData?.isWatching,
         isWinning: auctionData?.isWinning
@@ -380,19 +384,20 @@ router.post('/auth/validate', async (req, res) => {
     });
   } catch (error) {
     logger.error('Error validating authentication:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: error.message,
       stack: error.stack
     });
   }
+  return undefined;
 });
 
 // Get authentication status
 router.get('/auth/status', async (req, res) => {
   try {
     const authStatus = await nellisApi.checkAuth();
-    
+
     res.json({
       authenticated: authStatus.authenticated,
       cookieCount: authStatus.cookieCount,
@@ -408,7 +413,7 @@ router.get('/auth/status', async (req, res) => {
 // Get system status
 router.get('/status', async (req, res) => {
   const redisHealthy = await storage.isHealthy();
-  
+
   res.json({
     success: true,
     status: 'running',
@@ -440,8 +445,8 @@ router.get('/settings', async (req, res) => {
 router.get('/features', (req, res) => {
   const featureFlags = require('../config/features');
   const status = featureFlags.getStatus();
-  res.json({ 
-    success: true, 
+  res.json({
+    success: true,
     features: status,
     phase: 3,
     description: 'Performance & Architecture improvements'
@@ -477,10 +482,10 @@ router.get('/circuit-breaker', (req, res) => {
 router.post('/settings', validateBody('Settings'), async (req, res) => {
   try {
     const settings = req.body; // validateBody already handles the validation
-    
+
     // Validate settings structure
     const validationErrors = [];
-    
+
     // Validate general settings
     if (settings.general) {
       if (settings.general.defaultMaxBid !== undefined) {
@@ -489,19 +494,19 @@ router.post('/settings', validateBody('Settings'), async (req, res) => {
           validationErrors.push('defaultMaxBid must be between 1 and 10000');
         }
       }
-      
+
       if (settings.general.defaultStrategy !== undefined) {
         const validStrategies = ['increment', 'sniping'];
         if (!validStrategies.includes(settings.general.defaultStrategy)) {
           validationErrors.push(`defaultStrategy must be one of: ${validStrategies.join(', ')}`);
         }
       }
-      
+
       if (settings.general.autoBidDefault !== undefined && typeof settings.general.autoBidDefault !== 'boolean') {
         validationErrors.push('autoBidDefault must be a boolean');
       }
     }
-    
+
     // Validate bidding settings
     if (settings.bidding) {
       if (settings.bidding.snipeTiming !== undefined) {
@@ -510,14 +515,14 @@ router.post('/settings', validateBody('Settings'), async (req, res) => {
           validationErrors.push('snipeTiming must be between 1 and 30 seconds');
         }
       }
-      
+
       if (settings.bidding.bidBuffer !== undefined) {
         const buffer = settings.bidding.bidBuffer;
         if (typeof buffer !== 'number' || buffer < 0 || buffer > 100) {
           validationErrors.push('bidBuffer must be between 0 and 100');
         }
       }
-      
+
       if (settings.bidding.retryAttempts !== undefined) {
         const attempts = settings.bidding.retryAttempts;
         if (typeof attempts !== 'number' || attempts < 1 || attempts > 10) {
@@ -525,9 +530,9 @@ router.post('/settings', validateBody('Settings'), async (req, res) => {
         }
       }
     }
-    
+
     // Notification settings validation removed
-    
+
     if (validationErrors.length > 0) {
       return res.status(400).json({
         success: false,
@@ -535,15 +540,16 @@ router.post('/settings', validateBody('Settings'), async (req, res) => {
         details: validationErrors
       });
     }
-    
+
     // Save settings
     await storage.saveSettings(settings);
-    
+
     res.json({ success: true, settings });
   } catch (error) {
     logger.error('Error saving settings:', error);
     res.status(500).json({ success: false, error: error.message });
   }
+  return undefined;
 });
 
 // Get hot deals - tools with great discounts
@@ -553,82 +559,82 @@ router.get('/hot-deals', asyncHandler(async (req, res) => {
     const searchQuery = req.query.q || 'tools';
     const maxDiscountRatio = parseFloat(req.query.maxRatio) || 0.15; // Default to 15% of retail
     const maxPrice = req.query.maxPrice ? parseFloat(req.query.maxPrice) : null; // Optional max current price filter
-    const page = parseInt(req.query.page) || 1; // Page number (1-based)
-    const limit = parseInt(req.query.limit) || 20; // Items per page
+    const page = parseInt(req.query.page, 10) || 1; // Page number (1-based)
+    const limit = parseInt(req.query.limit, 10) || 20; // Items per page
     const useMockData = req.query.mock === 'true'; // Option to use mock data for testing
-    
+
     logger.info(`Fetching hot deals for ${searchQuery} in ${location}`, { useMockData });
-    
+
     // Check if we should use mock data
     if (useMockData) {
       const mockHotDeals = [
-      {
-        id: '58040119',
-        title: 'DeWalt 20V MAX Cordless Drill/Driver Kit',
-        currentPrice: 25,
-        retailPrice: 199,
-        discountPercentage: 87,
-        location: 'Phoenix',
-        closeTime: new Date(Date.now() + 3600000).toISOString(),
-        bidCount: 15,
-        imageUrl: 'https://nellisauction.com/images/drill.jpg',
-        auctionUrl: `https://www.nellisauction.com/p/product/58040119`,
-        timeRemaining: 3600
-      },
-      {
-        id: '58040120',
-        title: 'Milwaukee M18 FUEL Hammer Drill Kit',
-        currentPrice: 35,
-        retailPrice: 329,
-        discountPercentage: 89,
-        location: 'Phoenix',
-        closeTime: new Date(Date.now() + 7200000).toISOString(),
-        bidCount: 22,
-        imageUrl: 'https://nellisauction.com/images/hammer-drill.jpg',
-        auctionUrl: `https://www.nellisauction.com/p/product/58040120`,
-        timeRemaining: 7200
-      },
-      {
-        id: '58040121',
-        title: 'Craftsman 450-Piece Mechanics Tool Set',
-        currentPrice: 40,
-        retailPrice: 299,
-        discountPercentage: 87,
-        location: 'Phoenix',
-        closeTime: new Date(Date.now() + 1800000).toISOString(),
-        bidCount: 8,
-        imageUrl: 'https://nellisauction.com/images/tool-set.jpg',
-        auctionUrl: `https://www.nellisauction.com/p/product/58040121`,
-        timeRemaining: 1800
-      },
-      {
-        id: '58040122',
-        title: 'RYOBI 18V ONE+ Cordless 6-Tool Combo Kit',
-        currentPrice: 45,
-        retailPrice: 399,
-        discountPercentage: 89,
-        location: 'Phoenix',
-        closeTime: new Date(Date.now() + 5400000).toISOString(),
-        bidCount: 19,
-        imageUrl: 'https://nellisauction.com/images/combo-kit.jpg',
-        auctionUrl: `https://www.nellisauction.com/p/product/58040122`,
-        timeRemaining: 5400
-      },
-      {
-        id: '58040123',
-        title: 'BOSCH 12V Max 2-Tool Combo Kit',
-        currentPrice: 20,
-        retailPrice: 169,
-        discountPercentage: 88,
-        location: 'Phoenix',
-        closeTime: new Date(Date.now() + 2700000).toISOString(),
-        bidCount: 11,
-        imageUrl: 'https://nellisauction.com/images/bosch-kit.jpg',
-        auctionUrl: `https://www.nellisauction.com/p/product/58040123`,
-        timeRemaining: 2700
-      }
+        {
+          id: '58040119',
+          title: 'DeWalt 20V MAX Cordless Drill/Driver Kit',
+          currentPrice: 25,
+          retailPrice: 199,
+          discountPercentage: 87,
+          location: 'Phoenix',
+          closeTime: new Date(Date.now() + 3600000).toISOString(),
+          bidCount: 15,
+          imageUrl: 'https://nellisauction.com/images/drill.jpg',
+          auctionUrl: 'https://www.nellisauction.com/p/product/58040119',
+          timeRemaining: 3600
+        },
+        {
+          id: '58040120',
+          title: 'Milwaukee M18 FUEL Hammer Drill Kit',
+          currentPrice: 35,
+          retailPrice: 329,
+          discountPercentage: 89,
+          location: 'Phoenix',
+          closeTime: new Date(Date.now() + 7200000).toISOString(),
+          bidCount: 22,
+          imageUrl: 'https://nellisauction.com/images/hammer-drill.jpg',
+          auctionUrl: 'https://www.nellisauction.com/p/product/58040120',
+          timeRemaining: 7200
+        },
+        {
+          id: '58040121',
+          title: 'Craftsman 450-Piece Mechanics Tool Set',
+          currentPrice: 40,
+          retailPrice: 299,
+          discountPercentage: 87,
+          location: 'Phoenix',
+          closeTime: new Date(Date.now() + 1800000).toISOString(),
+          bidCount: 8,
+          imageUrl: 'https://nellisauction.com/images/tool-set.jpg',
+          auctionUrl: 'https://www.nellisauction.com/p/product/58040121',
+          timeRemaining: 1800
+        },
+        {
+          id: '58040122',
+          title: 'RYOBI 18V ONE+ Cordless 6-Tool Combo Kit',
+          currentPrice: 45,
+          retailPrice: 399,
+          discountPercentage: 89,
+          location: 'Phoenix',
+          closeTime: new Date(Date.now() + 5400000).toISOString(),
+          bidCount: 19,
+          imageUrl: 'https://nellisauction.com/images/combo-kit.jpg',
+          auctionUrl: 'https://www.nellisauction.com/p/product/58040122',
+          timeRemaining: 5400
+        },
+        {
+          id: '58040123',
+          title: 'BOSCH 12V Max 2-Tool Combo Kit',
+          currentPrice: 20,
+          retailPrice: 169,
+          discountPercentage: 88,
+          location: 'Phoenix',
+          closeTime: new Date(Date.now() + 2700000).toISOString(),
+          bidCount: 11,
+          imageUrl: 'https://nellisauction.com/images/bosch-kit.jpg',
+          auctionUrl: 'https://www.nellisauction.com/p/product/58040123',
+          timeRemaining: 2700
+        }
       ];
-      
+
       // Filter based on discount ratio and max price
       const hotDeals = mockHotDeals.filter(deal => {
         const ratio = deal.currentPrice / deal.retailPrice;
@@ -636,12 +642,12 @@ router.get('/hot-deals', asyncHandler(async (req, res) => {
         const meetsPriceCriteria = !maxPrice || deal.currentPrice <= maxPrice;
         return meetsDiscountCriteria && meetsPriceCriteria;
       });
-      
+
       // Apply pagination
       const startIndex = (page - 1) * limit;
       const endIndex = startIndex + limit;
       const paginatedDeals = hotDeals.slice(startIndex, endIndex);
-      
+
       res.json({
         success: true,
         location,
@@ -662,14 +668,14 @@ router.get('/hot-deals', asyncHandler(async (req, res) => {
       });
       return;
     }
-    
+
     // Use real data from Nellis
     try {
       // First, search for products
       const searchResults = await nellisApi.searchAuctions(searchQuery, { location });
-      
+
       if (!searchResults || searchResults.length === 0) {
-        return res.json({
+        res.json({
           success: true,
           location,
           searchQuery,
@@ -679,30 +685,31 @@ router.get('/hot-deals', asyncHandler(async (req, res) => {
           lastUpdated: new Date().toISOString(),
           dataSource: 'live'
         });
+        return;
       }
-      
+
       // Filter by discount ratio and max price (exclude items with no bids yet)
       const hotDeals = searchResults.filter(product => {
-        if (!product.retailPrice || product.retailPrice === 0) return false;
-        if (product.currentBid === 0) return false; // Skip items with no bids
+        if (!product.retailPrice || product.retailPrice === 0) { return false; }
+        if (product.currentBid === 0) { return false; } // Skip items with no bids
         const ratio = product.currentBid / product.retailPrice;
         const meetsDiscountCriteria = ratio <= maxDiscountRatio;
         const meetsPriceCriteria = !maxPrice || product.currentBid <= maxPrice;
         return meetsDiscountCriteria && meetsPriceCriteria;
       });
-      
+
       // Sort by discount percentage (highest discount first)
       hotDeals.sort((a, b) => b.discountPercentage - a.discountPercentage);
-      
+
       // Apply pagination
       const startIndex = (page - 1) * limit;
       const endIndex = startIndex + limit;
       const paginatedDeals = hotDeals.slice(startIndex, endIndex);
-      
+
       // Get detailed information for these products if needed
       const productIds = paginatedDeals.map(deal => deal.id);
       let detailedDeals = paginatedDeals;
-      
+
       // Optionally fetch more details using the listings endpoint
       if (req.query.detailed === 'true' && productIds.length > 0) {
         try {
@@ -714,7 +721,7 @@ router.get('/hot-deals', asyncHandler(async (req, res) => {
           logger.warn('Could not fetch detailed listings, using search results', { error: detailError.message });
         }
       }
-      
+
       res.json({
         success: true,
         location,
@@ -734,10 +741,10 @@ router.get('/hot-deals', asyncHandler(async (req, res) => {
         dataSource: 'live',
         totalSearchResults: searchResults.length
       });
-      
+
     } catch (searchError) {
       logger.error('Error searching for hot deals, falling back to mock data', { error: searchError.message });
-      
+
       // Fall back to mock data on error
       const mockHotDeals = [
         {
@@ -750,11 +757,11 @@ router.get('/hot-deals', asyncHandler(async (req, res) => {
           closeTime: new Date(Date.now() + 3600000).toISOString(),
           bidCount: 15,
           imageUrl: 'https://nellisauction.com/images/drill.jpg',
-          auctionUrl: `https://www.nellisauction.com/p/product/58040119`,
+          auctionUrl: 'https://www.nellisauction.com/p/product/58040119',
           timeRemaining: 3600
         }
       ];
-      
+
       res.json({
         success: true,
         location,
@@ -769,8 +776,8 @@ router.get('/hot-deals', asyncHandler(async (req, res) => {
     }
   } catch (error) {
     logger.error('Error fetching hot deals:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: error.message,
       deals: []
     });
@@ -778,10 +785,10 @@ router.get('/hot-deals', asyncHandler(async (req, res) => {
 }));
 
 // Get product image URL
-router.get('/product-image/:productId', asyncHandler(async (req, res) => {
+router.get('/product-image/:productId', asyncHandler((req, res) => {
   try {
     const productId = req.params.productId;
-    
+
     // For now, return a constructed URL based on common patterns
     // In production, this could fetch the actual product page and extract the image
     const imageUrls = [
@@ -789,7 +796,7 @@ router.get('/product-image/:productId', asyncHandler(async (req, res) => {
       `https://firebasestorage.googleapis.com/v0/b/nellishr-cbba0.appspot.com/o/processing-photos%2F${productId}%2Fimage.jpeg`,
       `https://via.placeholder.com/300x200/e5e7eb/6b7280?text=Product+${productId}`
     ];
-    
+
     // Return the first URL as a redirect
     res.json({
       success: true,
@@ -799,8 +806,8 @@ router.get('/product-image/:productId', asyncHandler(async (req, res) => {
     });
   } catch (error) {
     logger.error('Error fetching product image:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: error.message,
       imageUrl: 'https://via.placeholder.com/300x200/e5e7eb/6b7280?text=No+Image'
     });

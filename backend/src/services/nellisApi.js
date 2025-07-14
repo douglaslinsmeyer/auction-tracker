@@ -16,7 +16,7 @@ class NellisApi {
     };
     this.initialized = false;
   }
-  
+
   async initialize() {
     try {
       // Try to recover cookies from storage
@@ -32,10 +32,10 @@ class NellisApi {
   }
 
   async getAuctionData(auctionId) {
+    // Use the _data parameter to get JSON response
+    const url = `${this.baseUrl}/p/product/${auctionId}?_data=routes/p.$title.$productId._index`;
+
     try {
-      // Use the _data parameter to get JSON response
-      const url = `${this.baseUrl}/p/product/${auctionId}?_data=routes/p.$title.$productId._index`;
-      
       const response = await axios.get(url, {
         headers: {
           ...this.headers,
@@ -47,7 +47,7 @@ class NellisApi {
         const product = response.data.product;
         const timeRemaining = this.calculateTimeRemaining(product.closeTime?.value);
         const isClosed = product.isClosed || product.marketStatus === 'sold' || timeRemaining <= 0;
-        
+
         return {
           id: product.id,
           title: product.title,
@@ -83,12 +83,12 @@ class NellisApi {
   }
 
   calculateTimeRemaining(closeTimeString) {
-    if (!closeTimeString) return 0;
-    
+    if (!closeTimeString) { return 0; }
+
     const closeTime = new Date(closeTimeString);
     const now = new Date();
     const diff = closeTime - now;
-    
+
     return Math.max(0, Math.floor(diff / 1000)); // Return seconds
   }
 
@@ -105,10 +105,10 @@ class NellisApi {
   }
 
   // Check authentication status
-  async checkAuth() {
-    const hasCookies = !!this.cookies && this.cookies.length > 0;
+  checkAuth() {
+    const hasCookies = Boolean(this.cookies) && this.cookies.length > 0;
     const cookieCount = hasCookies ? this.cookies.split(';').length : 0;
-    
+
     return {
       authenticated: hasCookies,
       cookieCount: cookieCount
@@ -118,12 +118,12 @@ class NellisApi {
   async placeBid(auctionId, amount, retryCount = 0) {
     try {
       logger.logBidActivity('placing_bid', auctionId, amount);
-      
+
       // Ensure amount is a whole number
       const bidAmount = Math.floor(amount);
-      
+
       const response = await axios.post(`${this.baseUrl}/api/bids`, {
-        productId: parseInt(auctionId),
+        productId: parseInt(auctionId, 10),
         bid: bidAmount
       }, {
         headers: {
@@ -138,7 +138,7 @@ class NellisApi {
         },
         timeout: 10000 // 10 second timeout
       });
-      
+
       // Check if response indicates success
       if (response.status === 200 || response.status === 201) {
         logger.logBidActivity('bid_placed', auctionId, bidAmount, { success: true });
@@ -157,16 +157,16 @@ class NellisApi {
       }
     } catch (error) {
       logger.error(`Error placing bid on auction ${auctionId}`, { error: error.message, stack: error.stack });
-      
+
       // Extract meaningful error message
       let errorMessage = error.message;
       let errorType = 'UNKNOWN_ERROR';
-      
+
       if (error.response) {
         const responseError = error.response.data?.error || error.response.data?.message;
         if (responseError) {
           errorMessage = responseError;
-          
+
           // Categorize specific error types
           if (responseError.includes('already placed a bid with the same price')) {
             errorType = 'DUPLICATE_BID_AMOUNT';
@@ -186,26 +186,26 @@ class NellisApi {
       } else if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
         errorType = 'CONNECTION_ERROR';
       }
-      
+
       const result = {
         success: false,
         error: errorMessage,
         errorType: errorType,
         retryable: ['CONNECTION_ERROR', 'SERVER_ERROR'].includes(errorType)
       };
-      
+
       // Retry logic based on settings
       if (result.retryable && retryCount === 0) {
         const globalSettings = await storage.getSettings();
         const maxRetries = globalSettings.bidding.retryAttempts || 3;
-        
+
         if (retryCount < maxRetries - 1) {
           logger.info(`Retrying bid (attempt ${retryCount + 2} of ${maxRetries})...`);
           await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Exponential backoff
           return this.placeBid(auctionId, amount, retryCount + 1);
         }
       }
-      
+
       return result;
     }
   }
@@ -214,7 +214,7 @@ class NellisApi {
     try {
       const promises = auctionIds.map(id => this.getAuctionData(id));
       const results = await Promise.allSettled(promises);
-      
+
       return results.map((result, index) => {
         if (result.status === 'fulfilled') {
           return result.value;
@@ -234,9 +234,9 @@ class NellisApi {
       if (!productIds || productIds.length === 0) {
         return [];
       }
-      
+
       logger.info(`Fetching details for ${productIds.length} products`);
-      
+
       // Use the /api/listings endpoint
       const response = await axios.post(
         `${this.baseUrl}/api/listings`,
@@ -255,7 +255,7 @@ class NellisApi {
           }
         }
       );
-      
+
       if (response.data && Array.isArray(response.data)) {
         // Transform the listings data to our format
         return response.data.map(listing => ({
@@ -272,13 +272,13 @@ class NellisApi {
           bidCount: listing.bidCount || 0,
           inventoryNumber: listing.inventoryNumber,
           timeRemaining: this.calculateTimeRemaining(listing.closeTime),
-          discountPercentage: listing.retailPrice > 0 
+          discountPercentage: listing.retailPrice > 0
             ? Math.round((1 - (listing.currentPrice / listing.retailPrice)) * 100)
             : 0,
           auctionUrl: `${this.baseUrl}/p/product/${listing.id || listing.productId}`
         }));
       }
-      
+
       return [];
     } catch (error) {
       logger.error('Error fetching listings details', { error: error.message, stack: error.stack });
@@ -289,7 +289,7 @@ class NellisApi {
   async searchAuctions(query, filters = {}) {
     try {
       logger.info(`Searching auctions with query: ${query}`, { filters });
-      
+
       // Fetch the search page
       const searchUrl = `${this.baseUrl}/search?query=${encodeURIComponent(query)}`;
       const response = await axios.get(searchUrl, {
@@ -299,31 +299,31 @@ class NellisApi {
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
         }
       });
-      
+
       if (response.status !== 200) {
         throw new Error(`Search request failed with status ${response.status}`);
       }
-      
+
       // Extract product data from the Remix context
       const html = response.data;
       const jsonDataMatch = html.match(/window\.__remixContext\s*=\s*({.*?});/s);
-      
+
       if (!jsonDataMatch) {
         logger.warn('Could not find Remix context data in search results');
         return [];
       }
-      
+
       try {
         const remixData = JSON.parse(jsonDataMatch[1]);
-        
+
         // Find product data in the loader data
         if (remixData.state && remixData.state.loaderData) {
           const routeData = Object.values(remixData.state.loaderData);
-          
+
           for (const data of routeData) {
             if (data && data.products && Array.isArray(data.products)) {
               let products = data.products;
-              
+
               // Apply location filter if specified
               if (filters.location) {
                 products = products.filter(p => {
@@ -331,29 +331,29 @@ class NellisApi {
                   return productLocation && productLocation.toLowerCase().includes(filters.location.toLowerCase());
                 });
               }
-              
+
               // Transform to our format
               return products.map(product => {
                 // Try to find image URL from various possible fields
                 let imageUrl = product.imageUrl || product.image || product.primaryImage;
-                
+
                 // If no image URL, try to extract from photos array (most common)
                 if (!imageUrl && product.photos && Array.isArray(product.photos) && product.photos.length > 0) {
                   const firstPhoto = product.photos[0];
                   imageUrl = typeof firstPhoto === 'string' ? firstPhoto : (firstPhoto.url || firstPhoto);
                 }
-                
+
                 // If no image URL, try to extract from images array
                 if (!imageUrl && product.images && Array.isArray(product.images) && product.images.length > 0) {
                   imageUrl = product.images[0];
                 }
-                
+
                 // If still no image, we'll construct a URL to fetch later
                 if (!imageUrl) {
                   // We'll use a placeholder that indicates we need to fetch the image
                   imageUrl = null;
                 }
-                
+
                 return {
                   id: product.id,
                   title: product.title,
@@ -367,7 +367,7 @@ class NellisApi {
                   categories: product.categories,
                   bidCount: product.bidCount || 0,
                   inventoryNumber: product.inventoryNumber,
-                  discountPercentage: product.retailPrice > 0 
+                  discountPercentage: product.retailPrice > 0
                     ? Math.round((1 - (product.currentPrice / product.retailPrice)) * 100)
                     : 0,
                   auctionUrl: `https://www.nellisauction.com/p/product/${product.id}`
@@ -379,7 +379,7 @@ class NellisApi {
       } catch (parseError) {
         logger.error('Error parsing search results', { error: parseError.message });
       }
-      
+
       return [];
     } catch (error) {
       logger.error('Error searching auctions', { error: error.message, stack: error.stack });
@@ -421,13 +421,13 @@ class NellisApi {
 
       // Set the cookies
       await this.setCookies(credentials.cookies);
-      
+
       // Save cookies to storage
       await storage.saveCookies(credentials.cookies);
-      
+
       // Validate the cookies by making a test request
       const isValid = await this.validateCookies();
-      
+
       if (isValid) {
         logger.logAuthActivity('authenticate', true);
         return true;

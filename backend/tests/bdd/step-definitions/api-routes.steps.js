@@ -9,51 +9,51 @@ const express = require('express');
 const api = require('../../../src/routes/api');
 
 // Background steps
-Given('the API server is running', function() {
+Given('the API server is running', function () {
   this.app = express();
   this.app.use(express.json());
   this.app.use('/api', api);
   this.agent = request.agent(this.app);
 });
 
-Given('required services are initialized', function() {
+Given('required services are initialized', function () {
   // Services would be initialized in actual implementation
   this.servicesInitialized = true;
 });
 
 // Generic HTTP request steps
-When('I make a GET request to {string}', async function(endpoint) {
+When('I make a GET request to {string}', async function (endpoint) {
   this.response = await this.agent.get(endpoint);
 });
 
-When('I make a POST request to {string}', async function(endpoint) {
+When('I make a POST request to {string}', async function (endpoint) {
   this.response = await this.agent.post(endpoint);
 });
 
-When('I make a POST request to {string} with body:', async function(endpoint, bodyString) {
+When('I make a POST request to {string} with body:', async function (endpoint, bodyString) {
   const body = JSON.parse(bodyString);
   this.response = await this.agent.post(endpoint).send(body);
 });
 
-When('I make a PUT request to {string} with body:', async function(endpoint, bodyString) {
+When('I make a PUT request to {string} with body:', async function (endpoint, bodyString) {
   const body = JSON.parse(bodyString);
   this.response = await this.agent.put(endpoint).send(body);
 });
 
-When('I make a DELETE request to {string}', async function(endpoint) {
+When('I make a DELETE request to {string}', async function (endpoint) {
   this.response = await this.agent.delete(endpoint);
 });
 
 // Query parameter handling
-When('I make a GET request to {string} with query {string}', async function(endpoint, queryString) {
+When('I make a GET request to {string} with query {string}', async function (endpoint, queryString) {
   this.response = await this.agent.get(endpoint + queryString);
 });
 
 // Request body handling for inline data
-When('I send a POST to {string} with maxBid {int} and strategy {string}', async function(endpoint, maxBid, strategy) {
+When('I send a POST to {string} with maxBid {int} and strategy {string}', async function (endpoint, maxBid, strategy) {
   this.response = await this.agent
     .post(endpoint)
-    .send({ 
+    .send({
       config: {
         maxBid: maxBid,
         strategy: strategy,
@@ -62,10 +62,10 @@ When('I send a POST to {string} with maxBid {int} and strategy {string}', async 
     });
 });
 
-When('I send a POST to {string} with invalid config', async function(endpoint) {
+When('I send a POST to {string} with invalid config', async function (endpoint) {
   this.response = await this.agent
     .post(endpoint)
-    .send({ 
+    .send({
       config: {
         strategy: 'invalid',
         maxBid: 0
@@ -73,70 +73,70 @@ When('I send a POST to {string} with invalid config', async function(endpoint) {
     });
 });
 
-When('I send a POST to {string} with cookies {string}', async function(endpoint, cookies) {
+When('I send a POST to {string} with cookies {string}', async function (endpoint, cookies) {
   this.response = await this.agent
     .post(endpoint)
     .send({ cookies: cookies });
 });
 
-When('I send a POST to {string} without cookies', async function(endpoint) {
+When('I send a POST to {string} without cookies', async function (endpoint) {
   this.response = await this.agent
     .post(endpoint)
     .send({});
 });
 
-When('I send a POST to {string} with amount {int}', async function(endpoint, amount) {
+When('I send a POST to {string} with amount {int}', async function (endpoint, amount) {
   this.response = await this.agent
     .post(endpoint)
     .send({ amount: amount });
 });
 
 // Response status checks
-Then('the response status should be {int}', function(expectedStatus) {
+Then('the response status should be {int}', function (expectedStatus) {
   expect(this.response.status).to.equal(expectedStatus);
 });
 
-Then('the response should be successful', function() {
+Then('the response should be successful', function () {
   expect(this.response.status).to.be.oneOf([200, 201, 204]);
 });
 
-Then('the response should be a bad request', function() {
+Then('the response should be a bad request', function () {
   expect(this.response.status).to.equal(400);
 });
 
-Then('the response should be not found', function() {
+Then('the response should be not found', function () {
   expect(this.response.status).to.equal(404);
 });
 
-Then('the response should be unauthorized', function() {
+Then('the response should be unauthorized', function () {
   expect(this.response.status).to.equal(401);
 });
 
 // Response body checks
-Then('the response should have success {string}', function(expectedSuccess) {
+Then('the response should have success {string}', function (expectedSuccess) {
   const expected = expectedSuccess === 'true';
   expect(this.response.body.success).to.equal(expected);
 });
 
-Then('the response should include {string} field', function(fieldName) {
+Then('the response should include {string} field', function (fieldName) {
   expect(this.response.body).to.have.property(fieldName);
 });
 
-Then('the response should include error {string}', function(expectedError) {
+Then('the response should include error {string}', function (expectedError) {
   expect(this.response.body.error).to.equal(expectedError);
 });
 
-Then('the response should include {int} auctions', function(expectedCount) {
+Then('the response should include {int} auctions', function (expectedCount) {
   expect(this.response.body.auctions).to.be.an('array');
   expect(this.response.body.auctions.length).to.equal(expectedCount);
 });
 
-Then('the response errors should be an array', function() {
+Then('the response errors should be an array', function () {
   expect(this.response.body.errors).to.be.an('array');
 });
 
 // Data setup steps
-Given('{int} auctions are being monitored', function(count) {
+Given('{int} auctions are being monitored', function (count) {
   this.monitoredAuctionCount = count;
   this.monitoredAuctions = [];
   for (let i = 1; i <= count; i++) {
@@ -148,23 +148,23 @@ Given('{int} auctions are being monitored', function(count) {
   }
 });
 
-Given('auction {string} is already monitored', function(auctionId) {
+Given('auction {string} is already monitored', function (auctionId) {
   this.alreadyMonitoredAuction = auctionId;
 });
 
-Given('auction {string} is being monitored', function(auctionId) {
+Given('auction {string} is being monitored', function (auctionId) {
   this.monitoredAuction = auctionId;
 });
 
-Given('auction {string} is not monitored', function(auctionId) {
+Given('auction {string} is not monitored', function (auctionId) {
   this.unmonitoredAuction = auctionId;
 });
 
-Given('strategy is {string}', function(strategy) {
+Given('strategy is {string}', function (strategy) {
   this.strategy = strategy;
 });
 
-Given('settings pass validation', function() {
+Given('settings pass validation', function () {
   this.validSettings = {
     defaultMaxBid: 150,
     defaultStrategy: 'increment',
@@ -174,38 +174,38 @@ Given('settings pass validation', function() {
   };
 });
 
-Given('testBidAmount is provided', function() {
+Given('testBidAmount is provided', function () {
   this.testBidAmount = 50;
 });
 
 // Validation steps
-When('config is validated with {word} = {string}', function(field, value) {
+When('config is validated with {word} = {string}', function (field, value) {
   this.configField = field;
   this.configValue = value;
   this.validationResult = validateConfig(field, value);
 });
 
-When('config is validated with {word} = {int}', function(field, value) {
+When('config is validated with {word} = {int}', function (field, value) {
   this.configField = field;
   this.configValue = value;
   this.validationResult = validateConfig(field, value);
 });
 
-When('config has no maxBid', function() {
+When('config has no maxBid', function () {
   this.configValidation = validateStrategyRequirements(this.strategy, {});
 });
 
-Then('validation should {word}', function(expectedResult) {
+Then('validation should {word}', function (expectedResult) {
   const shouldPass = expectedResult === 'pass';
   expect(this.validationResult.valid).to.equal(shouldPass);
 });
 
-Then('validation should fail with {string}', function(expectedError) {
+Then('validation should fail with {string}', function (expectedError) {
   expect(this.configValidation.valid).to.be.false;
   expect(this.configValidation.error).to.equal(expectedError);
 });
 
-Then('error should be {string}', function(expectedError) {
+Then('error should be {string}', function (expectedError) {
   if (this.validationResult && !this.validationResult.valid) {
     expect(this.validationResult.error).to.equal(expectedError);
   } else if (this.response && this.response.body.error) {
@@ -214,172 +214,172 @@ Then('error should be {string}', function(expectedError) {
 });
 
 // Complex response validations
-Then('response should include all {int} auctions', function(expectedCount) {
+Then('response should include all {int} auctions', function (expectedCount) {
   expect(this.response.body.success).to.be.true;
   expect(this.response.body.auctions).to.be.an('array');
   expect(this.response.body.auctions.length).to.equal(expectedCount);
 });
 
-Then('success should be {word}', function(expectedSuccess) {
+Then('success should be {word}', function (expectedSuccess) {
   const expected = expectedSuccess === 'true';
   expect(this.response.body.success).to.equal(expected);
 });
 
-Then('response should include auction data', function() {
+Then('response should include auction data', function () {
   expect(this.response.body).to.have.property('auction');
   expect(this.response.body.auction).to.be.an('object');
 });
 
-Then('errors should return {int} status', function(expectedStatus) {
+Then('errors should return {int} status', function (expectedStatus) {
   if (this.response.status !== 200) {
     expect(this.response.status).to.equal(expectedStatus);
   }
 });
 
-Then('details should list validation errors', function() {
+Then('details should list validation errors', function () {
   expect(this.response.body).to.have.property('errors');
   expect(this.response.body.errors).to.be.an('array');
 });
 
-Then('monitoring should stop', function() {
+Then('monitoring should stop', function () {
   expect(this.response.status).to.be.oneOf([200, 204]);
 });
 
-Then('success message should be returned', function() {
+Then('success message should be returned', function () {
   if (this.response.body) {
     expect(this.response.body.success).to.be.true;
   }
 });
 
-Then('endpoint should behave identically to DELETE', function() {
+Then('endpoint should behave identically to DELETE', function () {
   expect(this.response.status).to.be.oneOf([200, 204]);
 });
 
-Then('all auctions should be removed', function() {
+Then('all auctions should be removed', function () {
   expect(this.response.status).to.equal(200);
 });
 
-Then('response should show cleared count of {int}', function(expectedCount) {
+Then('response should show cleared count of {int}', function (expectedCount) {
   expect(this.response.body.cleared).to.equal(expectedCount);
 });
 
-Then('config should be merged with existing', function() {
+Then('config should be merged with existing', function () {
   expect(this.response.status).to.equal(200);
 });
 
-Then('validation should run on merged config', function() {
+Then('validation should run on merged config', function () {
   expect(this.response.body.success).to.be.true;
 });
 
-Then('response should include bidHistory array', function() {
+Then('response should include bidHistory array', function () {
   expect(this.response.body).to.have.property('bidHistory');
   expect(this.response.body.bidHistory).to.be.an('array');
 });
 
-Then('count should be included', function() {
+Then('count should be included', function () {
   expect(this.response.body).to.have.property('count');
 });
 
 // Service interaction checks
-Then('nellisApi.getAuctionData should be called with {string}', function(expectedId) {
+Then('nellisApi.getAuctionData should be called with {string}', function (expectedId) {
   // In actual implementation, this would verify the service was called
   expect(expectedId).to.be.a('string');
 });
 
-Then('storage.getBidHistory should be called with limit {int}', function(expectedLimit) {
+Then('storage.getBidHistory should be called with limit {int}', function (expectedLimit) {
   expect(expectedLimit).to.be.a('number');
 });
 
-Then('auctionMonitor.updateAuctionConfig should be called', function() {
+Then('auctionMonitor.updateAuctionConfig should be called', function () {
   // In actual implementation, this would verify the service was called
   expect(this.response.status).to.equal(200);
 });
 
-Then('nellisApi.authenticate should be called', function() {
+Then('nellisApi.authenticate should be called', function () {
   expect(this.response.status).to.be.oneOf([200, 401]);
 });
 
-Then('success status should be returned', function() {
+Then('success status should be returned', function () {
   if (this.response.status === 200) {
     expect(this.response.body.success).to.be.true;
   }
 });
 
-Then('request body, headers, and content-type should be logged', function() {
+Then('request body, headers, and content-type should be logged', function () {
   // Logging verification would occur in actual implementation
   expect(this.response.status).to.be.a('number');
 });
 
-Then('test auction should be fetched', function() {
+Then('test auction should be fetched', function () {
   expect(this.response.status).to.be.a('number');
 });
 
-Then('user state should be checked', function() {
+Then('user state should be checked', function () {
   if (this.response.body) {
     expect(this.response.body).to.have.property('authenticated');
   }
 });
 
-Then('authenticated status should be determined', function() {
+Then('authenticated status should be determined', function () {
   if (this.response.body) {
     expect(this.response.body.authenticated).to.be.a('boolean');
   }
 });
 
-Then('safe bid amount should be used \\(below current)', function() {
+Then('safe bid amount should be used \\(below current)', function () {
   expect(this.testBidAmount).to.be.a('number');
 });
 
-Then('bid test result should be included', function() {
+Then('bid test result should be included', function () {
   if (this.response.body) {
     expect(this.response.body).to.have.property('bidTest');
   }
 });
 
-Then('response should include authenticated boolean', function() {
+Then('response should include authenticated boolean', function () {
   expect(this.response.body).to.have.property('authenticated');
   expect(this.response.body.authenticated).to.be.a('boolean');
 });
 
-Then('cookieCount should be provided', function() {
+Then('cookieCount should be provided', function () {
   expect(this.response.body).to.have.property('cookieCount');
 });
 
-Then('appropriate message should be shown', function() {
+Then('appropriate message should be shown', function () {
   expect(this.response.body).to.have.property('message');
 });
 
-Then('storage.getSettings should be called', function() {
+Then('storage.getSettings should be called', function () {
   expect(this.response.status).to.equal(200);
 });
 
-Then('current settings should be returned', function() {
+Then('current settings should be returned', function () {
   expect(this.response.body).to.be.an('object');
 });
 
-Then('storage.saveSettings should be called', function() {
+Then('storage.saveSettings should be called', function () {
   expect(this.response.status).to.equal(200);
 });
 
-Then('updated settings should be returned', function() {
+Then('updated settings should be returned', function () {
   expect(this.response.body).to.be.an('object');
 });
 
-Then('error should be logged with context', function() {
+Then('error should be logged with context', function () {
   // Error logging verification would occur in actual implementation
   expect(true).to.be.true;
 });
 
-Then('{int} status should be returned', function(expectedStatus) {
+Then('{int} status should be returned', function (expectedStatus) {
   expect(this.response.status).to.equal(expectedStatus);
 });
 
-Then('error message should be in response', function() {
+Then('error message should be in response', function () {
   expect(this.response.body).to.have.property('error');
 });
 
 // Table handling
-Then('response should include:', function(dataTable) {
+Then('response should include:', function (dataTable) {
   const expectedFields = dataTable.hashes();
   expectedFields.forEach(field => {
     const fieldPath = field.Field.split('.');
@@ -391,26 +391,26 @@ Then('response should include:', function(dataTable) {
   });
 });
 
-Then('validation should check:', function(dataTable) {
+Then('validation should check:', function (_dataTable) {
   expect(this.response.status).to.equal(400);
   expect(this.response.body).to.have.property('errors');
 });
 
-When('POST request includes settings:', function(dataTable) {
+When('POST request includes settings:', function (dataTable) {
   const settings = {};
   dataTable.hashes().forEach(row => {
-    settings[row.Setting] = isNaN(row.Value) ? row.Value : parseInt(row.Value);
+    settings[row.Setting] = isNaN(row.Value) ? row.Value : parseInt(row.Value, 10);
   });
   this.settingsToPost = settings;
 });
 
 // Error type mapping
-When('bid fails with errorType {string}', function(errorType) {
+When('bid fails with errorType {string}', function (errorType) {
   this.bidErrorType = errorType;
   this.bidErrorStatus = mapErrorToStatus(errorType);
 });
 
-Then('HTTP status should be {int}', function(expectedStatus) {
+Then('HTTP status should be {int}', function (expectedStatus) {
   expect(this.bidErrorStatus).to.equal(expectedStatus);
 });
 
@@ -422,7 +422,7 @@ function validateConfig(field, value) {
         return { valid: false, error: 'Invalid strategy' };
       }
       break;
-    case 'maxBid':
+    case 'maxBid': {
       const numValue = typeof value === 'string' ? parseFloat(value) : value;
       if (isNaN(numValue)) {
         return { valid: false, error: 'maxBid must be a valid number' };
@@ -434,6 +434,7 @@ function validateConfig(field, value) {
         return { valid: false, error: 'maxBid cannot exceed $10,000' };
       }
       break;
+    }
     case 'dailyLimit':
       if (value > 50000) {
         return { valid: false, error: 'dailyLimit cannot exceed $50,000' };
@@ -479,7 +480,7 @@ function mapErrorToStatus(errorType) {
 
 // Cleanup
 const { After } = require('@cucumber/cucumber');
-After(function() {
+After(function () {
   // Clean up any server instances if needed
   if (this.server) {
     this.server.close();

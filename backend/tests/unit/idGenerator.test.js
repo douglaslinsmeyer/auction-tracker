@@ -31,8 +31,8 @@ describe('ID Generator', () => {
       const before = Date.now();
       const id = IdGenerator.generateClientId();
       const after = Date.now();
-      
-      const timestamp = parseInt(id.split('_')[1]);
+
+      const timestamp = parseInt(id.split('_', 10)[1], 10);
       expect(timestamp).toBeGreaterThanOrEqual(before);
       expect(timestamp).toBeLessThanOrEqual(after);
     });
@@ -74,7 +74,7 @@ describe('ID Generator', () => {
       const token16 = IdGenerator.generateToken(16);
       const token32 = IdGenerator.generateToken(32);
       const token64 = IdGenerator.generateToken(64);
-      
+
       // Base64 encoding increases length by ~4/3
       expect(token16.length).toBeGreaterThanOrEqual(21);
       expect(token32.length).toBeGreaterThanOrEqual(42);
@@ -92,10 +92,10 @@ describe('ID Generator', () => {
     it('should set correct version and variant bits', () => {
       const uuid = IdGenerator.generateUUID();
       const parts = uuid.split('-');
-      
+
       // Version should be 4
       expect(parts[2][0]).toBe('4');
-      
+
       // Variant should be 8, 9, a, or b
       expect(['8', '9', 'a', 'b']).toContain(parts[3][0]);
     });
@@ -105,7 +105,7 @@ describe('ID Generator', () => {
     it('should generate alphanumeric IDs of specified length', () => {
       const id8 = IdGenerator.generateShortId(8);
       const id16 = IdGenerator.generateShortId(16);
-      
+
       expect(id8).toMatch(/^[A-Za-z0-9]{8}$/);
       expect(id16).toMatch(/^[A-Za-z0-9]{16}$/);
     });
@@ -120,17 +120,17 @@ describe('ID Generator', () => {
       // Generate many IDs and check character distribution
       const charCounts = {};
       const iterations = 10000;
-      
+
       for (let i = 0; i < iterations; i++) {
         const id = IdGenerator.generateShortId(1);
         charCounts[id] = (charCounts[id] || 0) + 1;
       }
-      
+
       // Each character should appear roughly equally
       const counts = Object.values(charCounts);
       const avg = iterations / 62; // 62 possible characters
       const tolerance = avg * 0.4; // 40% tolerance for random variation
-      
+
       counts.forEach(count => {
         expect(count).toBeGreaterThan(avg - tolerance);
         expect(count).toBeLessThan(avg + tolerance);
@@ -148,8 +148,8 @@ describe('ID Generator', () => {
       const before = Date.now();
       const id = IdGenerator.generateRequestId();
       const after = Date.now();
-      
-      const timestamp = parseInt(id.split('_')[1]);
+
+      const timestamp = parseInt(id.split('_', 10)[1], 10);
       expect(timestamp).toBeGreaterThanOrEqual(before);
       expect(timestamp).toBeLessThanOrEqual(after);
     });
@@ -161,13 +161,13 @@ describe('ID Generator', () => {
       for (let i = 0; i < 10; i++) {
         ids.push(IdGenerator.generate());
       }
-      
+
       // Check that IDs don't have predictable patterns
       for (let i = 1; i < ids.length; i++) {
         // IDs should be completely different
         let differences = 0;
         for (let j = 0; j < ids[i].length; j++) {
-          if (ids[i][j] !== ids[i-1][j]) {
+          if (ids[i][j] !== ids[i - 1][j]) {
             differences++;
           }
         }
@@ -179,7 +179,7 @@ describe('ID Generator', () => {
     it('should handle concurrent generation safely', async () => {
       const promises = [];
       const ids = new Set();
-      
+
       // Generate 100 IDs concurrently
       for (let i = 0; i < 100; i++) {
         promises.push(
@@ -190,7 +190,7 @@ describe('ID Generator', () => {
           })
         );
       }
-      
+
       await Promise.all(promises);
       expect(ids.size).toBe(100); // All IDs should be unique
     });

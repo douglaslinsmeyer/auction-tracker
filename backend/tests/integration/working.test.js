@@ -17,7 +17,7 @@ describe('Working Integration Tests', () => {
     // Create Express app
     app = express();
     app.use(express.json());
-    
+
     // Add mock API routes
     app.get('/api/status', (req, res) => {
       res.json({
@@ -31,37 +31,38 @@ describe('Working Integration Tests', () => {
         }
       });
     });
-    
+
     app.post('/api/auth', (req, res) => {
       const { cookies } = req.body;
       if (!cookies) {
-        return res.status(400).json({ success: false, error: 'Cookies required' });
+        res.status(400).json({ success: false, error: 'Cookies required' });
+        return;
       }
       res.json({ success: true });
     });
-    
+
     app.get('/api/auctions', (req, res) => {
       res.json({ success: true, auctions: [] });
     });
-    
+
     // Create server
     server = app.listen(0, () => {
       port = server.address().port;
-      
+
       // Create WebSocket server
       wss = new WebSocket.Server({ server });
-      
+
       wss.on('connection', (ws) => {
         let authenticated = false;
-        
+
         ws.on('message', (data) => {
           const message = JSON.parse(data);
-          
+
           switch (message.type) {
             case 'ping':
               ws.send(JSON.stringify({ type: 'pong' }));
               break;
-              
+
             case 'authenticate':
               if (message.token === 'dev-token') {
                 authenticated = true;
@@ -78,7 +79,7 @@ describe('Working Integration Tests', () => {
                 }));
               }
               break;
-              
+
             case 'startMonitoring':
               if (!authenticated) {
                 ws.send(JSON.stringify({
@@ -94,7 +95,7 @@ describe('Working Integration Tests', () => {
                 }));
               }
               break;
-              
+
             default:
               ws.send(JSON.stringify({
                 type: 'error',
@@ -103,22 +104,22 @@ describe('Working Integration Tests', () => {
           }
         });
       });
-      
+
       done();
     });
   });
-  
+
   afterAll((done) => {
     wss.close();
     server.close(done);
   });
-  
+
   describe('API Tests', () => {
     it('should return system status', async () => {
       const response = await request(app)
         .get('/api/status')
         .expect(200);
-      
+
       expect(response.body).toMatchObject({
         success: true,
         status: 'running',
@@ -128,55 +129,55 @@ describe('Working Integration Tests', () => {
         }
       });
     });
-    
+
     it('should handle authentication', async () => {
       const response = await request(app)
         .post('/api/auth')
         .send({ cookies: 'test-cookies' })
         .expect(200);
-      
+
       expect(response.body).toEqual({ success: true });
     });
-    
+
     it('should get auctions list', async () => {
       const response = await request(app)
         .get('/api/auctions')
         .expect(200);
-      
+
       expect(response.body).toMatchObject({
         success: true,
         auctions: []
       });
     });
   });
-  
+
   describe('WebSocket Tests', () => {
     it('should handle ping/pong', async () => {
       const ws = new WebSocket(`ws://localhost:${port}`);
-      
+
       await new Promise((resolve) => {
         ws.on('open', resolve);
       });
-      
+
       const response = await new Promise((resolve) => {
         ws.on('message', (data) => {
           resolve(JSON.parse(data));
         });
         ws.send(JSON.stringify({ type: 'ping' }));
       });
-      
+
       expect(response).toEqual({ type: 'pong' });
-      
+
       ws.close();
     });
-    
+
     it('should authenticate with valid token', async () => {
       const ws = new WebSocket(`ws://localhost:${port}`);
-      
+
       await new Promise((resolve) => {
         ws.on('open', resolve);
       });
-      
+
       const response = await new Promise((resolve) => {
         ws.on('message', (data) => {
           resolve(JSON.parse(data));
@@ -187,23 +188,23 @@ describe('Working Integration Tests', () => {
           requestId: 'test-123'
         }));
       });
-      
+
       expect(response).toMatchObject({
         type: 'authenticated',
         success: true,
         requestId: 'test-123'
       });
-      
+
       ws.close();
     });
-    
+
     it('should require authentication for monitoring', async () => {
       const ws = new WebSocket(`ws://localhost:${port}`);
-      
+
       await new Promise((resolve) => {
         ws.on('open', resolve);
       });
-      
+
       const response = await new Promise((resolve) => {
         ws.on('message', (data) => {
           resolve(JSON.parse(data));
@@ -214,17 +215,17 @@ describe('Working Integration Tests', () => {
           requestId: 'monitor-123'
         }));
       });
-      
+
       expect(response).toMatchObject({
         type: 'error',
         error: 'Not authenticated',
         requestId: 'monitor-123'
       });
-      
+
       ws.close();
     });
   });
-  
+
   describe('Integration Flow', () => {
     it('should handle complete flow', async () => {
       // 1. Authenticate via API
@@ -232,38 +233,38 @@ describe('Working Integration Tests', () => {
         .post('/api/auth')
         .send({ cookies: 'test-cookies' })
         .expect(200);
-      
+
       expect(authResponse.body.success).toBe(true);
-      
+
       // 2. Connect WebSocket
       const ws = new WebSocket(`ws://localhost:${port}`);
-      
+
       await new Promise((resolve) => {
         ws.on('open', resolve);
       });
-      
+
       // 3. Authenticate WebSocket
       ws.send(JSON.stringify({
         type: 'authenticate',
         token: 'dev-token',
         requestId: 'auth'
       }));
-      
+
       const authMsg = await new Promise((resolve) => {
         ws.on('message', (data) => {
           resolve(JSON.parse(data));
         });
       });
-      
+
       expect(authMsg.success).toBe(true);
-      
+
       // 4. Check status
       const statusResponse = await request(app)
         .get('/api/status')
         .expect(200);
-      
+
       expect(statusResponse.body.status).toBe('running');
-      
+
       ws.close();
     });
   });

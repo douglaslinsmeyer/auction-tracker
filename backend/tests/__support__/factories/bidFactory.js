@@ -13,10 +13,10 @@ class BidFactory {
       isAutoBid: false,
       strategy: 'manual'
     };
-    
+
     return { ...defaults, ...overrides };
   }
-  
+
   static createSuccessful(overrides = {}) {
     return this.create({
       status: 'successful',
@@ -24,7 +24,7 @@ class BidFactory {
       ...overrides
     });
   }
-  
+
   static createFailed(reason = 'Outbid', overrides = {}) {
     return this.create({
       status: 'failed',
@@ -33,7 +33,7 @@ class BidFactory {
       ...overrides
     });
   }
-  
+
   static createAutoBid(strategy, overrides = {}) {
     return this.create({
       isAutoBid: true,
@@ -41,11 +41,11 @@ class BidFactory {
       ...overrides
     });
   }
-  
+
   static createBidSequence(auctionId, count = 5, startAmount = 50) {
     const bids = [];
     let currentAmount = startAmount;
-    
+
     for (let i = 0; i < count; i++) {
       currentAmount += 5;
       bids.push(this.create({
@@ -56,10 +56,10 @@ class BidFactory {
         status: i === count - 1 ? 'successful' : 'outbid'
       }));
     }
-    
+
     return bids;
   }
-  
+
   static generateId() {
     return 'BID' + Math.random().toString(36).substr(2, 9).toUpperCase();
   }

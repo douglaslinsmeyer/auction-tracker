@@ -26,13 +26,13 @@ module.exports = {
   storage,
   wsHandler,
   sseClient,
-  
+
   // Class constructors (new API)
   AuctionMonitorClass,
   NellisApiClass,
   StorageClass,
   WebSocketHandlerClass,
-  
+
   // Convenience factory methods
   createAuctionMonitor: (storage, nellisApi, logger) => new AuctionMonitorClass(storage, nellisApi, logger),
   createNellisApi: (storage, logger) => new NellisApiClass(storage, logger),

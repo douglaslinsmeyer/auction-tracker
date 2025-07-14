@@ -8,7 +8,7 @@ describe('Simple Integration Test', () => {
   beforeAll(() => {
     app = express();
     app.use(express.json());
-    
+
     // Add a simple test route
     app.get('/test', (req, res) => {
       res.json({ success: true, message: 'Test endpoint working' });
@@ -19,7 +19,7 @@ describe('Simple Integration Test', () => {
     const response = await request(app)
       .get('/test')
       .expect(200);
-    
+
     expect(response.body).toEqual({
       success: true,
       message: 'Test endpoint working'
@@ -35,7 +35,7 @@ describe('Simple Integration Test', () => {
       .post('/test')
       .send({ data: 'test data' })
       .expect(200);
-    
+
     expect(response.body.received).toEqual({ data: 'test data' });
   });
 });

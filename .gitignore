@@ -34,3 +34,34 @@ prometheus-data/
 health-data.json
 health-data-*.json
 .health-cache/
+
+# CI/CD artifacts
+.buildx-cache/
+*.sarif
+test-results/
+junit.xml
+coverage.xml
+.nyc_output/
+
+# Linting and formatting
+.eslintcache
+.prettierignore
+
+# Extension packaging
+extension/*.zip
+extension/*.crx
+extension/*.pem
+
+# Temporary CI/CD files
+.tmp/
+.cache/
+
+# Kubernetes secrets (production)
+k8s/overlays/production/secrets/
+
+# GitHub Actions
+.github/workflows/*.local.yml
+
+# Performance test results
+lighthouse-reports/
+performance-reports/

@@ -11,7 +11,7 @@ class WebSocketHandlerClass extends IWebSocketHandler {
     super();
     // For now, delegate to singleton
     this._singleton = wsHandlerSingleton;
-    
+
     // Store dependencies for future use
     this._auctionMonitor = auctionMonitor;
     this._logger = logger;
@@ -56,7 +56,7 @@ class WebSocketHandlerClass extends IWebSocketHandler {
   getAuthenticatedClientCount() {
     let count = 0;
     this._singleton.clients.forEach(client => {
-      if (client.authenticated) count++;
+      if (client.authenticated) { count++; }
     });
     return count;
   }
