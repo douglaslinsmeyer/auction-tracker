@@ -5,6 +5,8 @@
 
 // const { EventSource } = require('eventsource');
 const EventEmitter = require('events');
+const testCleanup = require('../utils/testCleanup');
+const logger = require('../../src/utils/logger');
 
 describe('SSE Performance Tests', () => {
   let mockEventSources;
@@ -12,6 +14,9 @@ describe('SSE Performance Tests', () => {
   let sseClient;
   let storage;
   let eventEmitter;
+  
+  // Setup test cleanup hooks
+  testCleanup.setupJestHooks();
 
   beforeEach(() => {
     // Reset mocks
@@ -108,16 +113,16 @@ describe('SSE Performance Tests', () => {
         };
         bidUpdates.push(bidData);
 
-        // Simulate event with minimal delay
-        setTimeout(() => {
+        // Simulate event with minimal delay using tracked timer
+        testCleanup.setTimeout(() => {
           eventSource.emit(`ch_product_bids:${productId}`, {
             data: JSON.stringify(bidData)
           });
         }, i * 10); // 10ms between events = 100 events/second
       }
 
-      // Wait for all events to process
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Wait for all events to process using tracked timer
+      await new Promise(resolve => testCleanup.setTimeout(resolve, 2000));
 
       const endTime = process.hrtime.bigint();
       const endMemory = process.memoryUsage();
@@ -135,11 +140,12 @@ describe('SSE Performance Tests', () => {
       const avgProcessingTime = processingTime / 100;
       expect(avgProcessingTime).toBeLessThan(50); // Less than 50ms per event
 
-      console.log(`Performance Metrics:
-- Total events: ${eventsProcessed.length}
-- Total time: ${processingTime.toFixed(2)}ms
-- Average per event: ${avgProcessingTime.toFixed(2)}ms
-- Memory increase: ${(memoryIncrease / 1024 / 1024).toFixed(2)}MB`);
+      logger.debug('Performance Metrics', {
+        totalEvents: eventsProcessed.length,
+        totalTime: `${processingTime.toFixed(2)}ms`,
+        avgPerEvent: `${avgProcessingTime.toFixed(2)}ms`,
+        memoryIncrease: `${(memoryIncrease / 1024 / 1024).toFixed(2)}MB`
+      });
     });
 
     test('should handle multiple concurrent SSE connections', async () => {

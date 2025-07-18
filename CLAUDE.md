@@ -35,6 +35,9 @@ npm run test:coverage         # With coverage report
 # Development test scripts (comprehensive)
 npm run test:all              # Run all test suites via bash script
 ./scripts/run-all-tests.sh    # Direct bash script execution
+./scripts/run-all-tests.sh --no-e2e --no-bdd  # Skip slower tests for quick feedback
+./scripts/run-all-tests.sh --coverage         # Run with coverage report
+./scripts/run-all-tests.sh --verbose          # Show detailed test output
 
 # Run a single test file
 npm test -- tests/unit/auctionMonitor.test.js
@@ -155,21 +158,29 @@ kubectl -n auction-tracker-dev logs -f deployment/dev-dashboard
 - Optional `redis-mock` support via `tests/support/testRedis.js` (for legacy tests)
 - Test utilities in `tests/utils/`
 - Integration tests use real Express server
-- BDD tests using Cucumber.js with Gherkin syntax
+- BDD tests using Cucumber.js with Gherkin syntax (run directly, not through Jest)
+- E2E tests using Puppeteer with custom server startup script
 - Multiple Jest configurations:
   - `jest.config.js` - Main configuration
-  - `jest.config.bdd.js` - BDD/Cucumber tests
   - `jest.config.puppeteer.js` - E2E tests with Puppeteer
-  - `jest.config.test.js` - Additional test configuration
+  - `cucumber.js` - BDD/Cucumber test configuration
 - Test organization:
   - `tests/unit/` - Unit tests
   - `tests/integration/` - Integration tests
   - `tests/e2e/` - End-to-end tests
-  - `tests/features/` - BDD feature files (Gherkin)
-  - `tests/step-definitions/` and `tests/features/step_definitions/` - Step definitions
+  - `tests/bdd/features/` - BDD feature files (Gherkin)
+  - `tests/bdd/step-definitions/` - Step definitions
   - `tests/fixtures/` - Mock data
   - `tests/mocks/` - Custom mocks
   - `tests/support/` - Test support utilities
+  - `tests/utils/testCleanup.js` - Test resource cleanup manager
+
+#### Test Improvements (2025-07-18)
+- **E2E Tests**: Cross-platform server startup with `scripts/start-test-server.js`
+- **BDD Tests**: Direct Cucumber.js execution instead of Jest wrapper
+- **Process Cleanup**: Added `testCleanup.js` utility to prevent "Cannot log after tests are done" errors
+- **Test Script**: Comprehensive `scripts/run-all-tests.sh` with options for selective test execution
+- **Console Logging**: Replaced all console.* calls with proper logger to prevent test failures
 
 ### Environment Configuration
 - Create `.env` file with:

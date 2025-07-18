@@ -7,7 +7,7 @@ const { Before, After, BeforeAll, AfterAll } = require('@cucumber/cucumber');
 const RedisMock = require('../../__mocks__/ioredis');
 const storage = require('../../../src/services/storage');
 const auctionMonitor = require('../../../src/services/auctionMonitor');
-const testRedis = require('../__support__/testRedis');
+const testRedis = require('../../__support__/testRedis');
 
 // Global setup before all tests
 BeforeAll(function () {

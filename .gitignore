@@ -65,3 +65,6 @@ k8s/overlays/production/secrets/
 # Performance test results
 lighthouse-reports/
 performance-reports/
+
+# Local development files
+kubeconfig.yaml

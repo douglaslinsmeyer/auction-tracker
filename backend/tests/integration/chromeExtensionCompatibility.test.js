@@ -5,11 +5,16 @@
 
 const axios = require('axios');
 const WebSocket = require('ws');
+const testCleanup = require('../utils/testCleanup');
+const logger = require('../../src/utils/logger');
 
 describe('Chrome Extension Compatibility', () => {
   let server;
   let serverUrl;
   let wsUrl;
+  
+  // Setup test cleanup hooks
+  testCleanup.setupJestHooks();
 
   beforeAll(async () => {
     // Initialize services first
@@ -106,7 +111,7 @@ describe('Chrome Extension Compatibility', () => {
 
       // Debug logging
       if (response.status === 400) {
-        console.error('400 error response:', response.data);
+        logger.error('400 error response', { data: response.data });
       }
 
       expect([200, 409]).toContain(response.status); // 200 for new, 409 for already monitoring
@@ -115,7 +120,7 @@ describe('Chrome Extension Compatibility', () => {
 
   describe('WebSocket Communication', () => {
     it('should handle Chrome extension WebSocket pattern', (done) => {
-      const ws = new WebSocket(wsUrl);
+      const ws = testCleanup.trackWebSocket(new WebSocket(wsUrl));
 
       ws.on('open', () => {
         // Chrome extension sends auth immediately
@@ -140,6 +145,7 @@ describe('Chrome Extension Compatibility', () => {
       });
 
       ws.on('error', (error) => {
+        ws.close(); // Ensure WebSocket is closed on error
         done(error);
       });
     });

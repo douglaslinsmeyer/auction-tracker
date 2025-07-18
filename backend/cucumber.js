@@ -5,11 +5,13 @@
 module.exports = {
   default: {
     paths: [
-      'tests/bdd/features/**/*.feature'
+      'tests/bdd/features/**/*.feature',
+      'tests/features/**/*.feature'
     ],
     require: [
       'tests/bdd/step-definitions/**/*.steps.js',
-      'tests/bdd/support/**/*.js'
+      'tests/bdd/support/**/*.js',
+      'tests/features/step_definitions/**/*.js'
     ],
     format: [
       'progress-bar',
@@ -24,11 +26,13 @@ module.exports = {
   // CI configuration with more detailed output
   ci: {
     paths: [
-      'tests/bdd/features/**/*.feature'
+      'tests/bdd/features/**/*.feature',
+      'tests/features/**/*.feature'
     ],
     require: [
       'tests/bdd/step-definitions/**/*.steps.js',
-      'tests/bdd/support/**/*.js'
+      'tests/bdd/support/**/*.js',
+      'tests/features/step_definitions/**/*.js'
     ],
     format: [
       'progress',
