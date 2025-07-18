@@ -31,10 +31,11 @@ After(function () {
 
 // Given steps
 
-Given('I have a valid auth token', function () {
-  // Inherited from common steps
-  expect(this.authToken).to.exist;
-});
+// Commented out - duplicate definition exists in authentication.steps.js
+// Given('I have a valid auth token', function () {
+//   // Inherited from common steps
+//   expect(this.authToken).to.exist;
+// });
 
 Given('I have an authenticated WebSocket connection', async function () {
   this.ws = await this.createWebSocketConnection(true);
@@ -285,12 +286,13 @@ Then('my connection should be closed', function () {
   expect(this.wsClosed).to.be.true;
 });
 
-Then('I should receive an {string} message', function (messageType) {
-  const message = this.wsMessages.find(msg =>
-    msg.type === 'error' && msg.error && msg.error.includes(messageType)
-  );
-  expect(message).to.exist;
-});
+// Commented out - duplicate definition exists above at line 269
+// Then('I should receive an {string} message', function (messageType) {
+//   const message = this.wsMessages.find(msg =>
+//     msg.type === 'error' && msg.error && msg.error.includes(messageType)
+//   );
+//   expect(message).to.exist;
+// });
 
 Then('the message should contain the new price of ${int}', function (price) {
   const updateMessage = this.wsMessages.find(msg =>

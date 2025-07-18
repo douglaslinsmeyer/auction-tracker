@@ -468,13 +468,14 @@ Then('all should be persisted to storage', function () {
   expect(this.bulkStorageResult.saved).to.equal(this.bulkAuctions.length);
 });
 
-When('all auctions update simultaneously', function () {
-  this.simultaneousUpdates = this.bulkAuctions.map(auction => ({
-    ...auction,
-    lastUpdate: Date.now(),
-    currentBid: auction.config.maxBid - 20
-  }));
-});
+// Commented out - duplicate definition exists in performance-reliability.steps.js
+// When('all auctions update simultaneously', function () {
+//   this.simultaneousUpdates = this.bulkAuctions.map(auction => ({
+//     ...auction,
+//     lastUpdate: Date.now(),
+//     currentBid: auction.config.maxBid - 20
+//   }));
+// });
 
 Then('updates should be processed in parallel', function () {
   expect(this.simultaneousUpdates.length).to.equal(this.bulkAuctions.length);
@@ -522,16 +523,17 @@ Then('clients should be notified', function () {
 });
 
 // Startup Recovery Flow
-Given('{int} auctions are being monitored', function (auctionCount) {
-  this.recoveryAuctions = [];
-  for (let i = 1; i <= auctionCount; i++) {
-    this.recoveryAuctions.push({
-      id: `recovery-auction-${i}`,
-      status: i <= 4 ? 'active' : 'ended', // 1 ended auction
-      pollingInterval: i <= 2 ? 2000 : 6000 // 2 in fast polling
-    });
-  }
-});
+// Commented out - duplicate definition exists in api-routes.steps.js
+// Given('{int} auctions are being monitored', function (auctionCount) {
+//   this.recoveryAuctions = [];
+//   for (let i = 1; i <= auctionCount; i++) {
+//     this.recoveryAuctions.push({
+//       id: `recovery-auction-${i}`,
+//       status: i <= 4 ? 'active' : 'ended', // 1 ended auction
+//       pollingInterval: i <= 2 ? 2000 : 6000 // 2 in fast polling
+//     });
+//   }
+// });
 
 Given('{int} have active bids', function (activeBidCount) {
   for (let i = 0; i < activeBidCount; i++) {

@@ -190,8 +190,8 @@ describe('Health View UI Tests', () => {
       // Get initial state
       const initialChecked = await page.$eval('#auto-refresh-toggle', el => el.checked);
 
-      // Click toggle
-      await page.click('label[for="auto-refresh-toggle"]');
+      // Click toggle - find the label that contains the checkbox
+      await page.click('label:has(#auto-refresh-toggle)');
 
       // Verify state changed
       const afterChecked = await page.$eval('#auto-refresh-toggle', el => el.checked);
@@ -240,8 +240,9 @@ describe('Health View UI Tests', () => {
         return computed.gridTemplateColumns;
       });
 
-      // On mobile, should be single column
-      expect(statsGrid).toContain('1fr');
+      // On mobile, should be single column (one value in grid-template-columns)
+      const columnCount = statsGrid.split(' ').length;
+      expect(columnCount).toBe(1);
     });
 
     it('should display correctly on desktop', async () => {

@@ -196,6 +196,7 @@ jobs:
   bdd-tests:
     name: BDD Tests (Cucumber)
     runs-on: ubuntu-latest
+    timeout-minutes: 30  # Prevent infinite runs
     services:
       redis:
         image: redis:7-alpine
