@@ -14,7 +14,7 @@ describe('SSE Performance Tests', () => {
   let sseClient;
   let storage;
   let eventEmitter;
-  
+
   // Setup test cleanup hooks
   testCleanup.setupJestHooks();
 

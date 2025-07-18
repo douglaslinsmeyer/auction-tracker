@@ -1,5 +1,5 @@
 const puppeteer = require('puppeteer');
-const { server } = require('../server');
+const { app } = require('../server');
 
 describe('Health View UI Tests', () => {
   let browser;
@@ -9,8 +9,8 @@ describe('Health View UI Tests', () => {
   // const backendUrl = 'http://localhost:3000';
 
   beforeAll(async () => {
-    // Start dashboard server
-    dashboardServer = server.listen(3001);
+    // Start dashboard server on test port
+    dashboardServer = app.listen(3001);
 
     browser = await puppeteer.launch({
       headless: true,

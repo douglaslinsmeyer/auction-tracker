@@ -57,14 +57,14 @@ class TestCleanupManager {
    */
   trackWebSocket(ws) {
     this.resources.sockets.add(ws);
-    
+
     // Auto-remove when closed
     const originalClose = ws.close.bind(ws);
     ws.close = () => {
       originalClose();
       this.resources.sockets.delete(ws);
     };
-    
+
     return ws;
   }
 
@@ -81,7 +81,7 @@ class TestCleanupManager {
    */
   trackEventSource(eventSource) {
     this.resources.eventSources.add(eventSource);
-    
+
     // Auto-remove when closed
     if (eventSource.close) {
       const originalClose = eventSource.close.bind(eventSource);
@@ -90,7 +90,7 @@ class TestCleanupManager {
         this.resources.eventSources.delete(eventSource);
       };
     }
-    
+
     return eventSource;
   }
 
@@ -99,12 +99,12 @@ class TestCleanupManager {
    */
   trackPromise(promise) {
     this.resources.promises.add(promise);
-    
+
     // Auto-remove when resolved/rejected
     promise
       .then(() => this.resources.promises.delete(promise))
       .catch(() => this.resources.promises.delete(promise));
-    
+
     return promise;
   }
 
@@ -149,7 +149,9 @@ class TestCleanupManager {
 
     // Close all EventSources
     this.resources.eventSources.forEach(es => {
-      if (es.close) es.close();
+      if (es.close) {
+        es.close();
+      }
     });
     this.resources.eventSources.clear();
 

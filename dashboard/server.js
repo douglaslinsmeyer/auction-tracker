@@ -33,13 +33,17 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'src', 'index.html'));
 });
 
-const server = app.listen(PORT, () => {
-  if (process.env.NODE_ENV !== 'test') {
-    console.log(`Dashboard server running on http://localhost:${PORT}`);
-    console.log(`Backend URL (Internal): ${process.env.BACKEND_URL || 'http://backend:3000'}`);
-    console.log(`Backend URL (External): ${process.env.EXTERNAL_BACKEND_URL || 'http://localhost:3000'}`);
-  }
-});
+// Only start server if not in test environment or if this file is run directly
+let server;
+if (process.env.NODE_ENV !== 'test' || require.main === module) {
+  server = app.listen(PORT, () => {
+    if (process.env.NODE_ENV !== 'test') {
+      console.log(`Dashboard server running on http://localhost:${PORT}`);
+      console.log(`Backend URL (Internal): ${process.env.BACKEND_URL || 'http://backend:3000'}`);
+      console.log(`Backend URL (External): ${process.env.EXTERNAL_BACKEND_URL || 'http://localhost:3000'}`);
+    }
+  });
+}
 
 // Export for testing
 module.exports = { app, server };

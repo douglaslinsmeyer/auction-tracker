@@ -12,7 +12,7 @@ describe('Chrome Extension Compatibility', () => {
   let server;
   let serverUrl;
   let wsUrl;
-  
+
   // Setup test cleanup hooks
   testCleanup.setupJestHooks();
 
