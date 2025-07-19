@@ -27,6 +27,31 @@ describe('Health View UI Tests', () => {
 
   beforeEach(async () => {
     page = await browser.newPage();
+    
+    // Mock backend health API response
+    await page.setRequestInterception(true);
+    page.on('request', (request) => {
+      if (request.url().includes('/api/health') || request.url().includes('/health')) {
+        request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            status: 'healthy',
+            timestamp: new Date().toISOString(),
+            components: {
+              api: { status: 'healthy', message: 'API operational', responseTime: 15 },
+              memory: { status: 'healthy', message: 'Memory usage normal', metrics: { used: '256MB', total: '512MB' } },
+              redis: { status: 'healthy', message: 'Redis connected', responseTime: 2 },
+              websocket: { status: 'healthy', message: 'WebSocket server running', metrics: { connections: 0 } },
+              sse: { status: 'healthy', message: 'SSE client operational' },
+              auctionMonitor: { status: 'healthy', message: 'Monitoring 0 auctions' }
+            }
+          })
+        });
+      } else {
+        request.continue();
+      }
+    });
 
     // Set viewport
     await page.setViewport({ width: 1280, height: 800 });

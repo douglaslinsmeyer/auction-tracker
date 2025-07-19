@@ -35,7 +35,7 @@ describe('Backend API E2E Tests', () => {
 
     const jsonResponse = await response.json();
     expect(jsonResponse).toHaveProperty('status');
-    expect(jsonResponse.status).toBe('healthy');
+    expect(jsonResponse.status).toBe('running');
   }, 30000);
 
   test('API documentation endpoint responds', async () => {
@@ -49,8 +49,8 @@ describe('Backend API E2E Tests', () => {
   }, 30000);
 
   test('Backend API endpoints are accessible', async () => {
-    // Test health endpoint
-    const healthResponse = await page.goto('http://localhost:3000/api/health', { waitUntil: 'networkidle0' });
+    // Test health endpoint (at /health, not /api/health)
+    const healthResponse = await page.goto('http://localhost:3000/health', { waitUntil: 'networkidle0' });
     expect(healthResponse.status()).toBe(200);
 
     // Test auctions endpoint (should require auth but still respond)

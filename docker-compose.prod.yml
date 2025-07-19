@@ -2,8 +2,6 @@
 # Use with: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 # Or with env file: docker-compose --env-file .env.production up -d
 
-version: '3.8'
-
 services:
   backend:
     build:
